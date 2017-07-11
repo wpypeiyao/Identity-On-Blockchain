@@ -1,0 +1,30 @@
+{
+  "name": "identity-on-blockchain",
+  "version": "0.0.1",
+  "description": "This is a prototype of proposal:identity on the blockchain",
+  "scripts": {
+    "test": "embark test"
+  },
+  "author": "Peiyao Wu",
+  "license": "ISC",
+  "homepage": "https://github.com/wpypeiyao/Identity-On-Blockchain#readme",
+  "devDependencies": {
+    "embark": "^2.5.1",
+    "mocha": "^2.2.5"
+  },
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wpypeiyao/Identity-On-Blockchain.git"
+  },
+  "keywords": [
+    "identity;blockchain"
+  ],
+  "bugs": {
+    "url": "https://github.com/wpypeiyao/Identity-On-Blockchain/issues"
+  }
+}
