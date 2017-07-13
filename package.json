@@ -6,7 +6,7 @@
     "test": "embark test"
   },
   "author": "Peiyao Wu",
-  "license": "ISC",
+  "license": "MIT",
   "homepage": "https://github.com/wpypeiyao/Identity-On-Blockchain#readme",
   "devDependencies": {
     "embark": "^2.5.1",
@@ -16,7 +16,10 @@
   "directories": {
     "test": "test"
   },
-  "dependencies": {},
+  "dependencies": {
+    "jquery": "^3.2.1",
+    "web3": "^0.19.1"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wpypeiyao/Identity-On-Blockchain.git"
