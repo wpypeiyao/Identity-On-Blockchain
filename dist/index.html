@@ -1,36 +1,37 @@
 <html>
-  <head>
-    <title>Embark</title>
+<head>
+    <title>Identity on the Blockchain</title>
     <link rel="stylesheet" href="css/app.css">
     <script src="js/lib.js"></script>
     <script src="js/app.js"></script>
-  </head>
-  <body>
-    <h3>Welcome to Embark!</h3>
-    <p>See the <a href="http://embark.readthedocs.io/en/latest/index.html" target="_blank">Embark's documentation</a> to see what you can do with Embark!</p>
+</head>
+<body>
+<h3>Welcome to Nettoken!</h3>
+<a href="MyAccount.html">Link to MyAccount</a>
+<a href="Register.html">Link to Register</a>
 
 
-    <div role="tabpanel" class="tab-pane active" id="blockchain">
-      <h3> 1. Create a new UserAccount</h3>
-      <div class="form-group form-inline">
+<div role="tabpanel" class="tab-pane active" id="blockchain">
+    <h3> 1. Create a new UserAccount</h3>
+    <div class="form-group form-inline">
         User ID:<input type="text" class="UserID form-control">
         Public Key:<input type="text" class="UserPubKey form-control">
         <button class="create btn btn-primary">Create UserAccount</button>
-      </div>
-
-      <h3> 2. Get the current public key</h3>
-      <div class="form-group">
-        <div>
-          current public key is <span class="value"></span>
-        </div>
-        <button class="get btn btn-primary">Get public key</button>
-      </div>
-
-      <h3> 3. Contract Calls </h3>
-      <p>Javascript calls being made: </p>
-      <div class="logs">
-      </div>
     </div>
 
-  </body>
+    <h3> 2. Get the current public key</h3>
+    <div class="form-group">
+        <div>
+            current public key is <span class="value"></span>
+        </div>
+        <button class="get btn btn-primary">Get public key</button>
+    </div>
+
+    <h3> 3. Contract Calls </h3>
+    <p>Javascript calls being made: </p>
+    <div class="logs">
+    </div>
+</div>
+
+</body>
 </html>

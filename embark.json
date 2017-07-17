@@ -2,9 +2,12 @@
   "contracts": ["app/contracts/**"],
   "app": {
     "css/app.css": ["app/css/**"],
-    "js/app.js": ["embark.js", "app/js/**"],
+    "js/app.js": ["embark.js", "app/js/app-js/**"],
     "js/lib.js": ["app/js/lib-js/**"],
-    "index.html": "app/index.html"
+    "js/inner.js": ["app/js/inner-js/**"],
+    "index.html": "app/index.html",
+    "MyAccount.html": "app/MyAccount.html",
+    "Register.html": "app/Register.html"
   },
   "buildDir": "dist/",
   "config": "config/",

@@ -7,16 +7,39 @@ contract UserAccount {
 
     bytes32 public MyPubKey;
 
-    //mapping structure: to store a list of social accounts. It is a recursive mapping structure:the external bytes stands for application names; the internal bytes stands for username of accounts.
-    mapping (bytes32 => mapping (bytes32 => SocialAccount)) private SocialAccounts;
+    SocialAccount[] private SocialAccounts;//This is a dynamic arraylist of struct SocialAccount.
+    mapping (bytes32 => mapping (bytes32 => Index)) private SocialAccountIndex;
 
-    //mapping structure: to store a list of shared accounts. It is a recursive mapping structure:the external bytes stands for application names; the internal bytes stands for username of accounts.
-    mapping (bytes32 => mapping (bytes32 => SharedAccount)) private SharedAccounts;
+    Contact[] private Contacts;//This is a dynamic arraylist of struct Contact.
+    mapping (address => Index) private ContactIndex;
 
-    //mapping structure: to store a list of contacts according to contact's address.
-    mapping (address => Contact) private Contacts;
+    SharedAccount[] private SharedAccounts;//This is a dynamic arraylist of struct SharedAccount.
+    mapping (bytes32 => mapping (bytes32 => Index)) private SharedAccountIndex;
 
+    struct Index {
+    uint index;
+    bool initialized;
+    }
 
+    struct Contact {
+    address ConAddress;
+    bytes32 ConName;
+    bytes32 ConPubKey;
+    }
+
+    struct SocialAccount {
+    bytes32 App;
+    bytes32 Username;
+    bytes32 Password;
+    }
+
+    struct SharedAccount {
+    bytes32 SharedApp;
+    bytes32 SharedUsername;
+    bytes32 SharedPassword;
+    address SenderAddress;
+    uint time;//time is for time limitation
+    }
 
 
     //constructor
@@ -33,152 +56,175 @@ contract UserAccount {
         MyPubKey = newPubKey;
     }
 
-
-    //here are the definition and functions about application accounts.
-    //the unit struct to store basic information about one application account.
-    struct SocialAccount {
-    bytes32 AppName;
-    bytes32 AppUsername;
-    bytes32 AppPassword;
-    bool initialized;
+    //Functions about SocialAccount.
+    function AddSocialAccount(bytes32 newApp, bytes32 newUsername, bytes32 newPassword) returns (bool Successful){
+        if (!SocialAccountIndex[newApp][newUsername].initialized) {//There is no existing record. This function will add a new record.
+            SocialAccounts.push(SocialAccount(newApp, newUsername, newPassword));
+            SocialAccountIndex[newApp][newUsername].index = SocialAccounts.length - 1;
+            SocialAccountIndex[newApp][newUsername].initialized = true;
+            Successful = true;}
+        else {//There existing a record.
+            Successful = false;}
     }
 
-    //function: to add a social account to the mapping list of SocialAccounts.
-    function AddSocialAccount(bytes32 Name, bytes32 Username, bytes32 Password){
-        if (SocialAccounts[Name][Username].initialized) {
-            SocialAccounts[Name][Username].AppPassword = Password;
+    function AltSocialAccountPw(bytes32 targetApp, bytes32 targetUsername, bytes32 newPassword) returns (bool Successful){
+        if (!SocialAccountIndex[targetApp][targetUsername].initialized) {//There is no existing record.
+            Successful = false;}
+        else {//There existing target record.
+            SocialAccounts[SocialAccountIndex[targetApp][targetUsername].index].Password = newPassword;
+            Successful = true;}
+    }
+
+    function DelSocialAccount(bytes32 delApp, bytes32 delUsername) returns (bool isFound){
+        if (SocialAccountIndex[delApp][delUsername].initialized) {//There existing a record.
+            uint targetIndex = SocialAccountIndex[delApp][delUsername].index;
+            delete SocialAccounts[targetIndex];
+            delete SocialAccountIndex[delApp][delUsername];
+            SocialAccounts[targetIndex] = SocialAccounts[SocialAccounts.length - 1];
+            bytes32 lastApp = SocialAccounts[SocialAccounts.length - 1].App;
+            bytes32 lastUsername = SocialAccounts[SocialAccounts.length - 1].Username;
+            SocialAccountIndex[lastApp][lastUsername].index = targetIndex;
+            delete SocialAccounts[SocialAccounts.length - 1];
+            SocialAccounts.length--;
+            isFound = true;}
+        else {//There is no such record.
+            isFound = false;}
+    }
+
+    function getSocialAccountPw(bytes32 targetApp, bytes32 targetUsername) constant returns (bytes32 Password, bool isFound){
+        if (SocialAccountIndex[targetApp][targetUsername].initialized) {//There existing a record.
+            Password = SocialAccounts[SocialAccountIndex[targetApp][targetUsername].index].Password;
+            isFound = true;}
+        else {//There is no such record.
+            isFound = false;}
+    }
+
+    function getSocialAccountByIndex(uint index) constant returns (bytes32 App, bytes32 Username){
+        App = SocialAccounts[index].App;
+        Username = SocialAccounts[index].Username;
+    }
+
+    function getSocialAccountsLength() constant returns (uint length){
+        length = SocialAccounts.length;
+    }
+
+
+
+    //Functions about Contacts.
+    function AddContact(address newCAddress, bytes32 newCName, bytes32 newCPubkey) returns (bool Successful){
+        if (!ContactIndex[newCAddress].initialized) {//There is no existing record. This function will add a new record.
+            Contacts.push(Contact(newCAddress, newCName, newCPubkey));
+            ContactIndex[newCAddress].index = Contacts.length - 1;
+            ContactIndex[newCAddress].initialized = true;
+            Successful = true;}
+        else {
+            Successful = false;}
+    }
+
+    function AlterContactName(address targetAddress, bytes32 altCName) returns (bool Successful){
+        if (!ContactIndex[targetAddress].initialized) {//There is no existing record.
+            Successful = false;}
+        else {//There existing target record.
+            Contacts[ContactIndex[targetAddress].index].ConName = altCName;
+            Successful = true;}
+    }
+
+    function AlterContactPubkey(address targetAddress, bytes32 altCPubkey) returns (bool Successful){
+        if (!ContactIndex[targetAddress].initialized) {//There is no existing record.
+            Successful = false;}
+        else {//There existing target record.
+            Contacts[ContactIndex[targetAddress].index].ConPubKey = altCPubkey;
+            Successful = true;}
+    }
+
+    function deleteContact(address targetAddress) returns (bool Successful){
+        if (!ContactIndex[targetAddress].initialized) {//There is no existing record.
+            Successful = false;}
+        else {//There existing target record.
+            uint targetIndex = ContactIndex[targetAddress].index;
+            delete Contacts[targetIndex];
+            delete ContactIndex[targetAddress];
+            Contacts[targetIndex] = Contacts[Contacts.length - 1];
+            address lastAddress = Contacts[Contacts.length - 1].ConAddress;
+            ContactIndex[lastAddress].index = targetIndex;
+            delete Contacts[Contacts.length - 1];
+            Contacts.length--;
+            Successful = true;}
+    }
+
+    function getTargetContactPubKey(address targetAddress) constant returns (bytes32 resPubKey, bool isFound){
+        if (!ContactIndex[targetAddress].initialized) {//There is no existing record.
+            isFound = false;}
+        else {//There existing target record.
+            uint targetIndex = ContactIndex[targetAddress].index;
+            resPubKey = Contacts[targetIndex].ConPubKey;
+            isFound = true;}
+    }
+
+    function getContactByIndex(uint index) constant returns (address resAddress, bytes32 resName){
+        resAddress = Contacts[index].ConAddress;
+        resName = Contacts[index].ConName;
+    }
+
+    function getContactAddressByIndex(uint index) constant returns (address resAddress){
+        resAddress = Contacts[index].ConAddress;
+    }
+
+    function getContactsLength() constant returns (uint length){
+        length = Contacts.length;
+    }
+
+
+
+    //Functions about SharedAccounts.
+
+    function AddSharedAccount(bytes32 newApp, bytes32 newUsername, bytes32 newPassword, address SenderAddress) {
+        if (SharedAccountIndex[newApp][newUsername].initialized) {//There existing a record. This function will update password as well as time.
+            if (!(newPassword == SharedAccounts[SharedAccountIndex[newApp][newUsername].index].SharedPassword)) {
+                SharedAccounts[SharedAccountIndex[newApp][newUsername].index].SharedPassword = newPassword;}
+            SharedAccounts[SharedAccountIndex[newApp][newUsername].index].time = now;
         }
         else {
-            SocialAccounts[Name][Username].AppName = Name;
-            SocialAccounts[Name][Username].AppUsername = Username;
-            SocialAccounts[Name][Username].AppPassword = Password;
-            SocialAccounts[Name][Username].initialized = true;}
-    }
-
-
-    //function: to delete the struct of a specific social account from mapping list. If it is false, it means that there is no such account recorded, and there is nothing to delete.
-    function deleteSocialAccount(bytes32 Name, bytes32 Username) returns (bool isSuccessful){
-        if (SocialAccounts[Name][Username].initialized) {
-            delete SocialAccounts[Name][Username];
-            isSuccessful = true;}
-        else
-        isSuccessful = false;
-    }
-
-    //function:to get the information of a specific social account. If it is false, it means that there is no such account recorded.
-    function getSocialAccount(bytes32 AName, bytes32 AUsername) returns (bytes32 Password, bool isFound){
-        if (SocialAccounts[AName][AUsername].initialized) {
-            Password = SocialAccounts[AName][AUsername].AppPassword;
-            isFound = true;}
-        else
-        isFound = false;
-    }
-
-    //problem:how to get all accounts information?
-
-    //here are the definition and functions about contacts.
-    //the unit struct to store basic information about one contact.
-    struct Contact {
-    bytes32 ConName;
-    bytes32 ConPubKey;
-    address ConAddress;
-    bool initialized;
-    }
-
-    //function: to add a contact to the mapping list of Contacts.
-    function AddContact(bytes32 CName, bytes32 CPubkey, address CAddress){
-        Contacts[CAddress].ConName = CName;
-        Contacts[CAddress].ConPubKey = CPubkey;
-        Contacts[CAddress].ConAddress = CAddress;
-        Contacts[CAddress].initialized = true;
-    }
-
-    //function: to modify the contact name of a specific contact. If it is false, it means that there is no such contact recorded, and there is no need to modify contact name.
-    function AlterContactName(address CAddress, bytes32 newName) returns (bool isSuccessful){
-        if (Contacts[CAddress].initialized) {
-            Contacts[CAddress].ConName = newName;
-            isSuccessful = true;}
-        else
-        isSuccessful = false;
-    }
-
-    //function: to modify the public key of a specific contact. If it is false, it means that there is no such contact recorded, and there is no need to modify public key.
-    function AlterContactPubkey(address CAddress, bytes32 newPubkey) returns (bool isSuccessful){
-        if (Contacts[CAddress].initialized) {
-            Contacts[CAddress].ConPubKey = newPubkey;
-            isSuccessful = true;}
-        else
-        isSuccessful = false;
-    }
-
-    //function: to delete the struct of a specific contact from mapping list. If it is false, it means that there is no such contact recorded, and there is nothing to delete.
-    function deleteContact(address CAddress) returns (bool isSuccessful){
-        if (Contacts[CAddress].initialized) {
-            delete Contacts[CAddress];
-            isSuccessful = true;}
-        else
-        isSuccessful = false;
-    }
-    //function:to get the information of a specific contact. If it is false, it means that there is no such contact recorded.
-    function getContact(address CAddress) returns (bytes32 CName, bytes32 CPubKey, bool isFound){
-        if (Contacts[CAddress].initialized) {
-            CName = Contacts[CAddress].ConName;
-            CPubKey = Contacts[CAddress].ConPubKey;
-            isFound = true;}
-        else
-        isFound = false;
-    }
-
-
-    //here are the definition and functions about shared accounts from contacts.
-    //the unit struct to store basic information about one shared account.
-    struct SharedAccount {
-
-    address SenderAddress;
-    //time is for time limitation
-    uint time;
-    bytes32 SharedApp;
-    bytes32 SharedUsername;
-    bytes32 SharedPassword;
-    bool initialized;
-    }
-
-    //function: to add a shared account to the mapping list of SharedAccounts.
-    function AddSharedAccount(address newAddress, bytes32 newApp, bytes32 newUsername, bytes32 newPassword){
-        if (SharedAccounts[newApp][newUsername].initialized) {
-            SharedAccounts[newApp][newUsername].time = now;
-            SharedAccounts[newApp][newUsername].SharedPassword = newPassword;
+            SharedAccounts.push(SharedAccount(newApp, newUsername, newPassword, SenderAddress, now));
+            SharedAccountIndex[newApp][newUsername].initialized = true;
+            SharedAccountIndex[newApp][newUsername].index = SharedAccounts.length - 1;
         }
-        else {
-            SharedAccounts[newApp][newUsername].SenderAddress = newAddress;
-            SharedAccounts[newApp][newUsername].time = now;
-            SharedAccounts[newApp][newUsername].SharedApp = newApp;
-            SharedAccounts[newApp][newUsername].SharedUsername = newUsername;
-            SharedAccounts[newApp][newUsername].SharedPassword = newPassword;
-            SharedAccounts[newApp][newUsername].initialized = true;}
     }
 
 
-    //function: to delete the struct of a specific shared account from mapping list. If it is false, it means that there is no such account recorded, and there is nothing to delete.
-    function deleteSharedAccount(bytes32 SharedApp, bytes32 SharedUsername) returns (bool isSuccessful){
-        if (SharedAccounts[SharedApp][SharedUsername].initialized) {
-            delete SharedAccounts[SharedApp][SharedUsername];
-            isSuccessful = true;}
-        else
-        isSuccessful = false;
+    function deleteSharedAccount(bytes32 delApp, bytes32 delUsername, uint timeLimited) returns (bool){//only when it is true, it is allowed to continue.
+        if (SharedAccountIndex[delApp][delUsername].initialized) {//There existing a record.
+            uint targetIndex = SharedAccountIndex[delApp][delUsername].index;
+            uint targetTime = SharedAccounts[targetIndex].time;
+            uint currentTime = now;
+            if ((currentTime - targetTime) >= timeLimited) {//This record is not valid according to the timestamp.
+                delete SharedAccounts[targetIndex];
+                delete SharedAccountIndex[delApp][delUsername];
+                SharedAccounts[targetIndex] = SharedAccounts[SharedAccounts.length - 1];
+                bytes32 lastApp = SharedAccounts[SharedAccounts.length - 1].SharedApp;
+                bytes32 lastUsername = SharedAccounts[SharedAccounts.length - 1].SharedUsername;
+                SharedAccountIndex[lastApp][lastUsername].index = targetIndex;
+                delete SharedAccounts[SharedAccounts.length - 1];
+                SharedAccounts.length--;}
+            else {//else, this record is still valid, and there is no need to delete. It is allowed to continue.
+                return true;}
+        }
     }
 
-    //Hint:it is required to output all shared accounts.
-    //function:to get the information of a specific shared account. If it is false, it means that there is no such account recorded.
-    function getSharedAccount(bytes32 AName, bytes32 AUsername) returns (address SAddress, uint Stime, bytes32 SApp, bytes32 SUsername, bytes32 SPassword, bool isFound){
-        if (SharedAccounts[AName][AUsername].initialized) {
-            SAddress = SharedAccounts[AName][AUsername].SenderAddress;
-            Stime = SharedAccounts[AName][AUsername].time;
-            SApp = SharedAccounts[AName][AUsername].SharedApp;
-            SUsername = SharedAccounts[AName][AUsername].SharedUsername;
-            SPassword = SharedAccounts[AName][AUsername].SharedPassword;
-            isFound = true;}
-        else
-        isFound = false;
+
+    function getSharedAccountPw(bytes32 targetApp, bytes32 targetUsername) constant returns (bytes32 Password){
+        Password = SharedAccounts[SharedAccountIndex[targetApp][targetUsername].index].SharedPassword;
     }
+
+    function getSharedAccounByIndex(uint index) constant returns (bytes32 SharedApp, bytes32 SharedUsername, address SenderAddress, uint time){
+        SharedApp = SharedAccounts[index].SharedApp;
+        SharedUsername = SharedAccounts[index].SharedUsername;
+        SenderAddress = SharedAccounts[index].SenderAddress;
+        time = SharedAccounts[index].time;
+    }
+
+    function getSharedAccountsLength() constant returns (uint length){
+        length = SharedAccounts.length;
+    }
+
 }
