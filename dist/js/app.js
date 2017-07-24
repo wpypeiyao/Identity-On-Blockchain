@@ -79693,7 +79693,6 @@ if (typeof web3 !== 'undefined') {
     web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
 }
 
-
 //print the currnet accounts in the network
 var accounts = web3.eth.accounts;
 console.log(accounts);

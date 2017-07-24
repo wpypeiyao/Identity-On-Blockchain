@@ -6,8 +6,7 @@
     "js/lib.js": ["app/js/lib-js/**"],
     "js/inner.js": ["app/js/inner-js/**"],
     "index.html": "app/index.html",
-    "MyAccount.html": "app/MyAccount.html",
-    "ECC.html":"app/ECC.html"
+    "MyAccount.html": "app/MyAccount.html"
   },
   "buildDir": "dist/",
   "config": "config/",

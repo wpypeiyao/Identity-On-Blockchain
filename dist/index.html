@@ -47,13 +47,57 @@
 </div>
 
 <a href="MyAccount.html">Login - Link to MyAccount</a>
-<br>
-<a href="ECC.html">ecc</a>
 
 
 <label>New Timelimited:</label><input type="text" placeholder="The new timelimited." id="newTimelimited"/>
 <button class="btn btn-info" onclick="setTimeLimited()">Change Timelimited</button>
+<script type="text/javascript">
+    var ec = new ellipticjs.ec('secp256k1');
+    // Generate keys : keys should be stored physically
+    var key1 = ec.genKeyPair();
+    var key2 = ec.genKeyPair();
 
+    //derive value of x-axis and y-axis for each public key
+    var pubpoint_key1=key1.getPublic();
+    var x_key1 = pubpoint_key1.getX().toString(16);
+    var y_key1 = pubpoint_key1.getY().toString(16);
+
+    var pubpoint_key2=key2.getPublic();
+    var x_key2 = pubpoint_key2.getX().toString(16);
+    var y_key2 = pubpoint_key2.getY().toString(16);
+
+    console.log("the x-axis of public key1 is:" + x_key1);
+    console.log("the y-axis of public key1 is:" + y_key1);
+    console.log("the x-axis of public key2 is:" + x_key2);
+    console.log("the y-axis of public key2 is:" + y_key2);
+
+    //recover public key from split version
+    var pubpoint_recover_key1={x: x_key1, y: y_key1};
+    var key_recover_key1=ec.keyFromPublic(pubpoint_recover_key1, 'hex');
+    var pub_recover_key1=key_recover_key1.getPublic();
+
+    var pubpoint_recover_key2={x: x_key2, y: y_key2};
+    var key_recover_key2=ec.keyFromPublic(pubpoint_recover_key2, 'hex');
+    var pub_recover_key2=key_recover_key2.getPublic();
+
+    //derive shared key
+    var shared1 = key1.derive(pub_recover_key2);
+    var shared2 = key2.derive(pub_recover_key1);
+
+
+    console.log("the shared key is:" + shared1.toString(16));
+    console.log("the shared key is:" + shared2.toString(16));
+
+
+</script>
+
+<script type="text/javascript">
+    cipher=sjcl.encrypt("2063c1608d6e0baf80249c42e2be5804", "cryptography test context");
+    plaintext=sjcl.decrypt("2063c1608d6e0baf80249c42e2be5804", cipher);
+    console.log("the cipher is:" + cipher);
+    console.log("the plaintext is:" + plaintext);
+
+</script>
 <script src="js/inner.js"></script>
 
 </body>
