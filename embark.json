@@ -7,7 +7,7 @@
     "js/inner.js": ["app/js/inner-js/**"],
     "index.html": "app/index.html",
     "MyAccount.html": "app/MyAccount.html",
-    "Register.html": "app/Register.html"
+    "ECC.html":"app/ECC.html"
   },
   "buildDir": "dist/",
   "config": "config/",

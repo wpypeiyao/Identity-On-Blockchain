@@ -8,177 +8,113 @@
     <script src="js/app.js"></script>
 </head>
 <body>
+<div class="container">
+    <!--Login section-->
+    <div id="Login" class="row">
+        <label>Login Identity:</label><input type="text" id="LoginID"/>
+        <button class="btn btn-success" onclick="Login()">Login</button>
+    </div>
 
-<span>{{MyName}}</span>
-<input type="text" id="NewName"/>
-<button type="button">Set Name</button>
-<br>
+    <!--section that interacts with account name and public key-->
+    <div id="NamePubkey" class="row">
+        Hello<span v-if="isVisible">{{MyName}}</span>!
+        <button class="btn btn-success" onclick="setMyName()">Change Name</button>
+        <input type="text" id="setMyName" placeholder="Your new name"/>
+        <br>
+        Your Public Key is:<span v-if="isVisible">{{MyPubKey}}</span>
+        <button class="btn btn-success" onclick="setMyPubKey()">Change PublicKey</button>
+        <input type="text" id="setMyPubKey" placeholder="Your new public key"/>
+    </div>
 
-<span>{{MyPubKey}}</span>
-<input type="text" id="NewPubKey"/>
-<button type="button" class="btn">Set Public Key</button>
-<br>
+    <!--section that interacts with social accounts-->
+    <div id="SocialAccounts" class="row">
+        <h1 class="mbl pbl">My Social Accounts</h1>
+        <!--add a social account-->
+        <div class="row" id="AddSocialAccount">
+            <label>App:</label><input type="text" id="newApp" placeholder="Facebook, twitter or ..."/>
+            <label>Username:</label><input type="text" id="newUsername" placeholder="Your Username."/>
+            <label>Password:</label><input type="password" id="newPassword" placeholder="Your Password."/>
+            <button class="btn" onclick="AddSocialAccount()">Add</button>
+        </div>
 
-<!--Social Account-->
-<div>
-    <form>
-        <fieldset>
-            <legend>Add SocialAccount</legend>
-            <label>App</label><input type="text" id="newApp"/>
-            <br>
-            <label>Username</label><input type="text" id="newUsername"/>
-            <br>
-            <label>Password</label><input type="text" id="newPassword"/>
-            <br>
-            <button type="submit" class="btn">Add SocialAccount</button>
-        </fieldset>
-    </form>
+        <!--output all social accounts.-->
+        <div class="ShowData span9" id="SocialAccountOutput">
+            <template v-for="item in JSONAllSocialAccounts">
+                <div class="tile">
+                    <span>{{item.App}}</span>
+                    <span class="fui-facebook"></span>
+                    <span>{{item.username}}</span>
+                    <br>
+                    <button class="btn btn-info" v-on:click="getSocialAccountPW(item.App,item.username)">getPassword
+                    </button>
+                    <button class="btn btn-danger" v-on:click="DelSocialAccount(item.App,item.username)">Delete</button>
+                    <label>New Password:</label><input type="password" v-bind:id="item.inputID"
+                                                       placeholder="Your new password."/>
+                    <button class="btn btn-warning"
+                            v-on:click="AltSocialAccountPw(item.App, item.username,item.inputID)">Change
+                    </button>
+                    <br>
+                    <label>Share with:</label><input type="text" v-bind:id="item.inputAddressID"
+                                                       placeholder="Receiver address."/>
+                    <button class="btn btn-warning"
+                            v-on:click="ShareAccount(item.App, item.username,item.inputAddressID)">Share
+                    </button>
+                </div>
+            </template>
+        </div>
+    </div>
 
-    <form>
-        <fieldset>
-            <legend>Delete SocialAccount</legend>
-            <label>App</label><input type="text" id="delApp"/>
-            <br>
-            <label>Username</label><input type="text" id="delUsername"/>
-            <br>
-            <button type="submit" class="btn">Delete SocialAccount</button>
-        </fieldset>
-    </form>
+    <!--section that interacts with shared social accounts-->
+    <div id="SharedAccounts" class="row">
+        <h1 class="mbl pbl">My Shared Accounts From Contacts</h1>
+        <div class="ShowData span9" id="SharedAccountOutput">
+            <template v-for="item in JSONAllSharedAccounts">
+                <div class="tile">
+                    <span>From: {{item.fromAddress}}</span>
+                    <br>
+                    <span>{{item.SharedApp}}</span>
+                    <span class="fui-twitter"></span>
+                    <span>{{item.SharedUsername}}</span>
+                    <button class="btn btn-info" v-on:click="getSharedAccountPw(item.SharedApp,item.SharedUsername)">getPassword
+                    </button>
+                    <br>
+                    <span class="fui-time">Timestamp: {{item.timestamp}}</span>
+                </div>
+            </template>
+        </div>
+    </div>
 
-    <form>
-        <fieldset>
-            <legend>get SocialAccount</legend>
-            <label>App</label><input type="text" id="getApp"/>
-            <br>
-            <label>Username</label><input type="text" id="getUsername"/>
-            <br>
-            <button type="submit" class="btn">Get SocialAccount</button>
-            <span>{{Password}}</span>
-        </fieldset>
-    </form>
+    <!--section that interacts with contacts-->
+    <div id="Contacts" class="row">
+        <h1 class="mbl pbl">My Contacts</h1>
+        <!--add a contact-->
+        <div class="row" id="AddContact">
+            <label>Contact Address:</label><input type="text" id="newContactAddress" placeholder="Contact Address"/>
+            <button class="btn" onclick="AddContact()">Add</button>
+        </div>
+
+        <!--output all contacts.-->
+        <div class="span9 ShowData" id="ContactOutput">
+            <template v-for="item in JSONAllContacts">
+                <div class="tile">
+                    <span class="fui-user"></span><span>{{item.ContactName}}</span>
+                    <br>
+                    <span>From: {{item.ContactAddress}}</span>
+                    <br>
+                    <button class="btn btn-info" v-on:click="getTargetContactPubKey(item.ContactAddress)">PublicKey
+                    </button>
+                    <button class="btn btn-danger" v-on:click="deleteContact(item.ContactAddress)">Delete</button>
+                    <label>New Nickname:</label><input type="text" v-bind:id="item.inputID"
+                                                          placeholder="New Nickname."/>
+                    <button class="btn btn-warning"
+                            v-on:click="AlterContactName(item.ContactAddress,item.inputID)">Change
+                    </button>
+                </div>
+            </template>
+        </div>
+    </div>
+
 </div>
-
-<hr size="30px">
-
-<!--Contact-->
-<div>
-    <form>
-        <fieldset>
-            <legend>Add Contact</legend>
-            <label>Contact Name</label><input type="text" id="newConName"/>
-            <br>
-            <label>Public key</label><input type="text" id="newConPubKey"/>
-            <br>
-            <label>Address</label><input type="text" id="newConAddress"/>
-            <br>
-            <button type="submit" class="btn">Add Contact</button>
-        </fieldset>
-    </form>
-
-    <form>
-        <fieldset>
-            <legend>Alter Contact Name</legend>
-            <label>Address at:</label><input type="text" id="AltAddressName"/>
-            <br>
-            <label>new Contact Name</label><input type="text" id="AltConName"/>
-            <br>
-            <button type="submit" class="btn">Alter Contact Name</button>
-        </fieldset>
-    </form>
-
-    <form>
-        <fieldset>
-            <legend>Alter Contact Public Key</legend>
-            <label>Address at:</label><input type="text" id="AltAddressPub"/>
-            <br>
-            <label>new Contact Public Key</label><input type="text" id="AltConPubKey"/>
-            <br>
-            <button type="submit" class="btn">Alter Contact Public Key</button>
-        </fieldset>
-    </form>
-
-    <form>
-        <fieldset>
-            <legend>Delete Contact</legend>
-            <label>Address at:</label><input type="text" id="DelAddress"/>
-            <br>
-            <button type="submit" class="btn">Delete Contact</button>
-        </fieldset>
-    </form>
-
-    <form>
-        <fieldset>
-            <legend>Get Contact</legend>
-            <label>Address at:</label><input type="text" id="getAddress"/>
-            <br>
-            <button type="submit" class="btn">Get Contact</button>
-            <br>
-            <span>{{ConName}}</span>
-            <br>
-            <span>{{ConPubKey}}</span>
-        </fieldset>
-    </form>
-</div>
-
-<hr size="30px">
-
-<!--Shared Social Account-->
-<div>
-    <form>
-        <fieldset>
-            <legend>Add Shared Account</legend>
-            <label>Account from Address:</label><input type="text" id="newSenderAddress"/>
-            <br>
-            <label>App</label><input type="text" id="newSharedApp"/>
-            <br>
-            <label>Username</label><input type="text" id="newSharedUsername"/>
-            <br>
-            <label>Password</label><input type="text" id="newSharedPassword"/>
-            <br>
-            <button type="submit" class="btn">Add Shared Account</button>
-        </fieldset>
-    </form>
-
-    <form>
-        <fieldset>
-            <legend>Delete Shared Account</legend>
-            <label>App</label><input type="text" id="delSharedApp"/>
-            <br>
-            <label>Username</label><input type="text" id="delSharedUsername"/>
-            <br>
-            <button type="submit" class="btn">Delete Shared Account</button>
-        </fieldset>
-    </form>
-
-    <form>
-        <fieldset>
-            <legend>get Shared Account</legend>
-            <label>App</label><input type="text" id="getSharedApp"/>
-            <br>
-            <label>Username</label><input type="text" id="getSharedUsername"/>
-            <br>
-            <button type="submit" class="btn">Get Shared Account</button>
-            <br>
-            <span>{{SenderAddress}}</span>
-            <br>
-            <span>{{SharedTime}}</span>
-            <br>
-            <span>{{SharedSApp}}</span>
-            <br>
-            <span>{{SharedUsername}}</span>
-            <br>
-            <span>{{SharedPassword}}</span>
-            <br>
-        </fieldset>
-    </form>
-</div>
-
-<div>This is for showing all social accounts.</div>
-
-<div>This is for showing all shared social accounts from contacts.</div>
-
-<div>This is for showing all contacts.</div>
-
 <script src="js/inner.js"></script>
 
 </body>

@@ -16,6 +16,8 @@ contract UserAccount {
     SharedAccount[] private SharedAccounts;//This is a dynamic arraylist of struct SharedAccount.
     mapping (bytes32 => mapping (bytes32 => Index)) private SharedAccountIndex;
 
+    event Log(string description);
+
     struct Index {
     uint index;
     bool initialized;
@@ -43,40 +45,40 @@ contract UserAccount {
 
 
     //constructor
-    function UserAccount(bytes32 Name, bytes32 PubKey){
+    function UserAccount(bytes32 Name, bytes32 PubKey) payable {
         MyName = Name;
         MyPubKey = PubKey;
     }
 
-    function setName(bytes32 newName){
+    function setName(bytes32 newName) payable {
         MyName = newName;
     }
 
-    function setPublicKey(bytes32 newPubKey) {
+    function setPublicKey(bytes32 newPubKey) payable {
         MyPubKey = newPubKey;
     }
 
     //Functions about SocialAccount.
-    function AddSocialAccount(bytes32 newApp, bytes32 newUsername, bytes32 newPassword) returns (bool Successful){
-        if (!SocialAccountIndex[newApp][newUsername].initialized) {//There is no existing record. This function will add a new record.
+    function AddSocialAccount(bytes32 newApp, bytes32 newUsername, bytes32 newPassword) payable {
+        if (!SocialAccountIndex[newApp][newUsername].initialized) {
             SocialAccounts.push(SocialAccount(newApp, newUsername, newPassword));
             SocialAccountIndex[newApp][newUsername].index = SocialAccounts.length - 1;
             SocialAccountIndex[newApp][newUsername].initialized = true;
-            Successful = true;}
-        else {//There existing a record.
-            Successful = false;}
+            Log("Successfully added a record of social account.");}
+        else {
+            Log("Failed! There existing such record.");}
     }
 
-    function AltSocialAccountPw(bytes32 targetApp, bytes32 targetUsername, bytes32 newPassword) returns (bool Successful){
-        if (!SocialAccountIndex[targetApp][targetUsername].initialized) {//There is no existing record.
-            Successful = false;}
-        else {//There existing target record.
+    function AltSocialAccountPw(bytes32 targetApp, bytes32 targetUsername, bytes32 newPassword) payable {
+        if (!SocialAccountIndex[targetApp][targetUsername].initialized) {
+            Log("Failed! There is no such record.");}
+        else {
             SocialAccounts[SocialAccountIndex[targetApp][targetUsername].index].Password = newPassword;
-            Successful = true;}
+            Log("Successfully modified the password.");}
     }
 
-    function DelSocialAccount(bytes32 delApp, bytes32 delUsername) returns (bool isFound){
-        if (SocialAccountIndex[delApp][delUsername].initialized) {//There existing a record.
+    function DelSocialAccount(bytes32 delApp, bytes32 delUsername) payable {
+        if (SocialAccountIndex[delApp][delUsername].initialized) {
             uint targetIndex = SocialAccountIndex[delApp][delUsername].index;
             delete SocialAccounts[targetIndex];
             delete SocialAccountIndex[delApp][delUsername];
@@ -86,9 +88,9 @@ contract UserAccount {
             SocialAccountIndex[lastApp][lastUsername].index = targetIndex;
             delete SocialAccounts[SocialAccounts.length - 1];
             SocialAccounts.length--;
-            isFound = true;}
-        else {//There is no such record.
-            isFound = false;}
+            Log("Successfully deleted that account.");}
+        else {
+            Log("Failed! There is no such record.");}
     }
 
     function getSocialAccountPw(bytes32 targetApp, bytes32 targetUsername) constant returns (bytes32 Password, bool isFound){
@@ -111,36 +113,36 @@ contract UserAccount {
 
 
     //Functions about Contacts.
-    function AddContact(address newCAddress, bytes32 newCName, bytes32 newCPubkey) returns (bool Successful){
-        if (!ContactIndex[newCAddress].initialized) {//There is no existing record. This function will add a new record.
+    function AddContact(address newCAddress, bytes32 newCName, bytes32 newCPubkey) payable {
+        if (!ContactIndex[newCAddress].initialized) {
             Contacts.push(Contact(newCAddress, newCName, newCPubkey));
             ContactIndex[newCAddress].index = Contacts.length - 1;
             ContactIndex[newCAddress].initialized = true;
-            Successful = true;}
+            Log("Successfully added the contact.");}
         else {
-            Successful = false;}
+            Log("Failed! There existing such contact!");}
     }
 
-    function AlterContactName(address targetAddress, bytes32 altCName) returns (bool Successful){
-        if (!ContactIndex[targetAddress].initialized) {//There is no existing record.
-            Successful = false;}
-        else {//There existing target record.
+    function AlterContactName(address targetAddress, bytes32 altCName) payable {
+        if (!ContactIndex[targetAddress].initialized) {
+            Log("Failed! There is no such record.");}
+        else {
             Contacts[ContactIndex[targetAddress].index].ConName = altCName;
-            Successful = true;}
+            Log("Successfully modified the contact name.");}
     }
 
-    function AlterContactPubkey(address targetAddress, bytes32 altCPubkey) returns (bool Successful){
-        if (!ContactIndex[targetAddress].initialized) {//There is no existing record.
-            Successful = false;}
-        else {//There existing target record.
+    function AlterContactPubkey(address targetAddress, bytes32 altCPubkey) payable {
+        if (!ContactIndex[targetAddress].initialized) {
+            Log("Failed! There is no such record.");}
+        else {
             Contacts[ContactIndex[targetAddress].index].ConPubKey = altCPubkey;
-            Successful = true;}
+            Log("Successfully modified the contact public key.");}
     }
 
-    function deleteContact(address targetAddress) returns (bool Successful){
-        if (!ContactIndex[targetAddress].initialized) {//There is no existing record.
-            Successful = false;}
-        else {//There existing target record.
+    function deleteContact(address targetAddress) payable {
+        if (!ContactIndex[targetAddress].initialized) {
+            Log("Failed! There is no such contact to delete!");}
+        else {
             uint targetIndex = ContactIndex[targetAddress].index;
             delete Contacts[targetIndex];
             delete ContactIndex[targetAddress];
@@ -149,7 +151,7 @@ contract UserAccount {
             ContactIndex[lastAddress].index = targetIndex;
             delete Contacts[Contacts.length - 1];
             Contacts.length--;
-            Successful = true;}
+            Log("Successfully deleted the contact.");}
     }
 
     function getTargetContactPubKey(address targetAddress) constant returns (bytes32 resPubKey, bool isFound){
@@ -178,7 +180,7 @@ contract UserAccount {
 
     //Functions about SharedAccounts.
 
-    function AddSharedAccount(bytes32 newApp, bytes32 newUsername, bytes32 newPassword, address SenderAddress) {
+    function AddSharedAccount(bytes32 newApp, bytes32 newUsername, bytes32 newPassword, address SenderAddress) payable {
         if (SharedAccountIndex[newApp][newUsername].initialized) {//There existing a record. This function will update password as well as time.
             if (!(newPassword == SharedAccounts[SharedAccountIndex[newApp][newUsername].index].SharedPassword)) {
                 SharedAccounts[SharedAccountIndex[newApp][newUsername].index].SharedPassword = newPassword;}
@@ -192,12 +194,12 @@ contract UserAccount {
     }
 
 
-    function deleteSharedAccount(bytes32 delApp, bytes32 delUsername, uint timeLimited) returns (bool){//only when it is true, it is allowed to continue.
-        if (SharedAccountIndex[delApp][delUsername].initialized) {//There existing a record.
+    function deleteSharedAccount(bytes32 delApp, bytes32 delUsername, uint timeLimited) payable {
+        if (SharedAccountIndex[delApp][delUsername].initialized) {
             uint targetIndex = SharedAccountIndex[delApp][delUsername].index;
             uint targetTime = SharedAccounts[targetIndex].time;
             uint currentTime = now;
-            if ((currentTime - targetTime) >= timeLimited) {//This record is not valid according to the timestamp.
+            if ((currentTime - targetTime) >= timeLimited) {
                 delete SharedAccounts[targetIndex];
                 delete SharedAccountIndex[delApp][delUsername];
                 SharedAccounts[targetIndex] = SharedAccounts[SharedAccounts.length - 1];
@@ -205,15 +207,22 @@ contract UserAccount {
                 bytes32 lastUsername = SharedAccounts[SharedAccounts.length - 1].SharedUsername;
                 SharedAccountIndex[lastApp][lastUsername].index = targetIndex;
                 delete SharedAccounts[SharedAccounts.length - 1];
-                SharedAccounts.length--;}
-            else {//else, this record is still valid, and there is no need to delete. It is allowed to continue.
-                return true;}
+                SharedAccounts.length--;
+                Log("The target shared account is invalid since it is overdue.");}
+            else {
+                Log("The target shared account is valid, thus it can be used.");}
         }
+        else {
+            Log("Failed! There is no such record.");}
     }
 
 
-    function getSharedAccountPw(bytes32 targetApp, bytes32 targetUsername) constant returns (bytes32 Password){
-        Password = SharedAccounts[SharedAccountIndex[targetApp][targetUsername].index].SharedPassword;
+    function getSharedAccountPw(bytes32 targetApp, bytes32 targetUsername) constant returns (bytes32 Password, bool isFound){
+        if (SharedAccountIndex[targetApp][targetUsername].initialized) {//There existing a record.
+            Password = SharedAccounts[SharedAccountIndex[targetApp][targetUsername].index].SharedPassword;
+            isFound = true;}
+        else {//There is no such record.
+            isFound = false;}
     }
 
     function getSharedAccounByIndex(uint index) constant returns (bytes32 SharedApp, bytes32 SharedUsername, address SenderAddress, uint time){
