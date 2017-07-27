@@ -1,0 +1,19 @@
+.index-input{
+    position: absolute;
+    width:80%;
+    left: 20%;
+}
+
+.index-label {
+    font-size: 16px;
+    color: #5d6d7e;
+}
+
+#register-pane {
+    display: none;
+}
+
+#register-pane,#login-pane {
+    width: 640px;
+    left: 10%;
+}

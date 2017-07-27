@@ -1,7 +1,2862 @@
-!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var t;t="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof self?self:this,t.ellipticjs=e()}}(function(){return function e(t,r,d){function i(n,a){if(!r[n]){if(!t[n]){var s="function"==typeof require&&require;if(!a&&s)return s(n,!0);if(f)return f(n,!0);var c=new Error("Cannot find module '"+n+"'");throw c.code="MODULE_NOT_FOUND",c}var h=r[n]={exports:{}};t[n][0].call(h.exports,function(e){var r=t[n][1][e];return i(r?r:e)},h,h.exports,e,t,r,d)}return r[n].exports}for(var f="function"==typeof require&&require,n=0;n<d.length;n++)i(d[n]);return i}({1:[function(e,t,r){"use strict";var d=r;d.version=e("../package.json").version,d.utils=e("./elliptic/utils"),d.rand=e("brorand"),d.hmacDRBG=e("./elliptic/hmac-drbg"),d.curve=e("./elliptic/curve"),d.curves=e("./elliptic/curves"),d.ec=e("./elliptic/ec")},{"../package.json":23,"./elliptic/curve":4,"./elliptic/curves":7,"./elliptic/ec":8,"./elliptic/hmac-drbg":11,"./elliptic/utils":13,brorand:15}],2:[function(e,t){"use strict";function r(e,t){this.type=e,this.p=new i(t.p,16),this.red=t.prime?i.red(t.prime):i.mont(this.p),this.zero=new i(0).toRed(this.red),this.one=new i(1).toRed(this.red),this.two=new i(2).toRed(this.red),this.n=t.n&&new i(t.n,16),this.g=t.g&&this.pointFromJSON(t.g,t.gRed),this._wnafT1=new Array(4),this._wnafT2=new Array(4),this._wnafT3=new Array(4),this._wnafT4=new Array(4)}function d(e,t){this.curve=e,this.type=t,this.precomputed=null}var i=e("bn.js"),f=e("../../elliptic"),n=f.utils.getNAF,a=f.utils.getJSF,s=f.utils.assert;t.exports=r,r.prototype.point=function(){throw new Error("Not implemented")},r.prototype.validate=function(){throw new Error("Not implemented")},r.prototype._fixedNafMul=function(e,t){var r=e._getDoubles(),d=n(t,1),i=(1<<r.step+1)-(r.step%2===0?2:1);i/=3;for(var f=[],a=0;a<d.length;a+=r.step){for(var s=0,t=a+r.step-1;t>=a;t--)s=(s<<1)+d[t];f.push(s)}for(var c=this.jpoint(null,null,null),h=this.jpoint(null,null,null),o=i;o>0;o--){for(var a=0;a<f.length;a++){var s=f[a];s===o?h=h.mixedAdd(r.points[a]):s===-o&&(h=h.mixedAdd(r.points[a].neg()))}c=c.add(h)}return c.toP()},r.prototype._wnafMul=function(e,t){var r=4,d=e._getNAFPoints(r);r=d.wnd;for(var i=d.points,f=n(t,r),a=this.jpoint(null,null,null),c=f.length-1;c>=0;c--){for(var t=0;c>=0&&0===f[c];c--)t++;if(c>=0&&t++,a=a.dblp(t),0>c)break;var h=f[c];s(0!==h),a="affine"===e.type?a.mixedAdd(h>0?i[h-1>>1]:i[-h-1>>1].neg()):a.add(h>0?i[h-1>>1]:i[-h-1>>1].neg())}return"affine"===e.type?a.toP():a},r.prototype._wnafMulAdd=function(e,t,r,d){for(var i=this._wnafT1,f=this._wnafT2,s=this._wnafT3,c=0,h=0;d>h;h++){var o=t[h],b=o._getNAFPoints(e);i[h]=b.wnd,f[h]=b.points}for(var h=d-1;h>=1;h-=2){var u=h-1,p=h;if(1===i[u]&&1===i[p]){var l=[t[u],null,null,t[p]];0===t[u].y.cmp(t[p].y)?(l[1]=t[u].add(t[p]),l[2]=t[u].toJ().mixedAdd(t[p].neg())):0===t[u].y.cmp(t[p].y.redNeg())?(l[1]=t[u].toJ().mixedAdd(t[p]),l[2]=t[u].add(t[p].neg())):(l[1]=t[u].toJ().mixedAdd(t[p]),l[2]=t[u].toJ().mixedAdd(t[p].neg()));var v=[-3,-1,-5,-7,0,7,5,1,3],g=a(r[u],r[p]);c=Math.max(g[0].length,c),s[u]=new Array(c),s[p]=new Array(c);for(var m=0;c>m;m++){var y=0|g[0][m],w=0|g[1][m];s[u][m]=v[3*(y+1)+(w+1)],s[p][m]=0,f[u]=l}}else s[u]=n(r[u],i[u]),s[p]=n(r[p],i[p]),c=Math.max(s[u].length,c),c=Math.max(s[p].length,c)}for(var S=this.jpoint(null,null,null),_=this._wnafT4,h=c;h>=0;h--){for(var A=0;h>=0;){for(var x=!0,m=0;d>m;m++)_[m]=0|s[m][h],0!==_[m]&&(x=!1);if(!x)break;A++,h--}if(h>=0&&A++,S=S.dblp(A),0>h)break;for(var m=0;d>m;m++){var o,M=_[m];0!==M&&(M>0?o=f[m][M-1>>1]:0>M&&(o=f[m][-M-1>>1].neg()),S="affine"===o.type?S.mixedAdd(o):S.add(o))}}for(var h=0;d>h;h++)f[h]=null;return S.toP()},r.BasePoint=d,d.prototype.validate=function(){return this.curve.validate(this)},d.prototype.precompute=function(e){if(this.precomputed)return this;var t={doubles:null,naf:null,beta:null};return t.naf=this._getNAFPoints(8),t.doubles=this._getDoubles(4,e),t.beta=this._getBeta(),this.precomputed=t,this},d.prototype._getDoubles=function(e,t){if(this.precomputed&&this.precomputed.doubles)return this.precomputed.doubles;for(var r=[this],d=this,i=0;t>i;i+=e){for(var f=0;e>f;f++)d=d.dbl();r.push(d)}return{step:e,points:r}},d.prototype._getNAFPoints=function(e){if(this.precomputed&&this.precomputed.naf)return this.precomputed.naf;for(var t=[this],r=(1<<e)-1,d=1===r?null:this.dbl(),i=1;r>i;i++)t[i]=t[i-1].add(d);return{wnd:e,points:t}},d.prototype._getBeta=function(){return null},d.prototype.dblp=function(e){for(var t=this,r=0;e>r;r++)t=t.dbl();return t}},{"../../elliptic":1,"bn.js":14}],3:[function(e,t){"use strict";function r(e){this.twisted=1!==(0|e.a),this.mOneA=this.twisted&&-1===(0|e.a),this.extended=this.mOneA,s.call(this,"edwards",e),this.a=new n(e.a,16).mod(this.red.m).toRed(this.red),this.c=new n(e.c,16).toRed(this.red),this.c2=this.c.redSqr(),this.d=new n(e.d,16).toRed(this.red),this.dd=this.d.redAdd(this.d),c(!this.twisted||0===this.c.fromRed().cmpn(1)),this.oneC=1===(0|e.c)}function d(e,t,r,d,i){s.BasePoint.call(this,e,"projective"),null===t&&null===r&&null===d?(this.x=this.curve.zero,this.y=this.curve.one,this.z=this.curve.one,this.t=this.curve.zero,this.zOne=!0):(this.x=new n(t,16),this.y=new n(r,16),this.z=d?new n(d,16):this.curve.one,this.t=i&&new n(i,16),this.x.red||(this.x=this.x.toRed(this.curve.red)),this.y.red||(this.y=this.y.toRed(this.curve.red)),this.z.red||(this.z=this.z.toRed(this.curve.red)),this.t&&!this.t.red&&(this.t=this.t.toRed(this.curve.red)),this.zOne=this.z===this.curve.one,this.curve.extended&&!this.t&&(this.t=this.x.redMul(this.y),this.zOne||(this.t=this.t.redMul(this.z.redInvm()))))}var i=e("../curve"),f=e("../../elliptic"),n=e("bn.js"),a=e("inherits"),s=i.base,c=f.utils.assert;a(r,s),t.exports=r,r.prototype._mulA=function(e){return this.mOneA?e.redNeg():this.a.redMul(e)},r.prototype._mulC=function(e){return this.oneC?e:this.c.redMul(e)},r.prototype.jpoint=function(e,t,r,d){return this.point(e,t,r,d)},r.prototype.pointFromX=function(e,t){t=new n(t,16),t.red||(t=t.toRed(this.red));var r=t.redSqr(),d=this.c2.redSub(this.a.redMul(r)),f=this.one.redSub(this.c2.redMul(this.d).redMul(r)),a=d.redMul(f.redInvm()).redSqrt(),s=a.fromRed().isOdd();return(e&&!s||!e&&s)&&(a=a.redNeg()),this.point(t,a,i.one)},r.prototype.validate=function(e){if(e.isInfinity())return!0;e.normalize();var t=e.x.redSqr(),r=e.y.redSqr(),d=t.redMul(this.a).redAdd(r),i=this.c2.redMul(this.one.redAdd(this.d.redMul(t).redMul(r)));return 0===d.cmp(i)},a(d,s.BasePoint),r.prototype.pointFromJSON=function(e){return d.fromJSON(this,e)},r.prototype.point=function(e,t,r,i){return new d(this,e,t,r,i)},d.fromJSON=function(e,t){return new d(e,t[0],t[1],t[2])},d.prototype.inspect=function(){return this.isInfinity()?"<EC Point Infinity>":"<EC Point x: "+this.x.fromRed().toString(16,2)+" y: "+this.y.fromRed().toString(16,2)+" z: "+this.z.fromRed().toString(16,2)+">"},d.prototype.isInfinity=function(){return 0===this.x.cmpn(0)&&0===this.y.cmp(this.z)},d.prototype._extDbl=function(){var e=this.x.redSqr(),t=this.y.redSqr(),r=this.z.redSqr();r=r.redIAdd(r);var d=this.curve._mulA(e),i=this.x.redAdd(this.y).redSqr().redISub(e).redISub(t),f=d.redAdd(t),n=f.redSub(r),a=d.redSub(t),s=i.redMul(n),c=f.redMul(a),h=i.redMul(a),o=n.redMul(f);return this.curve.point(s,c,o,h)},d.prototype._projDbl=function(){var e,t,r,d=this.x.redAdd(this.y).redSqr(),i=this.x.redSqr(),f=this.y.redSqr();if(this.curve.twisted){var n=this.curve._mulA(i),a=n.redAdd(f);if(this.zOne)e=d.redSub(i).redSub(f).redMul(a.redSub(this.curve.two)),t=a.redMul(n.redSub(f)),r=a.redSqr().redSub(a).redSub(a);else{var s=this.z.redSqr(),c=a.redSub(s).redISub(s);e=d.redSub(i).redISub(f).redMul(c),t=a.redMul(n.redSub(f)),r=a.redMul(c)}}else{var n=i.redAdd(f),s=this.curve._mulC(this.c.redMul(this.z)).redSqr(),c=n.redSub(s).redSub(s);e=this.curve._mulC(d.redISub(n)).redMul(c),t=this.curve._mulC(n).redMul(i.redISub(f)),r=n.redMul(c)}return this.curve.point(e,t,r)},d.prototype.dbl=function(){return this.isInfinity()?this:this.curve.extended?this._extDbl():this._projDbl()},d.prototype._extAdd=function(e){var t=this.y.redSub(this.x).redMul(e.y.redSub(e.x)),r=this.y.redAdd(this.x).redMul(e.y.redAdd(e.x)),d=this.t.redMul(this.curve.dd).redMul(e.t),i=this.z.redMul(e.z.redAdd(e.z)),f=r.redSub(t),n=i.redSub(d),a=i.redAdd(d),s=r.redAdd(t),c=f.redMul(n),h=a.redMul(s),o=f.redMul(s),b=n.redMul(a);return this.curve.point(c,h,b,o)},d.prototype._projAdd=function(e){var t,r,d=this.z.redMul(e.z),i=d.redSqr(),f=this.x.redMul(e.x),n=this.y.redMul(e.y),a=this.curve.d.redMul(f).redMul(n),s=i.redSub(a),c=i.redAdd(a),h=this.x.redAdd(this.y).redMul(e.x.redAdd(e.y)).redISub(f).redISub(n),o=d.redMul(s).redMul(h);return this.curve.twisted?(t=d.redMul(c).redMul(n.redSub(this.curve._mulA(f))),r=s.redMul(c)):(t=d.redMul(c).redMul(n.redSub(f)),r=this.curve._mulC(s).redMul(c)),this.curve.point(o,t,r)},d.prototype.add=function(e){return this.isInfinity()?e:e.isInfinity()?this:this.curve.extended?this._extAdd(e):this._projAdd(e)},d.prototype.mul=function(e){return this.precomputed&&this.precomputed.doubles?this.curve._fixedNafMul(this,e):this.curve._wnafMul(this,e)},d.prototype.mulAdd=function(e,t,r){return this.curve._wnafMulAdd(1,[this,t],[e,r],2)},d.prototype.normalize=function(){if(this.zOne)return this;var e=this.z.redInvm();return this.x=this.x.redMul(e),this.y=this.y.redMul(e),this.t&&(this.t=this.t.redMul(e)),this.z=this.curve.one,this.zOne=!0,this},d.prototype.neg=function(){return this.curve.point(this.x.redNeg(),this.y,this.z,this.t&&this.t.redNeg())},d.prototype.getX=function(){return this.normalize(),this.x.fromRed()},d.prototype.getY=function(){return this.normalize(),this.y.fromRed()},d.prototype.toP=d.prototype.normalize,d.prototype.mixedAdd=d.prototype.add},{"../../elliptic":1,"../curve":4,"bn.js":14,inherits:22}],4:[function(e,t,r){"use strict";var d=r;d.base=e("./base"),d["short"]=e("./short"),d.mont=e("./mont"),d.edwards=e("./edwards")},{"./base":2,"./edwards":3,"./mont":5,"./short":6}],5:[function(e,t){"use strict";function r(e){a.call(this,"mont",e),this.a=new f(e.a,16).toRed(this.red),this.b=new f(e.b,16).toRed(this.red),this.i4=new f(4).toRed(this.red).redInvm(),this.two=new f(2).toRed(this.red),this.a24=this.i4.redMul(this.a.redAdd(this.two))}function d(e,t,r){a.BasePoint.call(this,e,"projective"),null===t&&null===r?(this.x=this.curve.one,this.z=this.curve.zero):(this.x=new f(t,16),this.z=new f(r,16),this.x.red||(this.x=this.x.toRed(this.curve.red)),this.z.red||(this.z=this.z.toRed(this.curve.red)))}var i=e("../curve"),f=e("bn.js"),n=e("inherits"),a=i.base;n(r,a),t.exports=r,r.prototype.validate=function(e){var t=e.normalize().x,r=t.redSqr(),d=r.redMul(t).redAdd(r.redMul(this.a)).redAdd(t),i=d.redSqrt();return 0===i.redSqr().cmp(d)},n(d,a.BasePoint),r.prototype.point=function(e,t){return new d(this,e,t)},r.prototype.pointFromJSON=function(e){return d.fromJSON(this,e)},d.prototype.precompute=function(){},d.fromJSON=function(e,t){return new d(e,t[0],t[1]||e.one)},d.prototype.inspect=function(){return this.isInfinity()?"<EC Point Infinity>":"<EC Point x: "+this.x.fromRed().toString(16,2)+" z: "+this.z.fromRed().toString(16,2)+">"},d.prototype.isInfinity=function(){return 0===this.z.cmpn(0)},d.prototype.dbl=function(){var e=this.x.redAdd(this.z),t=e.redSqr(),r=this.x.redSub(this.z),d=r.redSqr(),i=t.redSub(d),f=t.redMul(d),n=i.redMul(d.redAdd(this.curve.a24.redMul(i)));return this.curve.point(f,n)},d.prototype.add=function(){throw new Error("Not supported on Montgomery curve")},d.prototype.diffAdd=function(e,t){var r=this.x.redAdd(this.z),d=this.x.redSub(this.z),i=e.x.redAdd(e.z),f=e.x.redSub(e.z),n=f.redMul(r),a=i.redMul(d),s=t.z.redMul(n.redAdd(a).redSqr()),c=t.x.redMul(n.redISub(a).redSqr());return this.curve.point(s,c)},d.prototype.mul=function(e){for(var t=e.clone(),r=this,d=this.curve.point(null,null),i=this,f=[];0!==t.cmpn(0);t.ishrn(1))f.push(t.andln(1));for(var n=f.length-1;n>=0;n--)0===f[n]?(r=r.diffAdd(d,i),d=d.dbl()):(d=r.diffAdd(d,i),r=r.dbl());return d},d.prototype.mulAdd=function(){throw new Error("Not supported on Montgomery curve")},d.prototype.normalize=function(){return this.x=this.x.redMul(this.z.redInvm()),this.z=this.curve.one,this},d.prototype.getX=function(){return this.normalize(),this.x.fromRed()}},{"../curve":4,"bn.js":14,inherits:22}],6:[function(e,t){"use strict";function r(e){c.call(this,"short",e),this.a=new a(e.a,16).toRed(this.red),this.b=new a(e.b,16).toRed(this.red),this.tinv=this.two.redInvm(),this.zeroA=0===this.a.fromRed().cmpn(0),this.threeA=0===this.a.fromRed().sub(this.p).cmpn(-3),this.endo=this._getEndomorphism(e),this._endoWnafT1=new Array(4),this._endoWnafT2=new Array(4)}function d(e,t,r,d){c.BasePoint.call(this,e,"affine"),null===t&&null===r?(this.x=null,this.y=null,this.inf=!0):(this.x=new a(t,16),this.y=new a(r,16),d&&(this.x.forceRed(this.curve.red),this.y.forceRed(this.curve.red)),this.x.red||(this.x=this.x.toRed(this.curve.red)),this.y.red||(this.y=this.y.toRed(this.curve.red)),this.inf=!1)}function i(e,t,r,d){c.BasePoint.call(this,e,"jacobian"),null===t&&null===r&&null===d?(this.x=this.curve.one,this.y=this.curve.one,this.z=new a(0)):(this.x=new a(t,16),this.y=new a(r,16),this.z=new a(d,16)),this.x.red||(this.x=this.x.toRed(this.curve.red)),this.y.red||(this.y=this.y.toRed(this.curve.red)),this.z.red||(this.z=this.z.toRed(this.curve.red)),this.zOne=this.z===this.curve.one}var f=e("../curve"),n=e("../../elliptic"),a=e("bn.js"),s=e("inherits"),c=f.base,h=n.utils.assert;s(r,c),t.exports=r,r.prototype._getEndomorphism=function(e){if(this.zeroA&&this.g&&this.n&&1===this.p.modn(3)){var t,r;if(e.beta)t=new a(e.beta,16).toRed(this.red);else{var d=this._getEndoRoots(this.p);t=d[0].cmp(d[1])<0?d[0]:d[1],t=t.toRed(this.red)}if(e.lambda)r=new a(e.lambda,16);else{var i=this._getEndoRoots(this.n);0===this.g.mul(i[0]).x.cmp(this.g.x.redMul(t))?r=i[0]:(r=i[1],h(0===this.g.mul(r).x.cmp(this.g.x.redMul(t))))}var f;return f=e.basis?e.basis.map(function(e){return{a:new a(e.a,16),b:new a(e.b,16)}}):this._getEndoBasis(r),{beta:t,lambda:r,basis:f}}},r.prototype._getEndoRoots=function(e){var t=e===this.p?this.red:a.mont(e),r=new a(2).toRed(t).redInvm(),d=r.redNeg(),i=new a(3).toRed(t).redNeg().redSqrt().redMul(r),f=d.redAdd(i).fromRed(),n=d.redSub(i).fromRed();return[f,n]},r.prototype._getEndoBasis=function(e){for(var t,r,d,i,f,n,s,c,h,o=this.n.shrn(Math.floor(this.n.bitLength()/2)),b=e,u=this.n.clone(),p=new a(1),l=new a(0),v=new a(0),g=new a(1),m=0;0!==b.cmpn(0);){var y=u.div(b);c=u.sub(y.mul(b)),h=v.sub(y.mul(p));var w=g.sub(y.mul(l));if(!d&&c.cmp(o)<0)t=s.neg(),r=p,d=c.neg(),i=h;else if(d&&2===++m)break;s=c,u=b,b=c,v=p,p=h,g=l,l=w}f=c.neg(),n=h;var S=d.sqr().add(i.sqr()),_=f.sqr().add(n.sqr());return _.cmp(S)>=0&&(f=t,n=r),d.sign&&(d=d.neg(),i=i.neg()),f.sign&&(f=f.neg(),n=n.neg()),[{a:d,b:i},{a:f,b:n}]},r.prototype._endoSplit=function(e){var t=this.endo.basis,r=t[0],d=t[1],i=d.b.mul(e).divRound(this.n),f=r.b.neg().mul(e).divRound(this.n),n=i.mul(r.a),a=f.mul(d.a),s=i.mul(r.b),c=f.mul(d.b),h=e.sub(n).sub(a),o=s.add(c).neg();return{k1:h,k2:o}},r.prototype.pointFromX=function(e,t){t=new a(t,16),t.red||(t=t.toRed(this.red));var r=t.redSqr().redMul(t).redIAdd(t.redMul(this.a)).redIAdd(this.b),d=r.redSqrt(),i=d.fromRed().isOdd();return(e&&!i||!e&&i)&&(d=d.redNeg()),this.point(t,d)},r.prototype.validate=function(e){if(e.inf)return!0;var t=e.x,r=e.y,d=this.a.redMul(t),i=t.redSqr().redMul(t).redIAdd(d).redIAdd(this.b);return 0===r.redSqr().redISub(i).cmpn(0)},r.prototype._endoWnafMulAdd=function(e,t){for(var r=this._endoWnafT1,d=this._endoWnafT2,i=0;i<e.length;i++){var f=this._endoSplit(t[i]),n=e[i],a=n._getBeta();f.k1.sign&&(f.k1.sign=!f.k1.sign,n=n.neg(!0)),f.k2.sign&&(f.k2.sign=!f.k2.sign,a=a.neg(!0)),r[2*i]=n,r[2*i+1]=a,d[2*i]=f.k1,d[2*i+1]=f.k2}for(var s=this._wnafMulAdd(1,r,d,2*i),c=0;2*i>c;c++)r[c]=null,d[c]=null;return s},s(d,c.BasePoint),r.prototype.point=function(e,t,r){return new d(this,e,t,r)},r.prototype.pointFromJSON=function(e,t){return d.fromJSON(this,e,t)},d.prototype._getBeta=function(){if(this.curve.endo){var e=this.precomputed;if(e&&e.beta)return e.beta;var t=this.curve.point(this.x.redMul(this.curve.endo.beta),this.y);if(e){var r=this.curve,d=function(e){return r.point(e.x.redMul(r.endo.beta),e.y)};e.beta=t,t.precomputed={beta:null,naf:e.naf&&{wnd:e.naf.wnd,points:e.naf.points.map(d)},doubles:e.doubles&&{step:e.doubles.step,points:e.doubles.points.map(d)}}}return t}},d.prototype.toJSON=function(){return this.precomputed?[this.x,this.y,this.precomputed&&{doubles:this.precomputed.doubles&&{step:this.precomputed.doubles.step,points:this.precomputed.doubles.points.slice(1)},naf:this.precomputed.naf&&{wnd:this.precomputed.naf.wnd,points:this.precomputed.naf.points.slice(1)}}]:[this.x,this.y]},d.fromJSON=function(e,t,r){function d(t){return e.point(t[0],t[1],r)}"string"==typeof t&&(t=JSON.parse(t));var i=e.point(t[0],t[1],r);if(!t[2])return i;var f=t[2];return i.precomputed={beta:null,doubles:f.doubles&&{step:f.doubles.step,points:[i].concat(f.doubles.points.map(d))},naf:f.naf&&{wnd:f.naf.wnd,points:[i].concat(f.naf.points.map(d))}},i},d.prototype.inspect=function(){return this.isInfinity()?"<EC Point Infinity>":"<EC Point x: "+this.x.fromRed().toString(16,2)+" y: "+this.y.fromRed().toString(16,2)+">"},d.prototype.isInfinity=function(){return this.inf},d.prototype.add=function(e){if(this.inf)return e;if(e.inf)return this;if(this.eq(e))return this.dbl();if(this.neg().eq(e))return this.curve.point(null,null);if(0===this.x.cmp(e.x))return this.curve.point(null,null);var t=this.y.redSub(e.y);0!==t.cmpn(0)&&(t=t.redMul(this.x.redSub(e.x).redInvm()));var r=t.redSqr().redISub(this.x).redISub(e.x),d=t.redMul(this.x.redSub(r)).redISub(this.y);return this.curve.point(r,d)},d.prototype.dbl=function(){if(this.inf)return this;var e=this.y.redAdd(this.y);if(0===e.cmpn(0))return this.curve.point(null,null);var t=this.curve.a,r=this.x.redSqr(),d=e.redInvm(),i=r.redAdd(r).redIAdd(r).redIAdd(t).redMul(d),f=i.redSqr().redISub(this.x.redAdd(this.x)),n=i.redMul(this.x.redSub(f)).redISub(this.y);return this.curve.point(f,n)},d.prototype.getX=function(){return this.x.fromRed()},d.prototype.getY=function(){return this.y.fromRed()},d.prototype.mul=function(e){return e=new a(e,16),this.precomputed&&this.precomputed.doubles?this.curve._fixedNafMul(this,e):this.curve.endo?this.curve._endoWnafMulAdd([this],[e]):this.curve._wnafMul(this,e)},d.prototype.mulAdd=function(e,t,r){var d=[this,t],i=[e,r];return this.curve.endo?this.curve._endoWnafMulAdd(d,i):this.curve._wnafMulAdd(1,d,i,2)},d.prototype.eq=function(e){return this===e||this.inf===e.inf&&(this.inf||0===this.x.cmp(e.x)&&0===this.y.cmp(e.y))},d.prototype.neg=function(e){if(this.inf)return this;var t=this.curve.point(this.x,this.y.redNeg());if(e&&this.precomputed){var r=this.precomputed,d=function(e){return e.neg()};t.precomputed={naf:r.naf&&{wnd:r.naf.wnd,points:r.naf.points.map(d)},doubles:r.doubles&&{step:r.doubles.step,points:r.doubles.points.map(d)}}}return t},d.prototype.toJ=function(){if(this.inf)return this.curve.jpoint(null,null,null);var e=this.curve.jpoint(this.x,this.y,this.curve.one);return e},s(i,c.BasePoint),r.prototype.jpoint=function(e,t,r){return new i(this,e,t,r)},i.prototype.toP=function(){if(this.isInfinity())return this.curve.point(null,null);var e=this.z.redInvm(),t=e.redSqr(),r=this.x.redMul(t),d=this.y.redMul(t).redMul(e);return this.curve.point(r,d)},i.prototype.neg=function(){return this.curve.jpoint(this.x,this.y.redNeg(),this.z)},i.prototype.add=function(e){if(this.isInfinity())return e;if(e.isInfinity())return this;var t=e.z.redSqr(),r=this.z.redSqr(),d=this.x.redMul(t),i=e.x.redMul(r),f=this.y.redMul(t.redMul(e.z)),n=e.y.redMul(r.redMul(this.z)),a=d.redSub(i),s=f.redSub(n);if(0===a.cmpn(0))return 0!==s.cmpn(0)?this.curve.jpoint(null,null,null):this.dbl();var c=a.redSqr(),h=c.redMul(a),o=d.redMul(c),b=s.redSqr().redIAdd(h).redISub(o).redISub(o),u=s.redMul(o.redISub(b)).redISub(f.redMul(h)),p=this.z.redMul(e.z).redMul(a);return this.curve.jpoint(b,u,p)},i.prototype.mixedAdd=function(e){if(this.isInfinity())return e.toJ();if(e.isInfinity())return this;var t=this.z.redSqr(),r=this.x,d=e.x.redMul(t),i=this.y,f=e.y.redMul(t).redMul(this.z),n=r.redSub(d),a=i.redSub(f);if(0===n.cmpn(0))return 0!==a.cmpn(0)?this.curve.jpoint(null,null,null):this.dbl();var s=n.redSqr(),c=s.redMul(n),h=r.redMul(s),o=a.redSqr().redIAdd(c).redISub(h).redISub(h),b=a.redMul(h.redISub(o)).redISub(i.redMul(c)),u=this.z.redMul(n);return this.curve.jpoint(o,b,u)},i.prototype.dblp=function(e){if(0===e)return this;if(this.isInfinity())return this;if(!e)return this.dbl();if(this.curve.zeroA||this.curve.threeA){for(var t=this,r=0;e>r;r++)t=t.dbl();return t}for(var d=this.curve.a,i=this.curve.tinv,f=this.x,n=this.y,a=this.z,s=a.redSqr().redSqr(),c=n.redAdd(n),r=0;e>r;r++){var h=f.redSqr(),o=c.redSqr(),b=o.redSqr(),u=h.redAdd(h).redIAdd(h).redIAdd(d.redMul(s)),p=f.redMul(o),l=u.redSqr().redISub(p.redAdd(p)),v=p.redISub(l),g=u.redMul(v);g=g.redIAdd(g).redISub(b);var m=c.redMul(a);e>r+1&&(s=s.redMul(b)),f=l,a=m,c=g}return this.curve.jpoint(f,c.redMul(i),a)},i.prototype.dbl=function(){return this.isInfinity()?this:this.curve.zeroA?this._zeroDbl():this.curve.threeA?this._threeDbl():this._dbl()},i.prototype._zeroDbl=function(){var e,t,r;if(this.zOne){var d=this.x.redSqr(),i=this.y.redSqr(),f=i.redSqr(),n=this.x.redAdd(i).redSqr().redISub(d).redISub(f);n=n.redIAdd(n);var a=d.redAdd(d).redIAdd(d),s=a.redSqr().redISub(n).redISub(n),c=f.redIAdd(f);c=c.redIAdd(c),c=c.redIAdd(c),e=s,t=a.redMul(n.redISub(s)).redISub(c),r=this.y.redAdd(this.y)}else{var h=this.x.redSqr(),o=this.y.redSqr(),b=o.redSqr(),u=this.x.redAdd(o).redSqr().redISub(h).redISub(b);u=u.redIAdd(u);var p=h.redAdd(h).redIAdd(h),l=p.redSqr(),v=b.redIAdd(b);v=v.redIAdd(v),v=v.redIAdd(v),e=l.redISub(u).redISub(u),t=p.redMul(u.redISub(e)).redISub(v),r=this.y.redMul(this.z),r=r.redIAdd(r)}return this.curve.jpoint(e,t,r)},i.prototype._threeDbl=function(){var e,t,r;if(this.zOne){var d=this.x.redSqr(),i=this.y.redSqr(),f=i.redSqr(),n=this.x.redAdd(i).redSqr().redISub(d).redISub(f);n=n.redIAdd(n);var a=d.redAdd(d).redIAdd(d).redIAdd(this.curve.a),s=a.redSqr().redISub(n).redISub(n);e=s;var c=f.redIAdd(f);c=c.redIAdd(c),c=c.redIAdd(c),t=a.redMul(n.redISub(s)).redISub(c),r=this.y.redAdd(this.y)}else{var h=this.z.redSqr(),o=this.y.redSqr(),b=this.x.redMul(o),u=this.x.redSub(h).redMul(this.x.redAdd(h));u=u.redAdd(u).redIAdd(u);var p=b.redIAdd(b);p=p.redIAdd(p);var l=p.redAdd(p);e=u.redSqr().redISub(l),r=this.y.redAdd(this.z).redSqr().redISub(o).redISub(h);var v=o.redSqr();v=v.redIAdd(v),v=v.redIAdd(v),v=v.redIAdd(v),t=u.redMul(p.redISub(e)).redISub(v)}return this.curve.jpoint(e,t,r)},i.prototype._dbl=function(){var e=this.curve.a,t=this.x,r=this.y,d=this.z,i=d.redSqr().redSqr(),f=t.redSqr(),n=r.redSqr(),a=f.redAdd(f).redIAdd(f).redIAdd(e.redMul(i)),s=t.redAdd(t);s=s.redIAdd(s);var c=s.redMul(n),h=a.redSqr().redISub(c.redAdd(c)),o=c.redISub(h),b=n.redSqr();b=b.redIAdd(b),b=b.redIAdd(b),b=b.redIAdd(b);var u=a.redMul(o).redISub(b),p=r.redAdd(r).redMul(d);return this.curve.jpoint(h,u,p)},i.prototype.trpl=function(){if(!this.curve.zeroA)return this.dbl().add(this);var e=this.x.redSqr(),t=this.y.redSqr(),r=this.z.redSqr(),d=t.redSqr(),i=e.redAdd(e).redIAdd(e),f=i.redSqr(),n=this.x.redAdd(t).redSqr().redISub(e).redISub(d);n=n.redIAdd(n),n=n.redAdd(n).redIAdd(n),n=n.redISub(f);var a=n.redSqr(),s=d.redIAdd(d);s=s.redIAdd(s),s=s.redIAdd(s),s=s.redIAdd(s);var c=i.redIAdd(n).redSqr().redISub(f).redISub(a).redISub(s),h=t.redMul(c);h=h.redIAdd(h),h=h.redIAdd(h);var o=this.x.redMul(a).redISub(h);o=o.redIAdd(o),o=o.redIAdd(o);var b=this.y.redMul(c.redMul(s.redISub(c)).redISub(n.redMul(a)));b=b.redIAdd(b),b=b.redIAdd(b),b=b.redIAdd(b);var u=this.z.redAdd(n).redSqr().redISub(r).redISub(a);return this.curve.jpoint(o,b,u)},i.prototype.mul=function(e,t){return e=new a(e,t),this.curve._wnafMul(this,e)},i.prototype.eq=function(e){if("affine"===e.type)return this.eq(e.toJ());if(this===e)return!0;var t=this.z.redSqr(),r=e.z.redSqr();if(0!==this.x.redMul(r).redISub(e.x.redMul(t)).cmpn(0))return!1;var d=t.redMul(this.z),i=r.redMul(e.z);return 0===this.y.redMul(i).redISub(e.y.redMul(d)).cmpn(0)},i.prototype.inspect=function(){return this.isInfinity()?"<EC JPoint Infinity>":"<EC JPoint x: "+this.x.toString(16,2)+" y: "+this.y.toString(16,2)+" z: "+this.z.toString(16,2)+">"},i.prototype.isInfinity=function(){return 0===this.z.cmpn(0)}},{"../../elliptic":1,"../curve":4,"bn.js":14,inherits:22}],7:[function(e,t,r){"use strict";function d(e){this.curve="short"===e.type?new a.curve["short"](e):"edwards"===e.type?new a.curve.edwards(e):new a.curve.mont(e),this.g=this.curve.g,this.n=this.curve.n,this.hash=e.hash,s(this.g.validate(),"Invalid curve"),s(this.g.mul(this.n).isInfinity(),"Invalid curve, G*N != O")}function i(e,t){Object.defineProperty(f,e,{configurable:!0,enumerable:!0,get:function(){var r=new d(t);return Object.defineProperty(f,e,{configurable:!0,enumerable:!0,value:r}),r}})}var f=r,n=e("hash.js"),a=e("../elliptic"),s=a.utils.assert;f.PresetCurve=d,i("p192",{type:"short",prime:"p192",p:"ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff",a:"ffffffff ffffffff ffffffff fffffffe ffffffff fffffffc",b:"64210519 e59c80e7 0fa7e9ab 72243049 feb8deec c146b9b1",n:"ffffffff ffffffff ffffffff 99def836 146bc9b1 b4d22831",hash:n.sha256,gRed:!1,g:["188da80e b03090f6 7cbf20eb 43a18800 f4ff0afd 82ff1012","07192b95 ffc8da78 631011ed 6b24cdd5 73f977a1 1e794811"]}),i("p224",{type:"short",prime:"p224",p:"ffffffff ffffffff ffffffff ffffffff 00000000 00000000 00000001",a:"ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff fffffffe",b:"b4050a85 0c04b3ab f5413256 5044b0b7 d7bfd8ba 270b3943 2355ffb4",n:"ffffffff ffffffff ffffffff ffff16a2 e0b8f03e 13dd2945 5c5c2a3d",hash:n.sha256,gRed:!1,g:["b70e0cbd 6bb4bf7f 321390b9 4a03c1d3 56c21122 343280d6 115c1d21","bd376388 b5f723fb 4c22dfe6 cd4375a0 5a074764 44d58199 85007e34"]}),i("p256",{type:"short",prime:null,p:"ffffffff 00000001 00000000 00000000 00000000 ffffffff ffffffff ffffffff",a:"ffffffff 00000001 00000000 00000000 00000000 ffffffff ffffffff fffffffc",b:"5ac635d8 aa3a93e7 b3ebbd55 769886bc 651d06b0 cc53b0f6 3bce3c3e 27d2604b",n:"ffffffff 00000000 ffffffff ffffffff bce6faad a7179e84 f3b9cac2 fc632551",hash:n.sha256,gRed:!1,g:["6b17d1f2 e12c4247 f8bce6e5 63a440f2 77037d81 2deb33a0 f4a13945 d898c296","4fe342e2 fe1a7f9b 8ee7eb4a 7c0f9e16 2bce3357 6b315ece cbb64068 37bf51f5"]}),i("curve25519",{type:"mont",prime:"p25519",p:"7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed",a:"76d06",b:"0",n:"1000000000000000 0000000000000000 14def9dea2f79cd6 5812631a5cf5d3ed",hash:n.sha256,gRed:!1,g:["9"]}),i("ed25519",{type:"edwards",prime:"p25519",p:"7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed",a:"-1",c:"1",d:"52036cee2b6ffe73 8cc740797779e898 00700a4d4141d8ab 75eb4dca135978a3",n:"1000000000000000 0000000000000000 14def9dea2f79cd6 5812631a5cf5d3ed",hash:n.sha256,gRed:!1,g:["216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51a","6666666666666666666666666666666666666666666666666666666666666658"]});var c;try{c=e("./precomputed/secp256k1")}catch(h){c=void 0}i("secp256k1",{type:"short",prime:"k256",p:"ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe fffffc2f",a:"0",b:"7",n:"ffffffff ffffffff ffffffff fffffffe baaedce6 af48a03b bfd25e8c d0364141",h:"1",hash:n.sha256,beta:"7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee",lambda:"5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72",basis:[{a:"3086d221a7d46bcde86c90e49284eb15",b:"-e4437ed6010e88286f547fa90abfe4c3"},{a:"114ca50f7a8e2f3f657c1108d9d44cfd8",b:"3086d221a7d46bcde86c90e49284eb15"}],gRed:!1,g:["79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",c]})},{"../elliptic":1,"./precomputed/secp256k1":12,"hash.js":16}],8:[function(e,t){"use strict";function r(e){return this instanceof r?("string"==typeof e&&(n(i.curves.hasOwnProperty(e),"Unknown curve "+e),e=i.curves[e]),e instanceof i.curves.PresetCurve&&(e={curve:e}),this.curve=e.curve.curve,this.n=this.curve.n,this.nh=this.n.shrn(1),this.g=this.curve.g,this.g=e.curve.g,this.g.precompute(e.curve.n.bitLength()+1),void(this.hash=e.hash||e.curve.hash)):new r(e)}var d=e("bn.js"),i=e("../../elliptic"),f=i.utils,n=f.assert,a=e("./key"),s=e("./signature");t.exports=r,r.prototype.keyPair=function(e){return new a(this,e)},r.prototype.keyFromPrivate=function(e,t){return a.fromPrivate(this,e,t)},r.prototype.keyFromPublic=function(e,t){return a.fromPublic(this,e,t)},r.prototype.genKeyPair=function(e){e||(e={});for(var t=new i.hmacDRBG({hash:this.hash,pers:e.pers,entropy:e.entropy||i.rand(this.hash.hmacStrength),nonce:this.n.toArray()}),r=this.n.byteLength(),f=this.n.sub(new d(2));;){var n=new d(t.generate(r));if(!(n.cmp(f)>0))return n.iaddn(1),this.keyFromPrivate(n)}},r.prototype._truncateToN=function(e,t){var r=8*e.byteLength()-this.n.bitLength();return r>0&&(e=e.shrn(r)),!t&&e.cmp(this.n)>=0?e.sub(this.n):e},r.prototype.sign=function(e,t,r,f){"object"==typeof r&&(f=r,r=null),f||(f={}),t=this.keyFromPrivate(t,r),e=this._truncateToN(new d(e,16));for(var n=this.n.byteLength(),a=t.getPrivate().toArray(),c=a.length;21>c;c++)a.unshift(0);for(var h=e.toArray(),c=h.length;n>c;c++)h.unshift(0);for(var o=new i.hmacDRBG({hash:this.hash,entropy:a,nonce:h}),b=this.n.sub(new d(1));;){var u=new d(o.generate(this.n.byteLength()));if(u=this._truncateToN(u,!0),!(u.cmpn(1)<=0||u.cmp(b)>=0)){var p=this.g.mul(u);if(!p.isInfinity()){var l=p.getX().mod(this.n);if(0!==l.cmpn(0)){var v=u.invm(this.n).mul(l.mul(t.getPrivate()).iadd(e)).mod(this.n);if(0!==v.cmpn(0))return f.canonical&&v.cmp(this.nh)>0&&(v=this.n.sub(v)),new s({r:l,s:v})}}}}},r.prototype.verify=function(e,t,r,i){e=this._truncateToN(new d(e,16)),r=this.keyFromPublic(r,i),t=new s(t,"hex");var f=t.r,n=t.s;if(f.cmpn(1)<0||f.cmp(this.n)>=0)return!1;if(n.cmpn(1)<0||n.cmp(this.n)>=0)return!1;var a=n.invm(this.n),c=a.mul(e).mod(this.n),h=a.mul(f).mod(this.n),o=this.g.mulAdd(c,r.getPublic(),h);return o.isInfinity()?!1:0===o.getX().mod(this.n).cmp(f)}},{"../../elliptic":1,"./key":9,"./signature":10,"bn.js":14}],9:[function(e,t){"use strict";function r(e,t){this.ec=e,this.priv=null,this.pub=null,t.priv&&this._importPrivate(t.priv,t.privEnc),t.pub&&this._importPublic(t.pub,t.pubEnc)}var d=e("bn.js"),i=e("../../elliptic"),f=i.utils;t.exports=r,r.fromPublic=function(e,t,d){return t instanceof r?t:new r(e,{pub:t,pubEnc:d})},r.fromPrivate=function(e,t,d){return t instanceof r?t:new r(e,{priv:t,privEnc:d})},r.prototype.validate=function(){var e=this.getPublic();return e.isInfinity()?{result:!1,reason:"Invalid public key"}:e.validate()?e.mul(this.ec.curve.n).isInfinity()?{result:!0,reason:null}:{result:!1,reason:"Public key * N != O"}:{result:!1,reason:"Public key is not a point"}},r.prototype.getPublic=function(e,t){if(this.pub||(this.pub=this.ec.g.mul(this.priv)),"string"==typeof e&&(t=e,e=null),!t)return this.pub;for(var r=this.ec.curve.p.byteLength(),d=this.pub.getX().toArray(),i=d.length;r>i;i++)d.unshift(0);var n;if("mont"!==this.ec.curve.type)if(e)n=[this.pub.getY().isEven()?2:3].concat(d);else{for(var a=this.pub.getY().toArray(),i=a.length;r>i;i++)a.unshift(0);var n=[4].concat(d,a)}else n=d;return f.encode(n,t)},r.prototype.getPrivate=function(e){return"hex"===e?this.priv.toString(16,2):this.priv},r.prototype._importPrivate=function(e,t){this.priv=new d(e,t||16),this.priv=this.priv.mod(this.ec.curve.n)},r.prototype._importPublic=function(e,t){return e.x||e.y?void(this.pub=this.ec.curve.point(e.x,e.y)):(e=f.toArray(e,t),"mont"!==this.ec.curve.type?this._importPublicShort(e):this._importPublicMont(e))},r.prototype._importPublicShort=function(e){var t=this.ec.curve.p.byteLength();
-    4===e[0]&&e.length-1===2*t?this.pub=this.ec.curve.point(e.slice(1,1+t),e.slice(1+t,1+2*t)):2!==e[0]&&3!==e[0]||e.length-1!==t||(this.pub=this.ec.curve.pointFromX(3===e[0],e.slice(1,1+t)))},r.prototype._importPublicMont=function(e){this.pub=this.ec.curve.point(e,1)},r.prototype.derive=function(e){return e.mul(this.priv).getX()},r.prototype.sign=function(e){return this.ec.sign(e,this)},r.prototype.verify=function(e,t){return this.ec.verify(e,t,this)},r.prototype.inspect=function(){return"<Key priv: "+(this.priv&&this.priv.toString(16,2))+" pub: "+(this.pub&&this.pub.inspect())+" >"}},{"../../elliptic":1,"bn.js":14}],10:[function(e,t){"use strict";function r(e,t){return e instanceof r?e:void(this._importDER(e,t)||(n(e.r&&e.s,"Signature without r or s"),this.r=new d(e.r,16),this.s=new d(e.s,16)))}var d=e("bn.js"),i=e("../../elliptic"),f=i.utils,n=f.assert;t.exports=r,r.prototype._importDER=function(e,t){if(e=f.toArray(e,t),e.length<6||48!==e[0]||2!==e[2])return!1;var r=e[1];if(1+r>e.length)return!1;var i=e[3];if(i>=128)return!1;if(4+i+2>=e.length)return!1;if(2!==e[4+i])return!1;var n=e[5+i];return n>=128?!1:4+i+2+n>e.length?!1:(this.r=new d(e.slice(4,4+i)),this.s=new d(e.slice(4+i+2,4+i+2+n)),!0)},r.prototype.toDER=function(e){var t=this.r.toArray(),r=this.s.toArray();128&t[0]&&(t=[0].concat(t)),128&r[0]&&(r=[0].concat(r));var d=t.length+r.length+4,i=[48,d,2,t.length];return i=i.concat(t,[2,r.length],r),f.encode(i,e)}},{"../../elliptic":1,"bn.js":14}],11:[function(e,t){"use strict";function r(e){if(!(this instanceof r))return new r(e);this.hash=e.hash,this.predResist=!!e.predResist,this.outLen=this.hash.outSize,this.minEntropy=e.minEntropy||this.hash.hmacStrength,this.reseed=null,this.reseedInterval=null,this.K=null,this.V=null;var t=f.toArray(e.entropy,e.entropyEnc),d=f.toArray(e.nonce,e.nonceEnc),i=f.toArray(e.pers,e.persEnc);n(t.length>=this.minEntropy/8,"Not enough entropy. Minimum is: "+this.minEntropy+" bits"),this._init(t,d,i)}var d=e("hash.js"),i=e("../elliptic"),f=i.utils,n=f.assert;t.exports=r,r.prototype._init=function(e,t,r){var d=e.concat(t).concat(r);this.K=new Array(this.outLen/8),this.V=new Array(this.outLen/8);for(var i=0;i<this.V.length;i++)this.K[i]=0,this.V[i]=1;this._update(d),this.reseed=1,this.reseedInterval=281474976710656},r.prototype._hmac=function(){return new d.hmac(this.hash,this.K)},r.prototype._update=function(e){var t=this._hmac().update(this.V).update([0]);e&&(t=t.update(e)),this.K=t.digest(),this.V=this._hmac().update(this.V).digest(),e&&(this.K=this._hmac().update(this.V).update([1]).update(e).digest(),this.V=this._hmac().update(this.V).digest())},r.prototype.reseed=function(e,t,r,d){"string"!=typeof t&&(d=r,r=t,t=null),e=f.toBuffer(e,t),r=f.toBuffer(r,d),n(e.length>=this.minEntropy/8,"Not enough entropy. Minimum is: "+this.minEntropy+" bits"),this._update(e.concat(r||[])),this.reseed=1},r.prototype.generate=function(e,t,r,d){if(this.reseed>this.reseedInterval)throw new Error("Reseed is required");"string"!=typeof t&&(d=r,r=t,t=null),r&&(r=f.toArray(r,d),this._update(r));for(var i=[];i.length<e;)this.V=this._hmac().update(this.V).digest(),i=i.concat(this.V);var n=i.slice(0,e);return this._update(r),this.reseed++,f.encode(n,t)}},{"../elliptic":1,"hash.js":16}],12:[function(e,t){t.exports={doubles:{step:4,points:[["e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a","f7e3507399e595929db99f34f57937101296891e44d23f0be1f32cce69616821"],["8282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508","11f8a8098557dfe45e8256e830b60ace62d613ac2f7b17bed31b6eaff6e26caf"],["175e159f728b865a72f99cc6c6fc846de0b93833fd2222ed73fce5b551e5b739","d3506e0d9e3c79eba4ef97a51ff71f5eacb5955add24345c6efa6ffee9fed695"],["363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff4640","4e273adfc732221953b445397f3363145b9a89008199ecb62003c7f3bee9de9"],["8b4b5f165df3c2be8c6244b5b745638843e4a781a15bcd1b69f79a55dffdf80c","4aad0a6f68d308b4b3fbd7813ab0da04f9e336546162ee56b3eff0c65fd4fd36"],["723cbaa6e5db996d6bf771c00bd548c7b700dbffa6c0e77bcb6115925232fcda","96e867b5595cc498a921137488824d6e2660a0653779494801dc069d9eb39f5f"],["eebfa4d493bebf98ba5feec812c2d3b50947961237a919839a533eca0e7dd7fa","5d9a8ca3970ef0f269ee7edaf178089d9ae4cdc3a711f712ddfd4fdae1de8999"],["100f44da696e71672791d0a09b7bde459f1215a29b3c03bfefd7835b39a48db0","cdd9e13192a00b772ec8f3300c090666b7ff4a18ff5195ac0fbd5cd62bc65a09"],["e1031be262c7ed1b1dc9227a4a04c017a77f8d4464f3b3852c8acde6e534fd2d","9d7061928940405e6bb6a4176597535af292dd419e1ced79a44f18f29456a00d"],["feea6cae46d55b530ac2839f143bd7ec5cf8b266a41d6af52d5e688d9094696d","e57c6b6c97dce1bab06e4e12bf3ecd5c981c8957cc41442d3155debf18090088"],["da67a91d91049cdcb367be4be6ffca3cfeed657d808583de33fa978bc1ec6cb1","9bacaa35481642bc41f463f7ec9780e5dec7adc508f740a17e9ea8e27a68be1d"],["53904faa0b334cdda6e000935ef22151ec08d0f7bb11069f57545ccc1a37b7c0","5bc087d0bc80106d88c9eccac20d3c1c13999981e14434699dcb096b022771c8"],["8e7bcd0bd35983a7719cca7764ca906779b53a043a9b8bcaeff959f43ad86047","10b7770b2a3da4b3940310420ca9514579e88e2e47fd68b3ea10047e8460372a"],["385eed34c1cdff21e6d0818689b81bde71a7f4f18397e6690a841e1599c43862","283bebc3e8ea23f56701de19e9ebf4576b304eec2086dc8cc0458fe5542e5453"],["6f9d9b803ecf191637c73a4413dfa180fddf84a5947fbc9c606ed86c3fac3a7","7c80c68e603059ba69b8e2a30e45c4d47ea4dd2f5c281002d86890603a842160"],["3322d401243c4e2582a2147c104d6ecbf774d163db0f5e5313b7e0e742d0e6bd","56e70797e9664ef5bfb019bc4ddaf9b72805f63ea2873af624f3a2e96c28b2a0"],["85672c7d2de0b7da2bd1770d89665868741b3f9af7643397721d74d28134ab83","7c481b9b5b43b2eb6374049bfa62c2e5e77f17fcc5298f44c8e3094f790313a6"],["948bf809b1988a46b06c9f1919413b10f9226c60f668832ffd959af60c82a0a","53a562856dcb6646dc6b74c5d1c3418c6d4dff08c97cd2bed4cb7f88d8c8e589"],["6260ce7f461801c34f067ce0f02873a8f1b0e44dfc69752accecd819f38fd8e8","bc2da82b6fa5b571a7f09049776a1ef7ecd292238051c198c1a84e95b2b4ae17"],["e5037de0afc1d8d43d8348414bbf4103043ec8f575bfdc432953cc8d2037fa2d","4571534baa94d3b5f9f98d09fb990bddbd5f5b03ec481f10e0e5dc841d755bda"],["e06372b0f4a207adf5ea905e8f1771b4e7e8dbd1c6a6c5b725866a0ae4fce725","7a908974bce18cfe12a27bb2ad5a488cd7484a7787104870b27034f94eee31dd"],["213c7a715cd5d45358d0bbf9dc0ce02204b10bdde2a3f58540ad6908d0559754","4b6dad0b5ae462507013ad06245ba190bb4850f5f36a7eeddff2c27534b458f2"],["4e7c272a7af4b34e8dbb9352a5419a87e2838c70adc62cddf0cc3a3b08fbd53c","17749c766c9d0b18e16fd09f6def681b530b9614bff7dd33e0b3941817dcaae6"],["fea74e3dbe778b1b10f238ad61686aa5c76e3db2be43057632427e2840fb27b6","6e0568db9b0b13297cf674deccb6af93126b596b973f7b77701d3db7f23cb96f"],["76e64113f677cf0e10a2570d599968d31544e179b760432952c02a4417bdde39","c90ddf8dee4e95cf577066d70681f0d35e2a33d2b56d2032b4b1752d1901ac01"],["c738c56b03b2abe1e8281baa743f8f9a8f7cc643df26cbee3ab150242bcbb891","893fb578951ad2537f718f2eacbfbbbb82314eef7880cfe917e735d9699a84c3"],["d895626548b65b81e264c7637c972877d1d72e5f3a925014372e9f6588f6c14b","febfaa38f2bc7eae728ec60818c340eb03428d632bb067e179363ed75d7d991f"],["b8da94032a957518eb0f6433571e8761ceffc73693e84edd49150a564f676e03","2804dfa44805a1e4d7c99cc9762808b092cc584d95ff3b511488e4e74efdf6e7"],["e80fea14441fb33a7d8adab9475d7fab2019effb5156a792f1a11778e3c0df5d","eed1de7f638e00771e89768ca3ca94472d155e80af322ea9fcb4291b6ac9ec78"],["a301697bdfcd704313ba48e51d567543f2a182031efd6915ddc07bbcc4e16070","7370f91cfb67e4f5081809fa25d40f9b1735dbf7c0a11a130c0d1a041e177ea1"],["90ad85b389d6b936463f9d0512678de208cc330b11307fffab7ac63e3fb04ed4","e507a3620a38261affdcbd9427222b839aefabe1582894d991d4d48cb6ef150"],["8f68b9d2f63b5f339239c1ad981f162ee88c5678723ea3351b7b444c9ec4c0da","662a9f2dba063986de1d90c2b6be215dbbea2cfe95510bfdf23cbf79501fff82"],["e4f3fb0176af85d65ff99ff9198c36091f48e86503681e3e6686fd5053231e11","1e63633ad0ef4f1c1661a6d0ea02b7286cc7e74ec951d1c9822c38576feb73bc"],["8c00fa9b18ebf331eb961537a45a4266c7034f2f0d4e1d0716fb6eae20eae29e","efa47267fea521a1a9dc343a3736c974c2fadafa81e36c54e7d2a4c66702414b"],["e7a26ce69dd4829f3e10cec0a9e98ed3143d084f308b92c0997fddfc60cb3e41","2a758e300fa7984b471b006a1aafbb18d0a6b2c0420e83e20e8a9421cf2cfd51"],["b6459e0ee3662ec8d23540c223bcbdc571cbcb967d79424f3cf29eb3de6b80ef","67c876d06f3e06de1dadf16e5661db3c4b3ae6d48e35b2ff30bf0b61a71ba45"],["d68a80c8280bb840793234aa118f06231d6f1fc67e73c5a5deda0f5b496943e8","db8ba9fff4b586d00c4b1f9177b0e28b5b0e7b8f7845295a294c84266b133120"],["324aed7df65c804252dc0270907a30b09612aeb973449cea4095980fc28d3d5d","648a365774b61f2ff130c0c35aec1f4f19213b0c7e332843967224af96ab7c84"],["4df9c14919cde61f6d51dfdbe5fee5dceec4143ba8d1ca888e8bd373fd054c96","35ec51092d8728050974c23a1d85d4b5d506cdc288490192ebac06cad10d5d"],["9c3919a84a474870faed8a9c1cc66021523489054d7f0308cbfc99c8ac1f98cd","ddb84f0f4a4ddd57584f044bf260e641905326f76c64c8e6be7e5e03d4fc599d"],["6057170b1dd12fdf8de05f281d8e06bb91e1493a8b91d4cc5a21382120a959e5","9a1af0b26a6a4807add9a2daf71df262465152bc3ee24c65e899be932385a2a8"],["a576df8e23a08411421439a4518da31880cef0fba7d4df12b1a6973eecb94266","40a6bf20e76640b2c92b97afe58cd82c432e10a7f514d9f3ee8be11ae1b28ec8"],["7778a78c28dec3e30a05fe9629de8c38bb30d1f5cf9a3a208f763889be58ad71","34626d9ab5a5b22ff7098e12f2ff580087b38411ff24ac563b513fc1fd9f43ac"],["928955ee637a84463729fd30e7afd2ed5f96274e5ad7e5cb09eda9c06d903ac","c25621003d3f42a827b78a13093a95eeac3d26efa8a8d83fc5180e935bcd091f"],["85d0fef3ec6db109399064f3a0e3b2855645b4a907ad354527aae75163d82751","1f03648413a38c0be29d496e582cf5663e8751e96877331582c237a24eb1f962"],["ff2b0dce97eece97c1c9b6041798b85dfdfb6d8882da20308f5404824526087e","493d13fef524ba188af4c4dc54d07936c7b7ed6fb90e2ceb2c951e01f0c29907"],["827fbbe4b1e880ea9ed2b2e6301b212b57f1ee148cd6dd28780e5e2cf856e241","c60f9c923c727b0b71bef2c67d1d12687ff7a63186903166d605b68baec293ec"],["eaa649f21f51bdbae7be4ae34ce6e5217a58fdce7f47f9aa7f3b58fa2120e2b3","be3279ed5bbbb03ac69a80f89879aa5a01a6b965f13f7e59d47a5305ba5ad93d"],["e4a42d43c5cf169d9391df6decf42ee541b6d8f0c9a137401e23632dda34d24f","4d9f92e716d1c73526fc99ccfb8ad34ce886eedfa8d8e4f13a7f7131deba9414"],["1ec80fef360cbdd954160fadab352b6b92b53576a88fea4947173b9d4300bf19","aeefe93756b5340d2f3a4958a7abbf5e0146e77f6295a07b671cdc1cc107cefd"],["146a778c04670c2f91b00af4680dfa8bce3490717d58ba889ddb5928366642be","b318e0ec3354028add669827f9d4b2870aaa971d2f7e5ed1d0b297483d83efd0"],["fa50c0f61d22e5f07e3acebb1aa07b128d0012209a28b9776d76a8793180eef9","6b84c6922397eba9b72cd2872281a68a5e683293a57a213b38cd8d7d3f4f2811"],["da1d61d0ca721a11b1a5bf6b7d88e8421a288ab5d5bba5220e53d32b5f067ec2","8157f55a7c99306c79c0766161c91e2966a73899d279b48a655fba0f1ad836f1"],["a8e282ff0c9706907215ff98e8fd416615311de0446f1e062a73b0610d064e13","7f97355b8db81c09abfb7f3c5b2515888b679a3e50dd6bd6cef7c73111f4cc0c"],["174a53b9c9a285872d39e56e6913cab15d59b1fa512508c022f382de8319497c","ccc9dc37abfc9c1657b4155f2c47f9e6646b3a1d8cb9854383da13ac079afa73"],["959396981943785c3d3e57edf5018cdbe039e730e4918b3d884fdff09475b7ba","2e7e552888c331dd8ba0386a4b9cd6849c653f64c8709385e9b8abf87524f2fd"],["d2a63a50ae401e56d645a1153b109a8fcca0a43d561fba2dbb51340c9d82b151","e82d86fb6443fcb7565aee58b2948220a70f750af484ca52d4142174dcf89405"],["64587e2335471eb890ee7896d7cfdc866bacbdbd3839317b3436f9b45617e073","d99fcdd5bf6902e2ae96dd6447c299a185b90a39133aeab358299e5e9faf6589"],["8481bde0e4e4d885b3a546d3e549de042f0aa6cea250e7fd358d6c86dd45e458","38ee7b8cba5404dd84a25bf39cecb2ca900a79c42b262e556d64b1b59779057e"],["13464a57a78102aa62b6979ae817f4637ffcfed3c4b1ce30bcd6303f6caf666b","69be159004614580ef7e433453ccb0ca48f300a81d0942e13f495a907f6ecc27"],["bc4a9df5b713fe2e9aef430bcc1dc97a0cd9ccede2f28588cada3a0d2d83f366","d3a81ca6e785c06383937adf4b798caa6e8a9fbfa547b16d758d666581f33c1"],["8c28a97bf8298bc0d23d8c749452a32e694b65e30a9472a3954ab30fe5324caa","40a30463a3305193378fedf31f7cc0eb7ae784f0451cb9459e71dc73cbef9482"],["8ea9666139527a8c1dd94ce4f071fd23c8b350c5a4bb33748c4ba111faccae0","620efabbc8ee2782e24e7c0cfb95c5d735b783be9cf0f8e955af34a30e62b945"],["dd3625faef5ba06074669716bbd3788d89bdde815959968092f76cc4eb9a9787","7a188fa3520e30d461da2501045731ca941461982883395937f68d00c644a573"],["f710d79d9eb962297e4f6232b40e8f7feb2bc63814614d692c12de752408221e","ea98e67232d3b3295d3b535532115ccac8612c721851617526ae47a9c77bfc82"]]},naf:{wnd:7,points:[["f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9","388f7b0f632de8140fe337e62a37f3566500a99934c2231b6cb9fd7584b8e672"],["2f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4","d8ac222636e5e3d6d4dba9dda6c9c426f788271bab0d6840dca87d3aa6ac62d6"],["5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc","6aebca40ba255960a3178d6d861a54dba813d0b813fde7b5a5082628087264da"],["acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe","cc338921b0a7d9fd64380971763b61e9add888a4375f8e0f05cc262ac64f9c37"],["774ae7f858a9411e5ef4246b70c65aac5649980be5c17891bbec17895da008cb","d984a032eb6b5e190243dd56d7b7b365372db1e2dff9d6a8301d74c9c953c61b"],["f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8","ab0902e8d880a89758212eb65cdaf473a1a06da521fa91f29b5cb52db03ed81"],["d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e","581e2872a86c72a683842ec228cc6defea40af2bd896d3a5c504dc9ff6a26b58"],["defdea4cdb677750a420fee807eacf21eb9898ae79b9768766e4faa04a2d4a34","4211ab0694635168e997b0ead2a93daeced1f4a04a95c0f6cfb199f69e56eb77"],["2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c","85e89bc037945d93b343083b5a1c86131a01f60c50269763b570c854e5c09b7a"],["352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5","321eb4075348f534d59c18259dda3e1f4a1b3b2e71b1039c67bd3d8bcf81998c"],["2fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f","2de1068295dd865b64569335bd5dd80181d70ecfc882648423ba76b532b7d67"],["9248279b09b4d68dab21a9b066edda83263c3d84e09572e269ca0cd7f5453714","73016f7bf234aade5d1aa71bdea2b1ff3fc0de2a887912ffe54a32ce97cb3402"],["daed4f2be3a8bf278e70132fb0beb7522f570e144bf615c07e996d443dee8729","a69dce4a7d6c98e8d4a1aca87ef8d7003f83c230f3afa726ab40e52290be1c55"],["c44d12c7065d812e8acf28d7cbb19f9011ecd9e9fdf281b0e6a3b5e87d22e7db","2119a460ce326cdc76c45926c982fdac0e106e861edf61c5a039063f0e0e6482"],["6a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4","e022cf42c2bd4a708b3f5126f16a24ad8b33ba48d0423b6efd5e6348100d8a82"],["1697ffa6fd9de627c077e3d2fe541084ce13300b0bec1146f95ae57f0d0bd6a5","b9c398f186806f5d27561506e4557433a2cf15009e498ae7adee9d63d01b2396"],["605bdb019981718b986d0f07e834cb0d9deb8360ffb7f61df982345ef27a7479","2972d2de4f8d20681a78d93ec96fe23c26bfae84fb14db43b01e1e9056b8c49"],["62d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d","80fc06bd8cc5b01098088a1950eed0db01aa132967ab472235f5642483b25eaf"],["80c60ad0040f27dade5b4b06c408e56b2c50e9f56b9b8b425e555c2f86308b6f","1c38303f1cc5c30f26e66bad7fe72f70a65eed4cbe7024eb1aa01f56430bd57a"],["7a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb","d0e3fa9eca8726909559e0d79269046bdc59ea10c70ce2b02d499ec224dc7f7"],["d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9","eecf41253136e5f99966f21881fd656ebc4345405c520dbc063465b521409933"],["49370a4b5f43412ea25f514e8ecdad05266115e4a7ecb1387231808f8b45963","758f3f41afd6ed428b3081b0512fd62a54c3f3afbb5b6764b653052a12949c9a"],["77f230936ee88cbbd73df930d64702ef881d811e0e1498e2f1c13eb1fc345d74","958ef42a7886b6400a08266e9ba1b37896c95330d97077cbbe8eb3c7671c60d6"],["f2dac991cc4ce4b9ea44887e5c7c0bce58c80074ab9d4dbaeb28531b7739f530","e0dedc9b3b2f8dad4da1f32dec2531df9eb5fbeb0598e4fd1a117dba703a3c37"],["463b3d9f662621fb1b4be8fbbe2520125a216cdfc9dae3debcba4850c690d45b","5ed430d78c296c3543114306dd8622d7c622e27c970a1de31cb377b01af7307e"],["f16f804244e46e2a09232d4aff3b59976b98fac14328a2d1a32496b49998f247","cedabd9b82203f7e13d206fcdf4e33d92a6c53c26e5cce26d6579962c4e31df6"],["caf754272dc84563b0352b7a14311af55d245315ace27c65369e15f7151d41d1","cb474660ef35f5f2a41b643fa5e460575f4fa9b7962232a5c32f908318a04476"],["2600ca4b282cb986f85d0f1709979d8b44a09c07cb86d7c124497bc86f082120","4119b88753c15bd6a693b03fcddbb45d5ac6be74ab5f0ef44b0be9475a7e4b40"],["7635ca72d7e8432c338ec53cd12220bc01c48685e24f7dc8c602a7746998e435","91b649609489d613d1d5e590f78e6d74ecfc061d57048bad9e76f302c5b9c61"],["754e3239f325570cdbbf4a87deee8a66b7f2b33479d468fbc1a50743bf56cc18","673fb86e5bda30fb3cd0ed304ea49a023ee33d0197a695d0c5d98093c536683"],["e3e6bd1071a1e96aff57859c82d570f0330800661d1c952f9fe2694691d9b9e8","59c9e0bba394e76f40c0aa58379a3cb6a5a2283993e90c4167002af4920e37f5"],["186b483d056a033826ae73d88f732985c4ccb1f32ba35f4b4cc47fdcf04aa6eb","3b952d32c67cf77e2e17446e204180ab21fb8090895138b4a4a797f86e80888b"],["df9d70a6b9876ce544c98561f4be4f725442e6d2b737d9c91a8321724ce0963f","55eb2dafd84d6ccd5f862b785dc39d4ab157222720ef9da217b8c45cf2ba2417"],["5edd5cc23c51e87a497ca815d5dce0f8ab52554f849ed8995de64c5f34ce7143","efae9c8dbc14130661e8cec030c89ad0c13c66c0d17a2905cdc706ab7399a868"],["290798c2b6476830da12fe02287e9e777aa3fba1c355b17a722d362f84614fba","e38da76dcd440621988d00bcf79af25d5b29c094db2a23146d003afd41943e7a"],["af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45","f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6"],["766dbb24d134e745cccaa28c99bf274906bb66b26dcf98df8d2fed50d884249a","744b1152eacbe5e38dcc887980da38b897584a65fa06cedd2c924f97cbac5996"],["59dbf46f8c94759ba21277c33784f41645f7b44f6c596a58ce92e666191abe3e","c534ad44175fbc300f4ea6ce648309a042ce739a7919798cd85e216c4a307f6e"],["f13ada95103c4537305e691e74e9a4a8dd647e711a95e73cb62dc6018cfd87b8","e13817b44ee14de663bf4bc808341f326949e21a6a75c2570778419bdaf5733d"],["7754b4fa0e8aced06d4167a2c59cca4cda1869c06ebadfb6488550015a88522c","30e93e864e669d82224b967c3020b8fa8d1e4e350b6cbcc537a48b57841163a2"],["948dcadf5990e048aa3874d46abef9d701858f95de8041d2a6828c99e2262519","e491a42537f6e597d5d28a3224b1bc25df9154efbd2ef1d2cbba2cae5347d57e"],["7962414450c76c1689c7b48f8202ec37fb224cf5ac0bfa1570328a8a3d7c77ab","100b610ec4ffb4760d5c1fc133ef6f6b12507a051f04ac5760afa5b29db83437"],["3514087834964b54b15b160644d915485a16977225b8847bb0dd085137ec47ca","ef0afbb2056205448e1652c48e8127fc6039e77c15c2378b7e7d15a0de293311"],["d3cc30ad6b483e4bc79ce2c9dd8bc54993e947eb8df787b442943d3f7b527eaf","8b378a22d827278d89c5e9be8f9508ae3c2ad46290358630afb34db04eede0a4"],["1624d84780732860ce1c78fcbfefe08b2b29823db913f6493975ba0ff4847610","68651cf9b6da903e0914448c6cd9d4ca896878f5282be4c8cc06e2a404078575"],["733ce80da955a8a26902c95633e62a985192474b5af207da6df7b4fd5fc61cd4","f5435a2bd2badf7d485a4d8b8db9fcce3e1ef8e0201e4578c54673bc1dc5ea1d"],["15d9441254945064cf1a1c33bbd3b49f8966c5092171e699ef258dfab81c045c","d56eb30b69463e7234f5137b73b84177434800bacebfc685fc37bbe9efe4070d"],["a1d0fcf2ec9de675b612136e5ce70d271c21417c9d2b8aaaac138599d0717940","edd77f50bcb5a3cab2e90737309667f2641462a54070f3d519212d39c197a629"],["e22fbe15c0af8ccc5780c0735f84dbe9a790badee8245c06c7ca37331cb36980","a855babad5cd60c88b430a69f53a1a7a38289154964799be43d06d77d31da06"],["311091dd9860e8e20ee13473c1155f5f69635e394704eaa74009452246cfa9b3","66db656f87d1f04fffd1f04788c06830871ec5a64feee685bd80f0b1286d8374"],["34c1fd04d301be89b31c0442d3e6ac24883928b45a9340781867d4232ec2dbdf","9414685e97b1b5954bd46f730174136d57f1ceeb487443dc5321857ba73abee"],["f219ea5d6b54701c1c14de5b557eb42a8d13f3abbcd08affcc2a5e6b049b8d63","4cb95957e83d40b0f73af4544cccf6b1f4b08d3c07b27fb8d8c2962a400766d1"],["d7b8740f74a8fbaab1f683db8f45de26543a5490bca627087236912469a0b448","fa77968128d9c92ee1010f337ad4717eff15db5ed3c049b3411e0315eaa4593b"],["32d31c222f8f6f0ef86f7c98d3a3335ead5bcd32abdd94289fe4d3091aa824bf","5f3032f5892156e39ccd3d7915b9e1da2e6dac9e6f26e961118d14b8462e1661"],["7461f371914ab32671045a155d9831ea8793d77cd59592c4340f86cbc18347b5","8ec0ba238b96bec0cbdddcae0aa442542eee1ff50c986ea6b39847b3cc092ff6"],["ee079adb1df1860074356a25aa38206a6d716b2c3e67453d287698bad7b2b2d6","8dc2412aafe3be5c4c5f37e0ecc5f9f6a446989af04c4e25ebaac479ec1c8c1e"],["16ec93e447ec83f0467b18302ee620f7e65de331874c9dc72bfd8616ba9da6b5","5e4631150e62fb40d0e8c2a7ca5804a39d58186a50e497139626778e25b0674d"],["eaa5f980c245f6f038978290afa70b6bd8855897f98b6aa485b96065d537bd99","f65f5d3e292c2e0819a528391c994624d784869d7e6ea67fb18041024edc07dc"],["78c9407544ac132692ee1910a02439958ae04877151342ea96c4b6b35a49f51","f3e0319169eb9b85d5404795539a5e68fa1fbd583c064d2462b675f194a3ddb4"],["494f4be219a1a77016dcd838431aea0001cdc8ae7a6fc688726578d9702857a5","42242a969283a5f339ba7f075e36ba2af925ce30d767ed6e55f4b031880d562c"],["a598a8030da6d86c6bc7f2f5144ea549d28211ea58faa70ebf4c1e665c1fe9b5","204b5d6f84822c307e4b4a7140737aec23fc63b65b35f86a10026dbd2d864e6b"],["c41916365abb2b5d09192f5f2dbeafec208f020f12570a184dbadc3e58595997","4f14351d0087efa49d245b328984989d5caf9450f34bfc0ed16e96b58fa9913"],["841d6063a586fa475a724604da03bc5b92a2e0d2e0a36acfe4c73a5514742881","73867f59c0659e81904f9a1c7543698e62562d6744c169ce7a36de01a8d6154"],["5e95bb399a6971d376026947f89bde2f282b33810928be4ded112ac4d70e20d5","39f23f366809085beebfc71181313775a99c9aed7d8ba38b161384c746012865"],["36e4641a53948fd476c39f8a99fd974e5ec07564b5315d8bf99471bca0ef2f66","d2424b1b1abe4eb8164227b085c9aa9456ea13493fd563e06fd51cf5694c78fc"],["336581ea7bfbbb290c191a2f507a41cf5643842170e914faeab27c2c579f726","ead12168595fe1be99252129b6e56b3391f7ab1410cd1e0ef3dcdcabd2fda224"],["8ab89816dadfd6b6a1f2634fcf00ec8403781025ed6890c4849742706bd43ede","6fdcef09f2f6d0a044e654aef624136f503d459c3e89845858a47a9129cdd24e"],["1e33f1a746c9c5778133344d9299fcaa20b0938e8acff2544bb40284b8c5fb94","60660257dd11b3aa9c8ed618d24edff2306d320f1d03010e33a7d2057f3b3b6"],["85b7c1dcb3cec1b7ee7f30ded79dd20a0ed1f4cc18cbcfcfa410361fd8f08f31","3d98a9cdd026dd43f39048f25a8847f4fcafad1895d7a633c6fed3c35e999511"],["29df9fbd8d9e46509275f4b125d6d45d7fbe9a3b878a7af872a2800661ac5f51","b4c4fe99c775a606e2d8862179139ffda61dc861c019e55cd2876eb2a27d84b"],["a0b1cae06b0a847a3fea6e671aaf8adfdfe58ca2f768105c8082b2e449fce252","ae434102edde0958ec4b19d917a6a28e6b72da1834aff0e650f049503a296cf2"],["4e8ceafb9b3e9a136dc7ff67e840295b499dfb3b2133e4ba113f2e4c0e121e5","cf2174118c8b6d7a4b48f6d534ce5c79422c086a63460502b827ce62a326683c"],["d24a44e047e19b6f5afb81c7ca2f69080a5076689a010919f42725c2b789a33b","6fb8d5591b466f8fc63db50f1c0f1c69013f996887b8244d2cdec417afea8fa3"],["ea01606a7a6c9cdd249fdfcfacb99584001edd28abbab77b5104e98e8e3b35d4","322af4908c7312b0cfbfe369f7a7b3cdb7d4494bc2823700cfd652188a3ea98d"],["af8addbf2b661c8a6c6328655eb96651252007d8c5ea31be4ad196de8ce2131f","6749e67c029b85f52a034eafd096836b2520818680e26ac8f3dfbcdb71749700"],["e3ae1974566ca06cc516d47e0fb165a674a3dabcfca15e722f0e3450f45889","2aeabe7e4531510116217f07bf4d07300de97e4874f81f533420a72eeb0bd6a4"],["591ee355313d99721cf6993ffed1e3e301993ff3ed258802075ea8ced397e246","b0ea558a113c30bea60fc4775460c7901ff0b053d25ca2bdeee98f1a4be5d196"],["11396d55fda54c49f19aa97318d8da61fa8584e47b084945077cf03255b52984","998c74a8cd45ac01289d5833a7beb4744ff536b01b257be4c5767bea93ea57a4"],["3c5d2a1ba39c5a1790000738c9e0c40b8dcdfd5468754b6405540157e017aa7a","b2284279995a34e2f9d4de7396fc18b80f9b8b9fdd270f6661f79ca4c81bd257"],["cc8704b8a60a0defa3a99a7299f2e9c3fbc395afb04ac078425ef8a1793cc030","bdd46039feed17881d1e0862db347f8cf395b74fc4bcdc4e940b74e3ac1f1b13"],["c533e4f7ea8555aacd9777ac5cad29b97dd4defccc53ee7ea204119b2889b197","6f0a256bc5efdf429a2fb6242f1a43a2d9b925bb4a4b3a26bb8e0f45eb596096"],["c14f8f2ccb27d6f109f6d08d03cc96a69ba8c34eec07bbcf566d48e33da6593","c359d6923bb398f7fd4473e16fe1c28475b740dd098075e6c0e8649113dc3a38"],["a6cbc3046bc6a450bac24789fa17115a4c9739ed75f8f21ce441f72e0b90e6ef","21ae7f4680e889bb130619e2c0f95a360ceb573c70603139862afd617fa9b9f"],["347d6d9a02c48927ebfb86c1359b1caf130a3c0267d11ce6344b39f99d43cc38","60ea7f61a353524d1c987f6ecec92f086d565ab687870cb12689ff1e31c74448"],["da6545d2181db8d983f7dcb375ef5866d47c67b1bf31c8cf855ef7437b72656a","49b96715ab6878a79e78f07ce5680c5d6673051b4935bd897fea824b77dc208a"],["c40747cc9d012cb1a13b8148309c6de7ec25d6945d657146b9d5994b8feb1111","5ca560753be2a12fc6de6caf2cb489565db936156b9514e1bb5e83037e0fa2d4"],["4e42c8ec82c99798ccf3a610be870e78338c7f713348bd34c8203ef4037f3502","7571d74ee5e0fb92a7a8b33a07783341a5492144cc54bcc40a94473693606437"],["3775ab7089bc6af823aba2e1af70b236d251cadb0c86743287522a1b3b0dedea","be52d107bcfa09d8bcb9736a828cfa7fac8db17bf7a76a2c42ad961409018cf7"],["cee31cbf7e34ec379d94fb814d3d775ad954595d1314ba8846959e3e82f74e26","8fd64a14c06b589c26b947ae2bcf6bfa0149ef0be14ed4d80f448a01c43b1c6d"],["b4f9eaea09b6917619f6ea6a4eb5464efddb58fd45b1ebefcdc1a01d08b47986","39e5c9925b5a54b07433a4f18c61726f8bb131c012ca542eb24a8ac07200682a"],["d4263dfc3d2df923a0179a48966d30ce84e2515afc3dccc1b77907792ebcc60e","62dfaf07a0f78feb30e30d6295853ce189e127760ad6cf7fae164e122a208d54"],["48457524820fa65a4f8d35eb6930857c0032acc0a4a2de422233eeda897612c4","25a748ab367979d98733c38a1fa1c2e7dc6cc07db2d60a9ae7a76aaa49bd0f77"],["dfeeef1881101f2cb11644f3a2afdfc2045e19919152923f367a1767c11cceda","ecfb7056cf1de042f9420bab396793c0c390bde74b4bbdff16a83ae09a9a7517"],["6d7ef6b17543f8373c573f44e1f389835d89bcbc6062ced36c82df83b8fae859","cd450ec335438986dfefa10c57fea9bcc521a0959b2d80bbf74b190dca712d10"],["e75605d59102a5a2684500d3b991f2e3f3c88b93225547035af25af66e04541f","f5c54754a8f71ee540b9b48728473e314f729ac5308b06938360990e2bfad125"],["eb98660f4c4dfaa06a2be453d5020bc99a0c2e60abe388457dd43fefb1ed620c","6cb9a8876d9cb8520609af3add26cd20a0a7cd8a9411131ce85f44100099223e"],["13e87b027d8514d35939f2e6892b19922154596941888336dc3563e3b8dba942","fef5a3c68059a6dec5d624114bf1e91aac2b9da568d6abeb2570d55646b8adf1"],["ee163026e9fd6fe017c38f06a5be6fc125424b371ce2708e7bf4491691e5764a","1acb250f255dd61c43d94ccc670d0f58f49ae3fa15b96623e5430da0ad6c62b2"],["b268f5ef9ad51e4d78de3a750c2dc89b1e626d43505867999932e5db33af3d80","5f310d4b3c99b9ebb19f77d41c1dee018cf0d34fd4191614003e945a1216e423"],["ff07f3118a9df035e9fad85eb6c7bfe42b02f01ca99ceea3bf7ffdba93c4750d","438136d603e858a3a5c440c38eccbaddc1d2942114e2eddd4740d098ced1f0d8"],["8d8b9855c7c052a34146fd20ffb658bea4b9f69e0d825ebec16e8c3ce2b526a1","cdb559eedc2d79f926baf44fb84ea4d44bcf50fee51d7ceb30e2e7f463036758"],["52db0b5384dfbf05bfa9d472d7ae26dfe4b851ceca91b1eba54263180da32b63","c3b997d050ee5d423ebaf66a6db9f57b3180c902875679de924b69d84a7b375"],["e62f9490d3d51da6395efd24e80919cc7d0f29c3f3fa48c6fff543becbd43352","6d89ad7ba4876b0b22c2ca280c682862f342c8591f1daf5170e07bfd9ccafa7d"],["7f30ea2476b399b4957509c88f77d0191afa2ff5cb7b14fd6d8e7d65aaab1193","ca5ef7d4b231c94c3b15389a5f6311e9daff7bb67b103e9880ef4bff637acaec"],["5098ff1e1d9f14fb46a210fada6c903fef0fb7b4a1dd1d9ac60a0361800b7a00","9731141d81fc8f8084d37c6e7542006b3ee1b40d60dfe5362a5b132fd17ddc0"],["32b78c7de9ee512a72895be6b9cbefa6e2f3c4ccce445c96b9f2c81e2778ad58","ee1849f513df71e32efc3896ee28260c73bb80547ae2275ba497237794c8753c"],["e2cb74fddc8e9fbcd076eef2a7c72b0ce37d50f08269dfc074b581550547a4f7","d3aa2ed71c9dd2247a62df062736eb0baddea9e36122d2be8641abcb005cc4a4"],["8438447566d4d7bedadc299496ab357426009a35f235cb141be0d99cd10ae3a8","c4e1020916980a4da5d01ac5e6ad330734ef0d7906631c4f2390426b2edd791f"],["4162d488b89402039b584c6fc6c308870587d9c46f660b878ab65c82c711d67e","67163e903236289f776f22c25fb8a3afc1732f2b84b4e95dbda47ae5a0852649"],["3fad3fa84caf0f34f0f89bfd2dcf54fc175d767aec3e50684f3ba4a4bf5f683d","cd1bc7cb6cc407bb2f0ca647c718a730cf71872e7d0d2a53fa20efcdfe61826"],["674f2600a3007a00568c1a7ce05d0816c1fb84bf1370798f1c69532faeb1a86b","299d21f9413f33b3edf43b257004580b70db57da0b182259e09eecc69e0d38a5"],["d32f4da54ade74abb81b815ad1fb3b263d82d6c692714bcff87d29bd5ee9f08f","f9429e738b8e53b968e99016c059707782e14f4535359d582fc416910b3eea87"],["30e4e670435385556e593657135845d36fbb6931f72b08cb1ed954f1e3ce3ff6","462f9bce619898638499350113bbc9b10a878d35da70740dc695a559eb88db7b"],["be2062003c51cc3004682904330e4dee7f3dcd10b01e580bf1971b04d4cad297","62188bc49d61e5428573d48a74e1c655b1c61090905682a0d5558ed72dccb9bc"],["93144423ace3451ed29e0fb9ac2af211cb6e84a601df5993c419859fff5df04a","7c10dfb164c3425f5c71a3f9d7992038f1065224f72bb9d1d902a6d13037b47c"],["b015f8044f5fcbdcf21ca26d6c34fb8197829205c7b7d2a7cb66418c157b112c","ab8c1e086d04e813744a655b2df8d5f83b3cdc6faa3088c1d3aea1454e3a1d5f"],["d5e9e1da649d97d89e4868117a465a3a4f8a18de57a140d36b3f2af341a21b52","4cb04437f391ed73111a13cc1d4dd0db1693465c2240480d8955e8592f27447a"],["d3ae41047dd7ca065dbf8ed77b992439983005cd72e16d6f996a5316d36966bb","bd1aeb21ad22ebb22a10f0303417c6d964f8cdd7df0aca614b10dc14d125ac46"],["463e2763d885f958fc66cdd22800f0a487197d0a82e377b49f80af87c897b065","bfefacdb0e5d0fd7df3a311a94de062b26b80c61fbc97508b79992671ef7ca7f"],["7985fdfd127c0567c6f53ec1bb63ec3158e597c40bfe747c83cddfc910641917","603c12daf3d9862ef2b25fe1de289aed24ed291e0ec6708703a5bd567f32ed03"],["74a1ad6b5f76e39db2dd249410eac7f99e74c59cb83d2d0ed5ff1543da7703e9","cc6157ef18c9c63cd6193d83631bbea0093e0968942e8c33d5737fd790e0db08"],["30682a50703375f602d416664ba19b7fc9bab42c72747463a71d0896b22f6da3","553e04f6b018b4fa6c8f39e7f311d3176290d0e0f19ca73f17714d9977a22ff8"],["9e2158f0d7c0d5f26c3791efefa79597654e7a2b2464f52b1ee6c1347769ef57","712fcdd1b9053f09003a3481fa7762e9ffd7c8ef35a38509e2fbf2629008373"],["176e26989a43c9cfeba4029c202538c28172e566e3c4fce7322857f3be327d66","ed8cc9d04b29eb877d270b4878dc43c19aefd31f4eee09ee7b47834c1fa4b1c3"],["75d46efea3771e6e68abb89a13ad747ecf1892393dfc4f1b7004788c50374da8","9852390a99507679fd0b86fd2b39a868d7efc22151346e1a3ca4726586a6bed8"],["809a20c67d64900ffb698c4c825f6d5f2310fb0451c869345b7319f645605721","9e994980d9917e22b76b061927fa04143d096ccc54963e6a5ebfa5f3f8e286c1"],["1b38903a43f7f114ed4500b4eac7083fdefece1cf29c63528d563446f972c180","4036edc931a60ae889353f77fd53de4a2708b26b6f5da72ad3394119daf408f9"]]}}},{}],13:[function(e,t,r){"use strict";function d(e,t){if(Array.isArray(e))return e.slice();if(!e)return[];var r=[];if("string"!=typeof e){for(var d=0;d<e.length;d++)r[d]=0|e[d];return r}if(t){if("hex"===t){e=e.replace(/[^a-z0-9]+/gi,""),e.length%2!==0&&(e="0"+e);for(var d=0;d<e.length;d+=2)r.push(parseInt(e[d]+e[d+1],16))}}else for(var d=0;d<e.length;d++){var i=e.charCodeAt(d),f=i>>8,n=255&i;f?r.push(f,n):r.push(n)}return r}function i(e){return 1===e.length?"0"+e:e}function f(e){for(var t="",r=0;r<e.length;r++)t+=i(e[r].toString(16));return t}function n(e,t){for(var r=[],d=1<<t+1,i=e.clone();i.cmpn(1)>=0;){var f;if(i.isOdd()){var n=i.andln(d-1);f=n>(d>>1)-1?(d>>1)-n:n,i.isubn(f)}else f=0;r.push(f);for(var a=0!==i.cmpn(0)&&0===i.andln(d-1)?t+1:1,s=1;a>s;s++)r.push(0);i.ishrn(a)}return r}function a(e,t){var r=[[],[]];e=e.clone(),t=t.clone();for(var d=0,i=0;e.cmpn(-d)>0||t.cmpn(-i)>0;){var f=e.andln(3)+d&3,n=t.andln(3)+i&3;3===f&&(f=-1),3===n&&(n=-1);var a;if(0===(1&f))a=0;else{var s=e.andln(7)+d&7;a=3!==s&&5!==s||2!==n?f:-f}r[0].push(a);var c;if(0===(1&n))c=0;else{var s=t.andln(7)+i&7;c=3!==s&&5!==s||2!==f?n:-n}r[1].push(c),2*d===a+1&&(d=1-d),2*i===c+1&&(i=1-i),e.ishrn(1),t.ishrn(1)}return r}var s=r;s.assert=function(e,t){if(!e)throw new Error(t||"Assertion failed")},s.toArray=d,s.zero2=i,s.toHex=f,s.encode=function(e,t){return"hex"===t?f(e):e},s.getNAF=n,s.getJSF=a},{}],14:[function(e,t){!function(e,t){"use strict";function r(e,t){if(!e)throw new Error(t||"Assertion failed")}function d(e,t){e.super_=t;var r=function(){};r.prototype=t.prototype,e.prototype=new r,e.prototype.constructor=e}function i(e,t,r){return null!==e&&"object"==typeof e&&Array.isArray(e.words)?e:(this.sign=!1,this.words=null,this.length=0,this.red=null,("le"===t||"be"===t)&&(r=t,t=10),void(null!==e&&this._init(e||0,t||10,r||"be")))}function f(e,t,r){for(var d=0,i=Math.min(e.length,r),f=t;i>f;f++){var n=e.charCodeAt(f)-48;d<<=4,d|=n>=49&&54>=n?n-49+10:n>=17&&22>=n?n-17+10:15&n}return d}function n(e,t,r,d){for(var i=0,f=Math.min(e.length,r),n=t;f>n;n++){var a=e.charCodeAt(n)-48;i*=d,i+=a>=49?a-49+10:a>=17?a-17+10:a}return i}function a(e,t){this.name=e,this.p=new i(t,16),this.n=this.p.bitLength(),this.k=new i(1).ishln(this.n).isub(this.p),this.tmp=this._tmp()}function s(){a.call(this,"k256","ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe fffffc2f")}function c(){a.call(this,"p224","ffffffff ffffffff ffffffff ffffffff 00000000 00000000 00000001")}function h(){a.call(this,"p192","ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff")}function o(){a.call(this,"25519","7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed")
-}function b(e){if("string"==typeof e){var t=i._prime(e);this.m=t.p,this.prime=t}else this.m=e,this.prime=null}function u(e){b.call(this,e),this.shift=this.m.bitLength(),this.shift%26!==0&&(this.shift+=26-this.shift%26),this.r=new i(1).ishln(this.shift),this.r2=this.imod(this.r.sqr()),this.rinv=this.r._invmp(this.m),this.minv=this.rinv.mul(this.r).isubn(1).div(this.m),this.minv.sign=!0,this.minv=this.minv.mod(this.r)}"object"==typeof e?e.exports=i:t.BN=i,i.BN=i,i.wordSize=26,i.prototype._init=function(e,t,d){if("number"==typeof e)return 0>e&&(this.sign=!0,e=-e),void(67108864>e?(this.words=[67108863&e],this.length=1):(this.words=[67108863&e,e/67108864&67108863],this.length=2));if("object"==typeof e)return this._initArray(e,t,d);"hex"===t&&(t=16),r(t===(0|t)&&t>=2&&36>=t),e=e.toString().replace(/\s+/g,"");var i=0;"-"===e[0]&&i++,16===t?this._parseHex(e,i):this._parseBase(e,t,i),"-"===e[0]&&(this.sign=!0),this.strip()},i.prototype._initArray=function(e,t,d){r("number"==typeof e.length),this.length=Math.ceil(e.length/3),this.words=new Array(this.length);for(var i=0;i<this.length;i++)this.words[i]=0;var f=0;if("be"===d)for(var i=e.length-1,n=0;i>=0;i-=3){var a=e[i]|e[i-1]<<8|e[i-2]<<16;this.words[n]|=a<<f&67108863,this.words[n+1]=a>>>26-f&67108863,f+=24,f>=26&&(f-=26,n++)}else if("le"===d)for(var i=0,n=0;i<e.length;i+=3){var a=e[i]|e[i+1]<<8|e[i+2]<<16;this.words[n]|=a<<f&67108863,this.words[n+1]=a>>>26-f&67108863,f+=24,f>=26&&(f-=26,n++)}return this.strip()},i.prototype._parseHex=function(e,t){this.length=Math.ceil((e.length-t)/6),this.words=new Array(this.length);for(var r=0;r<this.length;r++)this.words[r]=0;for(var d=0,r=e.length-6,i=0;r>=t;r-=6){var n=f(e,r,r+6);this.words[i]|=n<<d&67108863,this.words[i+1]|=n>>>26-d&4194303,d+=24,d>=26&&(d-=26,i++)}if(r+6!==t){var n=f(e,t,r+6);this.words[i]|=n<<d&67108863,this.words[i+1]|=n>>>26-d&4194303}this.strip()},i.prototype._parseBase=function(e,t,r){this.words=[0],this.length=1;for(var d=0,i=1;67108863>=i;i*=t)d++;d--,i=i/t|0;for(var f=e.length-r,a=f%d,s=Math.min(f,f-a)+r,c=0,h=r;s>h;h+=d)c=n(e,h,h+d,t),this.imuln(i),this.words[0]+c<67108864?this.words[0]+=c:this._iaddn(c);if(0!==a){for(var o=1,c=n(e,h,e.length,t),h=0;a>h;h++)o*=t;this.imuln(o),this.words[0]+c<67108864?this.words[0]+=c:this._iaddn(c)}},i.prototype.copy=function(e){e.words=new Array(this.length);for(var t=0;t<this.length;t++)e.words[t]=this.words[t];e.length=this.length,e.sign=this.sign,e.red=this.red},i.prototype.clone=function(){var e=new i(null);return this.copy(e),e},i.prototype.strip=function(){for(;this.length>1&&0===this.words[this.length-1];)this.length--;return this._normSign()},i.prototype._normSign=function(){return 1===this.length&&0===this.words[0]&&(this.sign=!1),this},i.prototype.inspect=function(){return(this.red?"<BN-R: ":"<BN: ")+this.toString(16)+">"};var p=["","0","00","000","0000","00000","000000","0000000","00000000","000000000","0000000000","00000000000","000000000000","0000000000000","00000000000000","000000000000000","0000000000000000","00000000000000000","000000000000000000","0000000000000000000","00000000000000000000","000000000000000000000","0000000000000000000000","00000000000000000000000","000000000000000000000000","0000000000000000000000000"],l=[0,0,25,16,12,11,10,9,8,8,7,7,7,7,6,6,6,6,6,6,6,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],v=[0,0,33554432,43046721,16777216,48828125,60466176,40353607,16777216,43046721,1e7,19487171,35831808,62748517,7529536,11390625,16777216,24137569,34012224,47045881,64e6,4084101,5153632,6436343,7962624,9765625,11881376,14348907,17210368,20511149,243e5,28629151,33554432,39135393,45435424,52521875,60466176];i.prototype.toString=function(e,t){if(e=e||10,16===e||"hex"===e){for(var d="",i=0,t=0|t||1,f=0,n=0;n<this.length;n++){var a=this.words[n],s=(16777215&(a<<i|f)).toString(16);f=a>>>24-i&16777215,d=0!==f||n!==this.length-1?p[6-s.length]+s+d:s+d,i+=2,i>=26&&(i-=26,n--)}for(0!==f&&(d=f.toString(16)+d);d.length%t!==0;)d="0"+d;return this.sign&&(d="-"+d),d}if(e===(0|e)&&e>=2&&36>=e){var c=l[e],h=v[e],d="",o=this.clone();for(o.sign=!1;0!==o.cmpn(0);){var b=o.modn(h).toString(e);o=o.idivn(h),d=0!==o.cmpn(0)?p[c-b.length]+b+d:b+d}return 0===this.cmpn(0)&&(d="0"+d),this.sign&&(d="-"+d),d}r(!1,"Base should be between 2 and 36")},i.prototype.toJSON=function(){return this.toString(16)},i.prototype.toArray=function(){this.strip();var e=new Array(this.byteLength());e[0]=0;for(var t=this.clone(),r=0;0!==t.cmpn(0);r++){var d=t.andln(255);t.ishrn(8),e[e.length-r-1]=d}return e},i.prototype._countBits=Math.clz32?function(e){return 32-Math.clz32(e)}:function(e){var t=e,r=0;return t>=4096&&(r+=13,t>>>=13),t>=64&&(r+=7,t>>>=7),t>=8&&(r+=4,t>>>=4),t>=2&&(r+=2,t>>>=2),r+t},i.prototype._zeroBits=function(e){if(0===e)return 26;var t=e,r=0;return 0===(8191&t)&&(r+=13,t>>>=13),0===(127&t)&&(r+=7,t>>>=7),0===(15&t)&&(r+=4,t>>>=4),0===(3&t)&&(r+=2,t>>>=2),0===(1&t)&&r++,r},i.prototype.bitLength=function(){var e=0,t=this.words[this.length-1],e=this._countBits(t);return 26*(this.length-1)+e},i.prototype.zeroBits=function(){if(0===this.cmpn(0))return 0;for(var e=0,t=0;t<this.length;t++){var r=this._zeroBits(this.words[t]);if(e+=r,26!==r)break}return e},i.prototype.byteLength=function(){return Math.ceil(this.bitLength()/8)},i.prototype.neg=function(){if(0===this.cmpn(0))return this.clone();var e=this.clone();return e.sign=!this.sign,e},i.prototype.ior=function(e){for(this.sign=this.sign||e.sign;this.length<e.length;)this.words[this.length++]=0;for(var t=0;t<e.length;t++)this.words[t]=this.words[t]|e.words[t];return this.strip()},i.prototype.or=function(e){return this.length>e.length?this.clone().ior(e):e.clone().ior(this)},i.prototype.iand=function(e){this.sign=this.sign&&e.sign;var t;t=this.length>e.length?e:this;for(var r=0;r<t.length;r++)this.words[r]=this.words[r]&e.words[r];return this.length=t.length,this.strip()},i.prototype.and=function(e){return this.length>e.length?this.clone().iand(e):e.clone().iand(this)},i.prototype.ixor=function(e){this.sign=this.sign||e.sign;var t,r;this.length>e.length?(t=this,r=e):(t=e,r=this);for(var d=0;d<r.length;d++)this.words[d]=t.words[d]^r.words[d];if(this!==t)for(;d<t.length;d++)this.words[d]=t.words[d];return this.length=t.length,this.strip()},i.prototype.xor=function(e){return this.length>e.length?this.clone().ixor(e):e.clone().ixor(this)},i.prototype.setn=function(e,t){r("number"==typeof e&&e>=0);for(var d=e/26|0,i=e%26;this.length<=d;)this.words[this.length++]=0;return this.words[d]=t?this.words[d]|1<<i:this.words[d]&~(1<<i),this.strip()},i.prototype.iadd=function(e){if(this.sign&&!e.sign){this.sign=!1;var t=this.isub(e);return this.sign=!this.sign,this._normSign()}if(!this.sign&&e.sign){e.sign=!1;var t=this.isub(e);return e.sign=!0,t._normSign()}var r,d;this.length>e.length?(r=this,d=e):(r=e,d=this);for(var i=0,f=0;f<d.length;f++){var t=r.words[f]+d.words[f]+i;this.words[f]=67108863&t,i=t>>>26}for(;0!==i&&f<r.length;f++){var t=r.words[f]+i;this.words[f]=67108863&t,i=t>>>26}if(this.length=r.length,0!==i)this.words[this.length]=i,this.length++;else if(r!==this)for(;f<r.length;f++)this.words[f]=r.words[f];return this},i.prototype.add=function(e){if(e.sign&&!this.sign){e.sign=!1;var t=this.sub(e);return e.sign=!0,t}if(!e.sign&&this.sign){this.sign=!1;var t=e.sub(this);return this.sign=!0,t}return this.length>e.length?this.clone().iadd(e):e.clone().iadd(this)},i.prototype.isub=function(e){if(e.sign){e.sign=!1;var t=this.iadd(e);return e.sign=!0,t._normSign()}if(this.sign)return this.sign=!1,this.iadd(e),this.sign=!0,this._normSign();var r=this.cmp(e);if(0===r)return this.sign=!1,this.length=1,this.words[0]=0,this;var d,i;r>0?(d=this,i=e):(d=e,i=this);for(var f=0,n=0;n<i.length;n++){var t=d.words[n]-i.words[n]+f;f=t>>26,this.words[n]=67108863&t}for(;0!==f&&n<d.length;n++){var t=d.words[n]+f;f=t>>26,this.words[n]=67108863&t}if(0===f&&n<d.length&&d!==this)for(;n<d.length;n++)this.words[n]=d.words[n];return this.length=Math.max(this.length,n),d!==this&&(this.sign=!0),this.strip()},i.prototype.sub=function(e){return this.clone().isub(e)},i.prototype._smallMulTo=function(e,t){t.sign=e.sign!==this.sign,t.length=this.length+e.length;for(var r=0,d=0;d<t.length-1;d++){for(var i=r>>>26,f=67108863&r,n=Math.min(d,e.length-1),a=Math.max(0,d-this.length+1);n>=a;a++){var s=d-a,c=0|this.words[s],h=0|e.words[a],o=c*h,b=67108863&o;i=i+(o/67108864|0)|0,b=b+f|0,f=67108863&b,i=i+(b>>>26)|0}t.words[d]=f,r=i}return 0!==r?t.words[d]=r:t.length--,t.strip()},i.prototype._bigMulTo=function(e,t){t.sign=e.sign!==this.sign,t.length=this.length+e.length;for(var r=0,d=0,i=0;i<t.length-1;i++){var f=d;d=0;for(var n=67108863&r,a=Math.min(i,e.length-1),s=Math.max(0,i-this.length+1);a>=s;s++){var c=i-s,h=0|this.words[c],o=0|e.words[s],b=h*o,u=67108863&b;f=f+(b/67108864|0)|0,u=u+n|0,n=67108863&u,f=f+(u>>>26)|0,d+=f>>>26,f&=67108863}t.words[i]=n,r=f,f=d}return 0!==r?t.words[i]=r:t.length--,t.strip()},i.prototype.mulTo=function(e,t){var r;return r=this.length+e.length<63?this._smallMulTo(e,t):this._bigMulTo(e,t)},i.prototype.mul=function(e){var t=new i(null);return t.words=new Array(this.length+e.length),this.mulTo(e,t)},i.prototype.imul=function(e){if(0===this.cmpn(0)||0===e.cmpn(0))return this.words[0]=0,this.length=1,this;var t=this.length,r=e.length;this.sign=e.sign!==this.sign,this.length=this.length+e.length,this.words[this.length-1]=0;for(var d=this.length-2;d>=0;d--){for(var i=0,f=0,n=Math.min(d,r-1),a=Math.max(0,d-t+1);n>=a;a++){var s=d-a,c=this.words[s],h=e.words[a],o=c*h,b=67108863&o;i+=o/67108864|0,b+=f,f=67108863&b,i+=b>>>26}this.words[d]=f,this.words[d+1]+=i,i=0}for(var i=0,s=1;s<this.length;s++){var u=this.words[s]+i;this.words[s]=67108863&u,i=u>>>26}return this.strip()},i.prototype.imuln=function(e){r("number"==typeof e);for(var t=0,d=0;d<this.length;d++){var i=this.words[d]*e,f=(67108863&i)+(67108863&t);t>>=26,t+=i/67108864|0,t+=f>>>26,this.words[d]=67108863&f}return 0!==t&&(this.words[d]=t,this.length++),this},i.prototype.sqr=function(){return this.mul(this)},i.prototype.isqr=function(){return this.mul(this)},i.prototype.ishln=function(e){r("number"==typeof e&&e>=0);var t=e%26,d=(e-t)/26,i=67108863>>>26-t<<26-t;if(0!==t){for(var f=0,n=0;n<this.length;n++){var a=this.words[n]&i,s=this.words[n]-a<<t;this.words[n]=s|f,f=a>>>26-t}f&&(this.words[n]=f,this.length++)}if(0!==d){for(var n=this.length-1;n>=0;n--)this.words[n+d]=this.words[n];for(var n=0;d>n;n++)this.words[n]=0;this.length+=d}return this.strip()},i.prototype.ishrn=function(e,t,d){r("number"==typeof e&&e>=0);var i;i=t?(t-t%26)/26:0;var f=e%26,n=Math.min((e-f)/26,this.length),a=67108863^67108863>>>f<<f,s=d;if(i-=n,i=Math.max(0,i),s){for(var c=0;n>c;c++)s.words[c]=this.words[c];s.length=n}if(0===n);else if(this.length>n){this.length-=n;for(var c=0;c<this.length;c++)this.words[c]=this.words[c+n]}else this.words[0]=0,this.length=1;for(var h=0,c=this.length-1;c>=0&&(0!==h||c>=i);c--){var o=this.words[c];this.words[c]=h<<26-f|o>>>f,h=o&a}return s&&0!==h&&(s.words[s.length++]=h),0===this.length&&(this.words[0]=0,this.length=1),this.strip(),this},i.prototype.shln=function(e){return this.clone().ishln(e)},i.prototype.shrn=function(e){return this.clone().ishrn(e)},i.prototype.testn=function(e){r("number"==typeof e&&e>=0);var t=e%26,d=(e-t)/26,i=1<<t;if(this.length<=d)return!1;var f=this.words[d];return!!(f&i)},i.prototype.imaskn=function(e){r("number"==typeof e&&e>=0);var t=e%26,d=(e-t)/26;if(r(!this.sign,"imaskn works only with positive numbers"),0!==t&&d++,this.length=Math.min(d,this.length),0!==t){var i=67108863^67108863>>>t<<t;this.words[this.length-1]&=i}return this.strip()},i.prototype.maskn=function(e){return this.clone().imaskn(e)},i.prototype.iaddn=function(e){return r("number"==typeof e),0>e?this.isubn(-e):this.sign?1===this.length&&this.words[0]<e?(this.words[0]=e-this.words[0],this.sign=!1,this):(this.sign=!1,this.isubn(e),this.sign=!0,this):this._iaddn(e)},i.prototype._iaddn=function(e){this.words[0]+=e;for(var t=0;t<this.length&&this.words[t]>=67108864;t++)this.words[t]-=67108864,t===this.length-1?this.words[t+1]=1:this.words[t+1]++;return this.length=Math.max(this.length,t+1),this},i.prototype.isubn=function(e){if(r("number"==typeof e),0>e)return this.iaddn(-e);if(this.sign)return this.sign=!1,this.iaddn(e),this.sign=!0,this;this.words[0]-=e;for(var t=0;t<this.length&&this.words[t]<0;t++)this.words[t]+=67108864,this.words[t+1]-=1;return this.strip()},i.prototype.addn=function(e){return this.clone().iaddn(e)},i.prototype.subn=function(e){return this.clone().isubn(e)},i.prototype.iabs=function(){return this.sign=!1,this},i.prototype.abs=function(){return this.clone().iabs()},i.prototype._ishlnsubmul=function(e,t,d){var i,f=e.length+d;if(this.words.length<f){for(var n=new Array(f),i=0;i<this.length;i++)n[i]=this.words[i];this.words=n}else i=this.length;for(this.length=Math.max(this.length,f);i<this.length;i++)this.words[i]=0;for(var a=0,i=0;i<e.length;i++){var s=this.words[i+d]+a,c=e.words[i]*t;s-=67108863&c,a=(s>>26)-(c/67108864|0),this.words[i+d]=67108863&s}for(;i<this.length-d;i++){var s=this.words[i+d]+a;a=s>>26,this.words[i+d]=67108863&s}if(0===a)return this.strip();r(-1===a),a=0;for(var i=0;i<this.length;i++){var s=-this.words[i]+a;a=s>>26,this.words[i]=67108863&s}return this.sign=!0,this.strip()},i.prototype._wordDiv=function(e,t){var r=this.length-e.length,d=this.clone(),f=e,n=f.words[f.length-1],a=this._countBits(n);r=26-a,0!==r&&(f=f.shln(r),d.ishln(r),n=f.words[f.length-1]);var s,c=d.length-f.length;if("mod"!==t){s=new i(null),s.length=c+1,s.words=new Array(s.length);for(var h=0;h<s.length;h++)s.words[h]=0}var o=d.clone()._ishlnsubmul(f,1,c);o.sign||(d=o,s&&(s.words[c]=1));for(var b=c-1;b>=0;b--){var u=67108864*d.words[f.length+b]+d.words[f.length+b-1];for(u=Math.min(u/n|0,67108863),d._ishlnsubmul(f,u,b);d.sign;)u--,d.sign=!1,d._ishlnsubmul(f,1,b),d.sign=!d.sign;s&&(s.words[b]=u)}return s&&s.strip(),d.strip(),"div"!==t&&0!==r&&d.ishrn(r),{div:s?s:null,mod:d}},i.prototype.divmod=function(e,t){if(r(0!==e.cmpn(0)),this.sign&&!e.sign){var d,f,n=this.neg().divmod(e,t);return"mod"!==t&&(d=n.div.neg()),"div"!==t&&(f=0===n.mod.cmpn(0)?n.mod:e.sub(n.mod)),{div:d,mod:f}}if(!this.sign&&e.sign){var d,n=this.divmod(e.neg(),t);return"mod"!==t&&(d=n.div.neg()),{div:d,mod:n.mod}}return this.sign&&e.sign?this.neg().divmod(e.neg(),t):e.length>this.length||this.cmp(e)<0?{div:new i(0),mod:this}:1===e.length?"div"===t?{div:this.divn(e.words[0]),mod:null}:"mod"===t?{div:null,mod:new i(this.modn(e.words[0]))}:{div:this.divn(e.words[0]),mod:new i(this.modn(e.words[0]))}:this._wordDiv(e,t)},i.prototype.div=function(e){return this.divmod(e,"div").div},i.prototype.mod=function(e){return this.divmod(e,"mod").mod},i.prototype.divRound=function(e){var t=this.divmod(e);if(0===t.mod.cmpn(0))return t.div;var r=t.div.sign?t.mod.isub(e):t.mod,d=e.shrn(1),i=e.andln(1),f=r.cmp(d);return 0>f||1===i&&0===f?t.div:t.div.sign?t.div.isubn(1):t.div.iaddn(1)},i.prototype.modn=function(e){r(67108863>=e);for(var t=(1<<26)%e,d=0,i=this.length-1;i>=0;i--)d=(t*d+this.words[i])%e;return d},i.prototype.idivn=function(e){r(67108863>=e);for(var t=0,d=this.length-1;d>=0;d--){var i=this.words[d]+67108864*t;this.words[d]=i/e|0,t=i%e}return this.strip()},i.prototype.divn=function(e){return this.clone().idivn(e)},i.prototype.egcd=function(e){r(!e.sign),r(0!==e.cmpn(0));var t=this,d=e.clone();t=t.sign?t.mod(e):t.clone();for(var f=new i(1),n=new i(0),a=new i(0),s=new i(1),c=0;t.isEven()&&d.isEven();)t.ishrn(1),d.ishrn(1),++c;for(var h=d.clone(),o=t.clone();0!==t.cmpn(0);){for(;t.isEven();)t.ishrn(1),f.isEven()&&n.isEven()?(f.ishrn(1),n.ishrn(1)):(f.iadd(h).ishrn(1),n.isub(o).ishrn(1));for(;d.isEven();)d.ishrn(1),a.isEven()&&s.isEven()?(a.ishrn(1),s.ishrn(1)):(a.iadd(h).ishrn(1),s.isub(o).ishrn(1));t.cmp(d)>=0?(t.isub(d),f.isub(a),n.isub(s)):(d.isub(t),a.isub(f),s.isub(n))}return{a:a,b:s,gcd:d.ishln(c)}},i.prototype._invmp=function(e){r(!e.sign),r(0!==e.cmpn(0));var t=this,d=e.clone();t=t.sign?t.mod(e):t.clone();for(var f=new i(1),n=new i(0),a=d.clone();t.cmpn(1)>0&&d.cmpn(1)>0;){for(;t.isEven();)t.ishrn(1),f.isEven()?f.ishrn(1):f.iadd(a).ishrn(1);for(;d.isEven();)d.ishrn(1),n.isEven()?n.ishrn(1):n.iadd(a).ishrn(1);t.cmp(d)>=0?(t.isub(d),f.isub(n)):(d.isub(t),n.isub(f))}return 0===t.cmpn(1)?f:n},i.prototype.gcd=function(e){if(0===this.cmpn(0))return e.clone();if(0===e.cmpn(0))return this.clone();var t=this.clone(),r=e.clone();t.sign=!1,r.sign=!1;for(var d=0;t.isEven()&&r.isEven();d++)t.ishrn(1),r.ishrn(1);for(;;){for(;t.isEven();)t.ishrn(1);for(;r.isEven();)r.ishrn(1);var i=t.cmp(r);if(0>i){var f=t;t=r,r=f}else if(0===i||0===r.cmpn(1))break;t.isub(r)}return r.ishln(d)},i.prototype.invm=function(e){return this.egcd(e).a.mod(e)},i.prototype.isEven=function(){return 0===(1&this.words[0])},i.prototype.isOdd=function(){return 1===(1&this.words[0])},i.prototype.andln=function(e){return this.words[0]&e},i.prototype.bincn=function(e){r("number"==typeof e);var t=e%26,d=(e-t)/26,i=1<<t;if(this.length<=d){for(var f=this.length;d+1>f;f++)this.words[f]=0;return this.words[d]|=i,this.length=d+1,this}for(var n=i,f=d;0!==n&&f<this.length;f++){var a=this.words[f];a+=n,n=a>>>26,a&=67108863,this.words[f]=a}return 0!==n&&(this.words[f]=n,this.length++),this},i.prototype.cmpn=function(e){var t=0>e;if(t&&(e=-e),this.sign&&!t)return-1;if(!this.sign&&t)return 1;e&=67108863,this.strip();var r;if(this.length>1)r=1;else{var d=this.words[0];r=d===e?0:e>d?-1:1}return this.sign&&(r=-r),r},i.prototype.cmp=function(e){if(this.sign&&!e.sign)return-1;if(!this.sign&&e.sign)return 1;var t=this.ucmp(e);return this.sign?-t:t},i.prototype.ucmp=function(e){if(this.length>e.length)return 1;if(this.length<e.length)return-1;for(var t=0,r=this.length-1;r>=0;r--){var d=this.words[r],i=e.words[r];if(d!==i){i>d?t=-1:d>i&&(t=1);break}}return t},i.red=function(e){return new b(e)},i.prototype.toRed=function(e){return r(!this.red,"Already a number in reduction context"),r(!this.sign,"red works only with positives"),e.convertTo(this)._forceRed(e)},i.prototype.fromRed=function(){return r(this.red,"fromRed works only with numbers in reduction context"),this.red.convertFrom(this)},i.prototype._forceRed=function(e){return this.red=e,this},i.prototype.forceRed=function(e){return r(!this.red,"Already a number in reduction context"),this._forceRed(e)},i.prototype.redAdd=function(e){return r(this.red,"redAdd works only with red numbers"),this.red.add(this,e)},i.prototype.redIAdd=function(e){return r(this.red,"redIAdd works only with red numbers"),this.red.iadd(this,e)},i.prototype.redSub=function(e){return r(this.red,"redSub works only with red numbers"),this.red.sub(this,e)},i.prototype.redISub=function(e){return r(this.red,"redISub works only with red numbers"),this.red.isub(this,e)},i.prototype.redShl=function(e){return r(this.red,"redShl works only with red numbers"),this.red.shl(this,e)},i.prototype.redMul=function(e){return r(this.red,"redMul works only with red numbers"),this.red._verify2(this,e),this.red.mul(this,e)},i.prototype.redIMul=function(e){return r(this.red,"redMul works only with red numbers"),this.red._verify2(this,e),this.red.imul(this,e)},i.prototype.redSqr=function(){return r(this.red,"redSqr works only with red numbers"),this.red._verify1(this),this.red.sqr(this)},i.prototype.redISqr=function(){return r(this.red,"redISqr works only with red numbers"),this.red._verify1(this),this.red.isqr(this)},i.prototype.redSqrt=function(){return r(this.red,"redSqrt works only with red numbers"),this.red._verify1(this),this.red.sqrt(this)},i.prototype.redInvm=function(){return r(this.red,"redInvm works only with red numbers"),this.red._verify1(this),this.red.invm(this)},i.prototype.redNeg=function(){return r(this.red,"redNeg works only with red numbers"),this.red._verify1(this),this.red.neg(this)},i.prototype.redPow=function(e){return r(this.red&&!e.red,"redPow(normalNum)"),this.red._verify1(this),this.red.pow(this,e)};var g={k256:null,p224:null,p192:null,p25519:null};a.prototype._tmp=function(){var e=new i(null);return e.words=new Array(Math.ceil(this.n/13)),e},a.prototype.ireduce=function(e){var t,r=e;do this.split(r,this.tmp),r=this.imulK(r),r=r.iadd(this.tmp),t=r.bitLength();while(t>this.n);var d=t<this.n?-1:r.ucmp(this.p);return 0===d?(r.words[0]=0,r.length=1):d>0?r.isub(this.p):r.strip(),r},a.prototype.split=function(e,t){e.ishrn(this.n,0,t)},a.prototype.imulK=function(e){return e.imul(this.k)},d(s,a),s.prototype.split=function(e,t){for(var r=4194303,d=Math.min(e.length,9),i=0;d>i;i++)t.words[i]=e.words[i];if(t.length=d,e.length<=9)return e.words[0]=0,void(e.length=1);var f=e.words[9];t.words[t.length++]=f&r;for(var i=10;i<e.length;i++){var n=e.words[i];e.words[i-10]=(n&r)<<4|f>>>22,f=n}e.words[i-10]=f>>>22,e.length-=9},s.prototype.imulK=function(e){e.words[e.length]=0,e.words[e.length+1]=0,e.length+=2;for(var t,r=0,d=0;d<e.length;d++){var i=e.words[d];t=64*i,r+=977*i,t+=r/67108864|0,r&=67108863,e.words[d]=r,r=t}return 0===e.words[e.length-1]&&(e.length--,0===e.words[e.length-1]&&e.length--),e},d(c,a),d(h,a),d(o,a),o.prototype.imulK=function(e){for(var t=0,r=0;r<e.length;r++){var d=19*e.words[r]+t,i=67108863&d;d>>>=26,e.words[r]=i,t=d}return 0!==t&&(e.words[e.length++]=t),e},i._prime=function m(e){if(g[e])return g[e];var m;if("k256"===e)m=new s;else if("p224"===e)m=new c;else if("p192"===e)m=new h;else{if("p25519"!==e)throw new Error("Unknown prime "+e);m=new o}return g[e]=m,m},b.prototype._verify1=function(e){r(!e.sign,"red works only with positives"),r(e.red,"red works only with red numbers")},b.prototype._verify2=function(e,t){r(!e.sign&&!t.sign,"red works only with positives"),r(e.red&&e.red===t.red,"red works only with red numbers")},b.prototype.imod=function(e){return this.prime?this.prime.ireduce(e)._forceRed(this):e.mod(this.m)._forceRed(this)},b.prototype.neg=function(e){var t=e.clone();return t.sign=!t.sign,t.iadd(this.m)._forceRed(this)},b.prototype.add=function(e,t){this._verify2(e,t);var r=e.add(t);return r.cmp(this.m)>=0&&r.isub(this.m),r._forceRed(this)},b.prototype.iadd=function(e,t){this._verify2(e,t);var r=e.iadd(t);return r.cmp(this.m)>=0&&r.isub(this.m),r},b.prototype.sub=function(e,t){this._verify2(e,t);var r=e.sub(t);return r.cmpn(0)<0&&r.iadd(this.m),r._forceRed(this)},b.prototype.isub=function(e,t){this._verify2(e,t);var r=e.isub(t);return r.cmpn(0)<0&&r.iadd(this.m),r},b.prototype.shl=function(e,t){return this._verify1(e),this.imod(e.shln(t))},b.prototype.imul=function(e,t){return this._verify2(e,t),this.imod(e.imul(t))},b.prototype.mul=function(e,t){return this._verify2(e,t),this.imod(e.mul(t))},b.prototype.isqr=function(e){return this.imul(e,e)},b.prototype.sqr=function(e){return this.mul(e,e)},b.prototype.sqrt=function(e){if(0===e.cmpn(0))return e.clone();var t=this.m.andln(3);if(r(t%2===1),3===t){var d=this.m.add(new i(1)).ishrn(2),f=this.pow(e,d);return f}for(var n=this.m.subn(1),a=0;0!==n.cmpn(0)&&0===n.andln(1);)a++,n.ishrn(1);r(0!==n.cmpn(0));var s=new i(1).toRed(this),c=s.redNeg(),h=this.m.subn(1).ishrn(1),o=this.m.bitLength();for(o=new i(2*o*o).toRed(this);0!==this.pow(o,h).cmp(c);)o.redIAdd(c);for(var b=this.pow(o,n),f=this.pow(e,n.addn(1).ishrn(1)),u=this.pow(e,n),p=a;0!==u.cmp(s);){for(var l=u,v=0;0!==l.cmp(s);v++)l=l.redSqr();r(p>v);var g=this.pow(b,new i(1).ishln(p-v-1));f=f.redMul(g),b=g.redSqr(),u=u.redMul(b),p=v}return f},b.prototype.invm=function(e){var t=e._invmp(this.m);return t.sign?(t.sign=!1,this.imod(t).redNeg()):this.imod(t)},b.prototype.pow=function(e,t){for(var r=[],d=t.clone();0!==d.cmpn(0);)r.push(d.andln(1)),d.ishrn(1);for(var i=e,f=0;f<r.length&&0===r[f];f++,i=this.sqr(i));if(++f<r.length)for(var d=this.sqr(i);f<r.length;f++,d=this.sqr(d))0!==r[f]&&(i=this.mul(i,d));return i},b.prototype.convertTo=function(e){return e.clone()},b.prototype.convertFrom=function(e){var t=e.clone();return t.red=null,t},i.mont=function(e){return new u(e)},d(u,b),u.prototype.convertTo=function(e){return this.imod(e.shln(this.shift))},u.prototype.convertFrom=function(e){var t=this.imod(e.mul(this.rinv));return t.red=null,t},u.prototype.imul=function(e,t){if(0===e.cmpn(0)||0===t.cmpn(0))return e.words[0]=0,e.length=1,e;var r=e.imul(t),d=r.maskn(this.shift).mul(this.minv).imaskn(this.shift).mul(this.m),i=r.isub(d).ishrn(this.shift),f=i;return i.cmp(this.m)>=0?f=i.isub(this.m):i.cmpn(0)<0&&(f=i.iadd(this.m)),f._forceRed(this)},u.prototype.mul=function(e,t){if(0===e.cmpn(0)||0===t.cmpn(0))return new i(0)._forceRed(this);var r=e.mul(t),d=r.maskn(this.shift).mul(this.minv).imaskn(this.shift).mul(this.m),f=r.isub(d).ishrn(this.shift),n=f;return f.cmp(this.m)>=0?n=f.isub(this.m):f.cmpn(0)<0&&(n=f.iadd(this.m)),n._forceRed(this)},u.prototype.invm=function(e){var t=this.imod(e._invmp(this.m).mul(this.r2));return t._forceRed(this)}}("undefined"==typeof t||t,this)},{}],15:[function(e,t){function r(e){this.rand=e}var d;if(t.exports=function(e){return d||(d=new r(null)),d.generate(e)},t.exports.Rand=r,r.prototype.generate=function(e){return this._rand(e)},"object"==typeof window)r.prototype._rand=window.crypto&&window.crypto.getRandomValues?function(e){var t=new Uint8Array(e);return window.crypto.getRandomValues(t),t}:window.msCrypto&&window.msCrypto.getRandomValues?function(e){var t=new Uint8Array(e);return window.msCrypto.getRandomValues(t),t}:function(){throw new Error("Not implemented yet")};else try{var i=e("crypto");r.prototype._rand=function(e){return i.randomBytes(e)}}catch(f){r.prototype._rand=function(e){for(var t=new Uint8Array(e),r=0;r<t.length;r++)t[r]=this.rand.getByte();return t}}},{}],16:[function(e,t,r){var d=r;d.utils=e("./hash/utils"),d.common=e("./hash/common"),d.sha=e("./hash/sha"),d.ripemd=e("./hash/ripemd"),d.hmac=e("./hash/hmac"),d.sha1=d.sha.sha1,d.sha256=d.sha.sha256,d.sha224=d.sha.sha224,d.sha384=d.sha.sha384,d.sha512=d.sha.sha512,d.ripemd160=d.ripemd.ripemd160},{"./hash/common":17,"./hash/hmac":18,"./hash/ripemd":19,"./hash/sha":20,"./hash/utils":21}],17:[function(e,t,r){function d(){this.pending=null,this.pendingTotal=0,this.blockSize=this.constructor.blockSize,this.outSize=this.constructor.outSize,this.hmacStrength=this.constructor.hmacStrength,this.padLength=this.constructor.padLength/8,this.endian="big",this._delta8=this.blockSize/8,this._delta32=this.blockSize/32}var i=e("../hash"),f=i.utils,n=f.assert;r.BlockHash=d,d.prototype.update=function(e,t){if(e=f.toArray(e,t),this.pending=this.pending?this.pending.concat(e):e,this.pendingTotal+=e.length,this.pending.length>=this._delta8){e=this.pending;var r=e.length%this._delta8;this.pending=e.slice(e.length-r,e.length),0===this.pending.length&&(this.pending=null),e=f.join32(e,0,e.length-r,this.endian);for(var d=0;d<e.length;d+=this._delta32)this._update(e,d,d+this._delta32)}return this},d.prototype.digest=function(e){return this.update(this._pad()),n(null===this.pending),this._digest(e)},d.prototype._pad=function(){var e=this.pendingTotal,t=this._delta8,r=t-(e+this.padLength)%t,d=new Array(r+this.padLength);d[0]=128;for(var i=1;r>i;i++)d[i]=0;if(e<<=3,"big"===this.endian){for(var f=8;f<this.padLength;f++)d[i++]=0;d[i++]=0,d[i++]=0,d[i++]=0,d[i++]=0,d[i++]=e>>>24&255,d[i++]=e>>>16&255,d[i++]=e>>>8&255,d[i++]=255&e}else{d[i++]=255&e,d[i++]=e>>>8&255,d[i++]=e>>>16&255,d[i++]=e>>>24&255,d[i++]=0,d[i++]=0,d[i++]=0,d[i++]=0;for(var f=8;f<this.padLength;f++)d[i++]=0}return d}},{"../hash":16}],18:[function(e,t,r){function d(e,t,r){return this instanceof d?(this.Hash=e,this.blockSize=e.blockSize/8,this.outSize=e.outSize/8,this.inner=null,this.outer=null,void this._init(f.toArray(t,r))):new d(e,t,r)}var i=e("../hash"),f=i.utils,n=f.assert;t.exports=d,d.prototype._init=function(e){e.length>this.blockSize&&(e=(new this.Hash).update(e).digest()),n(e.length<=this.blockSize);for(var t=e.length;t<this.blockSize;t++)e.push(0);for(var t=0;t<e.length;t++)e[t]^=54;this.inner=(new this.Hash).update(e);for(var t=0;t<e.length;t++)e[t]^=106;this.outer=(new this.Hash).update(e)},d.prototype.update=function(e,t){return this.inner.update(e,t),this},d.prototype.digest=function(e){return this.outer.update(this.inner.digest()),this.outer.digest(e)}},{"../hash":16}],19:[function(e,t,r){function d(){return this instanceof d?(u.call(this),this.h=[1732584193,4023233417,2562383102,271733878,3285377520],void(this.endian="little")):new d}function i(e,t,r,d){return 15>=e?t^r^d:31>=e?t&r|~t&d:47>=e?(t|~r)^d:63>=e?t&d|r&~d:t^(r|~d)}function f(e){return 15>=e?0:31>=e?1518500249:47>=e?1859775393:63>=e?2400959708:2840853838}function n(e){return 15>=e?1352829926:31>=e?1548603684:47>=e?1836072691:63>=e?2053994217:0}var a=e("../hash"),s=a.utils,c=s.rotl32,h=s.sum32,o=s.sum32_3,b=s.sum32_4,u=a.common.BlockHash;s.inherits(d,u),r.ripemd160=d,d.blockSize=512,d.outSize=160,d.hmacStrength=192,d.padLength=64,d.prototype._update=function(e,t){for(var r=this.h[0],d=this.h[1],a=this.h[2],s=this.h[3],u=this.h[4],m=r,y=d,w=a,S=s,_=u,A=0;80>A;A++){var x=h(c(b(r,i(A,d,a,s),e[p[A]+t],f(A)),v[A]),u);r=u,u=s,s=c(a,10),a=d,d=x,x=h(c(b(m,i(79-A,y,w,S),e[l[A]+t],n(A)),g[A]),_),m=_,_=S,S=c(w,10),w=y,y=x}x=o(this.h[1],a,S),this.h[1]=o(this.h[2],s,_),this.h[2]=o(this.h[3],u,m),this.h[3]=o(this.h[4],r,y),this.h[4]=o(this.h[0],d,w),this.h[0]=x},d.prototype._digest=function(e){return"hex"===e?s.toHex32(this.h,"little"):s.split32(this.h,"little")};var p=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8,3,10,14,4,9,15,8,1,2,7,0,6,13,11,5,12,1,9,11,10,0,8,12,4,13,3,7,15,14,5,6,2,4,0,5,9,7,12,2,10,14,1,3,8,11,6,15,13],l=[5,14,7,0,9,2,11,4,13,6,15,8,1,10,3,12,6,11,3,7,0,13,5,10,14,15,8,12,4,9,1,2,15,5,1,3,7,14,6,9,11,8,12,2,10,0,4,13,8,6,4,1,3,11,15,0,5,12,2,13,9,7,10,14,12,15,10,4,1,5,8,7,6,2,13,14,0,3,9,11],v=[11,14,15,12,5,8,7,9,11,13,14,15,6,7,9,8,7,6,8,13,11,9,7,15,7,12,15,9,11,7,13,12,11,13,6,7,14,9,13,15,14,8,13,6,5,12,7,5,11,12,14,15,14,15,9,8,9,14,5,6,8,6,5,12,9,15,5,11,6,8,13,12,5,12,13,14,11,8,5,6],g=[8,9,9,11,13,15,15,5,7,7,8,11,14,14,12,6,9,13,15,7,12,8,9,11,7,7,12,7,6,15,13,11,9,7,15,11,8,6,6,14,12,13,5,14,13,13,7,5,15,5,8,11,14,14,6,14,6,9,12,9,12,5,15,8,8,5,12,9,12,5,14,6,8,13,6,5,15,13,11,11]},{"../hash":16}],20:[function(e,t,r){function d(){return this instanceof d?(X.call(this),this.h=[1779033703,3144134277,1013904242,2773480762,1359893119,2600822924,528734635,1541459225],this.k=U,void(this.W=new Array(64))):new d}function i(){return this instanceof i?(d.call(this),void(this.h=[3238371032,914150663,812702999,4144912697,4290775857,1750603025,1694076839,3204075428])):new i}function f(){return this instanceof f?(X.call(this),this.h=[1779033703,4089235720,3144134277,2227873595,1013904242,4271175723,2773480762,1595750129,1359893119,2917565137,2600822924,725511199,528734635,4215389547,1541459225,327033209],this.k=G,void(this.W=new Array(160))):new f}function n(){return this instanceof n?(f.call(this),void(this.h=[3418070365,3238371032,1654270250,914150663,2438529370,812702999,355462360,4144912697,1731405415,4290775857,2394180231,1750603025,3675008525,1694076839,1203062813,3204075428])):new n}function a(){return this instanceof a?(X.call(this),this.h=[1732584193,4023233417,2562383102,271733878,3285377520],void(this.W=new Array(80))):new a}function s(e,t,r){return e&t^~e&r}function c(e,t,r){return e&t^e&r^t&r}function h(e,t,r){return e^t^r}function o(e){return j(e,2)^j(e,13)^j(e,22)}function b(e){return j(e,6)^j(e,11)^j(e,25)}function u(e){return j(e,7)^j(e,18)^e>>>3}function p(e){return j(e,17)^j(e,19)^e>>>10}function l(e,t,r,d){return 0===e?s(t,r,d):1===e||3===e?h(t,r,d):2===e?c(t,r,d):void 0}function v(e,t,r,d,i){var f=e&r^~e&i;return 0>f&&(f+=4294967296),f}function g(e,t,r,d,i,f){var n=t&d^~t&f;return 0>n&&(n+=4294967296),n}function m(e,t,r,d,i){var f=e&r^e&i^r&i;return 0>f&&(f+=4294967296),f}function y(e,t,r,d,i,f){var n=t&d^t&f^d&f;return 0>n&&(n+=4294967296),n}function w(e,t){var r=O(e,t,28),d=O(t,e,2),i=O(t,e,7),f=r^d^i;return 0>f&&(f+=4294967296),f}function S(e,t){var r=L(e,t,28),d=L(t,e,2),i=L(t,e,7),f=r^d^i;return 0>f&&(f+=4294967296),f}function _(e,t){var r=O(e,t,14),d=O(e,t,18),i=O(t,e,9),f=r^d^i;return 0>f&&(f+=4294967296),f
-}function A(e,t){var r=L(e,t,14),d=L(e,t,18),i=L(t,e,9),f=r^d^i;return 0>f&&(f+=4294967296),f}function x(e,t){var r=O(e,t,1),d=O(e,t,8),i=T(e,t,7),f=r^d^i;return 0>f&&(f+=4294967296),f}function M(e,t){var r=L(e,t,1),d=L(e,t,8),i=C(e,t,7),f=r^d^i;return 0>f&&(f+=4294967296),f}function I(e,t){var r=O(e,t,19),d=O(t,e,29),i=T(e,t,6),f=r^d^i;return 0>f&&(f+=4294967296),f}function z(e,t){var r=L(e,t,19),d=L(t,e,29),i=C(e,t,6),f=r^d^i;return 0>f&&(f+=4294967296),f}var q=e("../hash"),k=q.utils,R=k.assert,j=k.rotr32,E=k.rotl32,P=k.sum32,N=k.sum32_4,B=k.sum32_5,O=k.rotr64_hi,L=k.rotr64_lo,T=k.shr64_hi,C=k.shr64_lo,F=k.sum64,J=k.sum64_hi,D=k.sum64_lo,H=k.sum64_4_hi,V=k.sum64_4_lo,W=k.sum64_5_hi,K=k.sum64_5_lo,X=q.common.BlockHash,U=[1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298],G=[1116352408,3609767458,1899447441,602891725,3049323471,3964484399,3921009573,2173295548,961987163,4081628472,1508970993,3053834265,2453635748,2937671579,2870763221,3664609560,3624381080,2734883394,310598401,1164996542,607225278,1323610764,1426881987,3590304994,1925078388,4068182383,2162078206,991336113,2614888103,633803317,3248222580,3479774868,3835390401,2666613458,4022224774,944711139,264347078,2341262773,604807628,2007800933,770255983,1495990901,1249150122,1856431235,1555081692,3175218132,1996064986,2198950837,2554220882,3999719339,2821834349,766784016,2952996808,2566594879,3210313671,3203337956,3336571891,1034457026,3584528711,2466948901,113926993,3758326383,338241895,168717936,666307205,1188179964,773529912,1546045734,1294757372,1522805485,1396182291,2643833823,1695183700,2343527390,1986661051,1014477480,2177026350,1206759142,2456956037,344077627,2730485921,1290863460,2820302411,3158454273,3259730800,3505952657,3345764771,106217008,3516065817,3606008344,3600352804,1432725776,4094571909,1467031594,275423344,851169720,430227734,3100823752,506948616,1363258195,659060556,3750685593,883997877,3785050280,958139571,3318307427,1322822218,3812723403,1537002063,2003034995,1747873779,3602036899,1955562222,1575990012,2024104815,1125592928,2227730452,2716904306,2361852424,442776044,2428436474,593698344,2756734187,3733110249,3204031479,2999351573,3329325298,3815920427,3391569614,3928383900,3515267271,566280711,3940187606,3454069534,4118630271,4000239992,116418474,1914138554,174292421,2731055270,289380356,3203993006,460393269,320620315,685471733,587496836,852142971,1086792851,1017036298,365543100,1126000580,2618297676,1288033470,3409855158,1501505948,4234509866,1607167915,987167468,1816402316,1246189591],Y=[1518500249,1859775393,2400959708,3395469782];k.inherits(d,X),r.sha256=d,d.blockSize=512,d.outSize=256,d.hmacStrength=192,d.padLength=64,d.prototype._update=function(e,t){for(var r=this.W,d=0;16>d;d++)r[d]=e[t+d];for(;d<r.length;d++)r[d]=N(p(r[d-2]),r[d-7],u(r[d-15]),r[d-16]);var i=this.h[0],f=this.h[1],n=this.h[2],a=this.h[3],h=this.h[4],l=this.h[5],v=this.h[6],g=this.h[7];R(this.k.length===r.length);for(var d=0;d<r.length;d++){var m=B(g,b(h),s(h,l,v),this.k[d],r[d]),y=P(o(i),c(i,f,n));g=v,v=l,l=h,h=P(a,m),a=n,n=f,f=i,i=P(m,y)}this.h[0]=P(this.h[0],i),this.h[1]=P(this.h[1],f),this.h[2]=P(this.h[2],n),this.h[3]=P(this.h[3],a),this.h[4]=P(this.h[4],h),this.h[5]=P(this.h[5],l),this.h[6]=P(this.h[6],v),this.h[7]=P(this.h[7],g)},d.prototype._digest=function(e){return"hex"===e?k.toHex32(this.h,"big"):k.split32(this.h,"big")},k.inherits(i,d),r.sha224=i,i.blockSize=512,i.outSize=224,i.hmacStrength=192,i.padLength=64,i.prototype._digest=function(e){return"hex"===e?k.toHex32(this.h.slice(0,7),"big"):k.split32(this.h.slice(0,7),"big")},k.inherits(f,X),r.sha512=f,f.blockSize=1024,f.outSize=512,f.hmacStrength=192,f.padLength=128,f.prototype._prepareBlock=function(e,t){for(var r=this.W,d=0;32>d;d++)r[d]=e[t+d];for(;d<r.length;d+=2){var i=I(r[d-4],r[d-3]),f=z(r[d-4],r[d-3]),n=r[d-14],a=r[d-13],s=x(r[d-30],r[d-29]),c=M(r[d-30],r[d-29]),h=r[d-32],o=r[d-31];r[d]=H(i,f,n,a,s,c,h,o),r[d+1]=V(i,f,n,a,s,c,h,o)}},f.prototype._update=function(e,t){this._prepareBlock(e,t);var r=this.W,d=this.h[0],i=this.h[1],f=this.h[2],n=this.h[3],a=this.h[4],s=this.h[5],c=this.h[6],h=this.h[7],o=this.h[8],b=this.h[9],u=this.h[10],p=this.h[11],l=this.h[12],x=this.h[13],M=this.h[14],I=this.h[15];R(this.k.length===r.length);for(var z=0;z<r.length;z+=2){var q=M,k=I,j=_(o,b),E=A(o,b),P=v(o,b,u,p,l,x),N=g(o,b,u,p,l,x),B=this.k[z],O=this.k[z+1],L=r[z],T=r[z+1],C=W(q,k,j,E,P,N,B,O,L,T),H=K(q,k,j,E,P,N,B,O,L,T),q=w(d,i),k=S(d,i),j=m(d,i,f,n,a,s),E=y(d,i,f,n,a,s),V=J(q,k,j,E),X=D(q,k,j,E);M=l,I=x,l=u,x=p,u=o,p=b,o=J(c,h,C,H),b=D(h,h,C,H),c=a,h=s,a=f,s=n,f=d,n=i,d=J(C,H,V,X),i=D(C,H,V,X)}F(this.h,0,d,i),F(this.h,2,f,n),F(this.h,4,a,s),F(this.h,6,c,h),F(this.h,8,o,b),F(this.h,10,u,p),F(this.h,12,l,x),F(this.h,14,M,I)},f.prototype._digest=function(e){return"hex"===e?k.toHex32(this.h,"big"):k.split32(this.h,"big")},k.inherits(n,f),r.sha384=n,n.blockSize=1024,n.outSize=384,n.hmacStrength=192,n.padLength=128,n.prototype._digest=function(e){return"hex"===e?k.toHex32(this.h.slice(0,12),"big"):k.split32(this.h.slice(0,12),"big")},k.inherits(a,X),r.sha1=a,a.blockSize=512,a.outSize=160,a.hmacStrength=80,a.padLength=64,a.prototype._update=function(e,t){for(var r=this.W,d=0;16>d;d++)r[d]=e[t+d];for(;d<r.length;d++)r[d]=E(r[d-3]^r[d-8]^r[d-14]^r[d-16],1);for(var i=this.h[0],f=this.h[1],n=this.h[2],a=this.h[3],s=this.h[4],d=0;d<r.length;d++){var c=~~(d/20),h=B(E(i,5),l(c,f,n,a),s,r[d],Y[c]);s=a,a=n,n=E(f,30),f=i,i=h}this.h[0]=P(this.h[0],i),this.h[1]=P(this.h[1],f),this.h[2]=P(this.h[2],n),this.h[3]=P(this.h[3],a),this.h[4]=P(this.h[4],s)},a.prototype._digest=function(e){return"hex"===e?k.toHex32(this.h,"big"):k.split32(this.h,"big")}},{"../hash":16}],21:[function(e,t,r){function d(e,t){if(Array.isArray(e))return e.slice();if(!e)return[];var r=[];if("string"==typeof e)if(t){if("hex"===t){e=e.replace(/[^a-z0-9]+/gi,""),e.length%2!==0&&(e="0"+e);for(var d=0;d<e.length;d+=2)r.push(parseInt(e[d]+e[d+1],16))}}else for(var d=0;d<e.length;d++){var i=e.charCodeAt(d),f=i>>8,n=255&i;f?r.push(f,n):r.push(n)}else for(var d=0;d<e.length;d++)r[d]=0|e[d];return r}function i(e){for(var t="",r=0;r<e.length;r++)t+=a(e[r].toString(16));return t}function f(e){var t=e>>>24|e>>>8&65280|e<<8&16711680|(255&e)<<24;return t>>>0}function n(e,t){for(var r="",d=0;d<e.length;d++){var i=e[d];"little"===t&&(i=f(i)),r+=s(i.toString(16))}return r}function a(e){return 1===e.length?"0"+e:e}function s(e){return 7===e.length?"0"+e:6===e.length?"00"+e:5===e.length?"000"+e:4===e.length?"0000"+e:3===e.length?"00000"+e:2===e.length?"000000"+e:1===e.length?"0000000"+e:e}function c(e,t,r,d){var i=r-t;g(i%4===0);for(var f=new Array(i/4),n=0,a=t;n<f.length;n++,a+=4){var s;s="big"===d?e[a]<<24|e[a+1]<<16|e[a+2]<<8|e[a+3]:e[a+3]<<24|e[a+2]<<16|e[a+1]<<8|e[a],f[n]=s>>>0}return f}function h(e,t){for(var r=new Array(4*e.length),d=0,i=0;d<e.length;d++,i+=4){var f=e[d];"big"===t?(r[i]=f>>>24,r[i+1]=f>>>16&255,r[i+2]=f>>>8&255,r[i+3]=255&f):(r[i+3]=f>>>24,r[i+2]=f>>>16&255,r[i+1]=f>>>8&255,r[i]=255&f)}return r}function o(e,t){return e>>>t|e<<32-t}function b(e,t){return e<<t|e>>>32-t}function u(e,t){return e+t>>>0}function p(e,t,r){return e+t+r>>>0}function l(e,t,r,d){return e+t+r+d>>>0}function v(e,t,r,d,i){return e+t+r+d+i>>>0}function g(e,t){if(!e)throw new Error(t||"Assertion failed")}function m(e,t,r,d){var i=e[t],f=e[t+1],n=d+f>>>0,a=(d>n?1:0)+r+i;e[t]=a>>>0,e[t+1]=n}function y(e,t,r,d){var i=t+d>>>0,f=(t>i?1:0)+e+r;return f>>>0}function w(e,t,r,d){var i=t+d;return i>>>0}function S(e,t,r,d,i,f,n,a){var s=0,c=t;c=c+d>>>0,s+=t>c?1:0,c=c+f>>>0,s+=f>c?1:0,c=c+a>>>0,s+=a>c?1:0;var h=e+r+i+n+s;return h>>>0}function _(e,t,r,d,i,f,n,a){var s=t+d+f+a;return s>>>0}function A(e,t,r,d,i,f,n,a,s,c){var h=0,o=t;o=o+d>>>0,h+=t>o?1:0,o=o+f>>>0,h+=f>o?1:0,o=o+a>>>0,h+=a>o?1:0,o=o+c>>>0,h+=c>o?1:0;var b=e+r+i+n+s+h;return b>>>0}function x(e,t,r,d,i,f,n,a,s,c){var h=t+d+f+a+c;return h>>>0}function M(e,t,r){var d=t<<32-r|e>>>r;return d>>>0}function I(e,t,r){var d=e<<32-r|t>>>r;return d>>>0}function z(e,t,r){return e>>>r}function q(e,t,r){var d=e<<32-r|t>>>r;return d>>>0}var k=r,R=e("inherits");k.toArray=d,k.toHex=i,k.htonl=f,k.toHex32=n,k.zero2=a,k.zero8=s,k.join32=c,k.split32=h,k.rotr32=o,k.rotl32=b,k.sum32=u,k.sum32_3=p,k.sum32_4=l,k.sum32_5=v,k.assert=g,k.inherits=R,r.sum64=m,r.sum64_hi=y,r.sum64_lo=w,r.sum64_4_hi=S,r.sum64_4_lo=_,r.sum64_5_hi=A,r.sum64_5_lo=x,r.rotr64_hi=M,r.rotr64_lo=I,r.shr64_hi=z,r.shr64_lo=q},{inherits:22}],22:[function(e,t){t.exports="function"==typeof Object.create?function(e,t){e.super_=t,e.prototype=Object.create(t.prototype,{constructor:{value:e,enumerable:!1,writable:!0,configurable:!0}})}:function(e,t){e.super_=t;var r=function(){};r.prototype=t.prototype,e.prototype=new r,e.prototype.constructor=e}},{}],23:[function(e,t){t.exports={name:"elliptic",version:"3.0.3",description:"EC cryptography",main:"lib/elliptic.js",scripts:{test:"make lint && mocha --reporter=spec test/*-test.js"},repository:{type:"git",url:"git@github.com:indutny/elliptic"},keywords:["EC","Elliptic","curve","Cryptography"],author:"Fedor Indutny <fedor@indutny.com>",license:"MIT",bugs:{url:"https://github.com/indutny/elliptic/issues"},homepage:"https://github.com/indutny/elliptic",devDependencies:{browserify:"^3.44.2",jscs:"^1.11.3",jshint:"^2.6.0",mocha:"^2.1.0","uglify-js":"^2.4.13"},dependencies:{"bn.js":"^2.0.0",brorand:"^1.0.1","hash.js":"^1.0.0",inherits:"^2.0.1"}}},{}]},{},[1])(1)});
+"use strict";
+
+(function(root) {
+
+    function checkInt(value) {
+        return (parseInt(value) === value);
+    }
+
+    function checkInts(arrayish) {
+        if (!checkInt(arrayish.length)) { return false; }
+
+        for (var i = 0; i < arrayish.length; i++) {
+            if (!checkInt(arrayish[i]) || arrayish[i] < 0 || arrayish[i] > 255) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function coerceArray(arg, copy) {
+
+        // ArrayBuffer view
+        if (arg.buffer && ArrayBuffer.isView(arg) && arg.name === 'Uint8Array') {
+
+            if (copy) {
+                if (arg.slice) {
+                    arg = arg.slice();
+                } else {
+                    arg = Array.prototype.slice.call(arg);
+                }
+            }
+
+            return arg;
+        }
+
+        // It's an array; check it is a valid representation of a byte
+        if (Array.isArray(arg)) {
+            if (!checkInts(arg)) {
+                throw new Error('Array contains invalid value: ' + arg);
+            }
+
+            return new Uint8Array(arg);
+        }
+
+        // Something else, but behaves like an array (maybe a Buffer? Arguments?)
+        if (checkInt(arg.length) && checkInts(arg)) {
+            return new Uint8Array(arg);
+        }
+
+        throw new Error('unsupported array-like object');
+    }
+
+    function createArray(length) {
+        return new Uint8Array(length);
+    }
+
+    function copyArray(sourceArray, targetArray, targetStart, sourceStart, sourceEnd) {
+        if (sourceStart != null || sourceEnd != null) {
+            if (sourceArray.slice) {
+                sourceArray = sourceArray.slice(sourceStart, sourceEnd);
+            } else {
+                sourceArray = Array.prototype.slice.call(sourceArray, sourceStart, sourceEnd);
+            }
+        }
+        targetArray.set(sourceArray, targetStart);
+    }
+
+
+
+    var convertUtf8 = (function() {
+        function toBytes(text) {
+            var result = [], i = 0;
+            text = encodeURI(text);
+            while (i < text.length) {
+                var c = text.charCodeAt(i++);
+
+                // if it is a % sign, encode the following 2 bytes as a hex value
+                if (c === 37) {
+                    result.push(parseInt(text.substr(i, 2), 16))
+                    i += 2;
+
+                    // otherwise, just the actual byte
+                } else {
+                    result.push(c)
+                }
+            }
+
+            return coerceArray(result);
+        }
+
+        function fromBytes(bytes) {
+            var result = [], i = 0;
+
+            while (i < bytes.length) {
+                var c = bytes[i];
+
+                if (c < 128) {
+                    result.push(String.fromCharCode(c));
+                    i++;
+                } else if (c > 191 && c < 224) {
+                    result.push(String.fromCharCode(((c & 0x1f) << 6) | (bytes[i + 1] & 0x3f)));
+                    i += 2;
+                } else {
+                    result.push(String.fromCharCode(((c & 0x0f) << 12) | ((bytes[i + 1] & 0x3f) << 6) | (bytes[i + 2] & 0x3f)));
+                    i += 3;
+                }
+            }
+
+            return result.join('');
+        }
+
+        return {
+            toBytes: toBytes,
+            fromBytes: fromBytes,
+        }
+    })();
+
+    var convertHex = (function() {
+        function toBytes(text) {
+            var result = [];
+            for (var i = 0; i < text.length; i += 2) {
+                result.push(parseInt(text.substr(i, 2), 16));
+            }
+
+            return result;
+        }
+
+        // http://ixti.net/development/javascript/2011/11/11/base64-encodedecode-of-utf8-in-browser-with-js.html
+        var Hex = '0123456789abcdef';
+
+        function fromBytes(bytes) {
+            var result = [];
+            for (var i = 0; i < bytes.length; i++) {
+                var v = bytes[i];
+                result.push(Hex[(v & 0xf0) >> 4] + Hex[v & 0x0f]);
+            }
+            return result.join('');
+        }
+
+        return {
+            toBytes: toBytes,
+            fromBytes: fromBytes,
+        }
+    })();
+
+
+    // Number of rounds by keysize
+    var numberOfRounds = {16: 10, 24: 12, 32: 14}
+
+    // Round constant words
+    var rcon = [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91];
+
+    // S-box and Inverse S-box (S is for Substitution)
+    var S = [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76, 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0, 0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15, 0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75, 0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84, 0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf, 0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8, 0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2, 0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73, 0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb, 0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79, 0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08, 0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a, 0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e, 0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf, 0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16];
+    var Si =[0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb, 0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb, 0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e, 0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25, 0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92, 0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda, 0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84, 0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06, 0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b, 0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73, 0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e, 0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b, 0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4, 0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f, 0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef, 0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61, 0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d];
+
+    // Transformations for encryption
+    var T1 = [0xc66363a5, 0xf87c7c84, 0xee777799, 0xf67b7b8d, 0xfff2f20d, 0xd66b6bbd, 0xde6f6fb1, 0x91c5c554, 0x60303050, 0x02010103, 0xce6767a9, 0x562b2b7d, 0xe7fefe19, 0xb5d7d762, 0x4dababe6, 0xec76769a, 0x8fcaca45, 0x1f82829d, 0x89c9c940, 0xfa7d7d87, 0xeffafa15, 0xb25959eb, 0x8e4747c9, 0xfbf0f00b, 0x41adadec, 0xb3d4d467, 0x5fa2a2fd, 0x45afafea, 0x239c9cbf, 0x53a4a4f7, 0xe4727296, 0x9bc0c05b, 0x75b7b7c2, 0xe1fdfd1c, 0x3d9393ae, 0x4c26266a, 0x6c36365a, 0x7e3f3f41, 0xf5f7f702, 0x83cccc4f, 0x6834345c, 0x51a5a5f4, 0xd1e5e534, 0xf9f1f108, 0xe2717193, 0xabd8d873, 0x62313153, 0x2a15153f, 0x0804040c, 0x95c7c752, 0x46232365, 0x9dc3c35e, 0x30181828, 0x379696a1, 0x0a05050f, 0x2f9a9ab5, 0x0e070709, 0x24121236, 0x1b80809b, 0xdfe2e23d, 0xcdebeb26, 0x4e272769, 0x7fb2b2cd, 0xea75759f, 0x1209091b, 0x1d83839e, 0x582c2c74, 0x341a1a2e, 0x361b1b2d, 0xdc6e6eb2, 0xb45a5aee, 0x5ba0a0fb, 0xa45252f6, 0x763b3b4d, 0xb7d6d661, 0x7db3b3ce, 0x5229297b, 0xdde3e33e, 0x5e2f2f71, 0x13848497, 0xa65353f5, 0xb9d1d168, 0x00000000, 0xc1eded2c, 0x40202060, 0xe3fcfc1f, 0x79b1b1c8, 0xb65b5bed, 0xd46a6abe, 0x8dcbcb46, 0x67bebed9, 0x7239394b, 0x944a4ade, 0x984c4cd4, 0xb05858e8, 0x85cfcf4a, 0xbbd0d06b, 0xc5efef2a, 0x4faaaae5, 0xedfbfb16, 0x864343c5, 0x9a4d4dd7, 0x66333355, 0x11858594, 0x8a4545cf, 0xe9f9f910, 0x04020206, 0xfe7f7f81, 0xa05050f0, 0x783c3c44, 0x259f9fba, 0x4ba8a8e3, 0xa25151f3, 0x5da3a3fe, 0x804040c0, 0x058f8f8a, 0x3f9292ad, 0x219d9dbc, 0x70383848, 0xf1f5f504, 0x63bcbcdf, 0x77b6b6c1, 0xafdada75, 0x42212163, 0x20101030, 0xe5ffff1a, 0xfdf3f30e, 0xbfd2d26d, 0x81cdcd4c, 0x180c0c14, 0x26131335, 0xc3ecec2f, 0xbe5f5fe1, 0x359797a2, 0x884444cc, 0x2e171739, 0x93c4c457, 0x55a7a7f2, 0xfc7e7e82, 0x7a3d3d47, 0xc86464ac, 0xba5d5de7, 0x3219192b, 0xe6737395, 0xc06060a0, 0x19818198, 0x9e4f4fd1, 0xa3dcdc7f, 0x44222266, 0x542a2a7e, 0x3b9090ab, 0x0b888883, 0x8c4646ca, 0xc7eeee29, 0x6bb8b8d3, 0x2814143c, 0xa7dede79, 0xbc5e5ee2, 0x160b0b1d, 0xaddbdb76, 0xdbe0e03b, 0x64323256, 0x743a3a4e, 0x140a0a1e, 0x924949db, 0x0c06060a, 0x4824246c, 0xb85c5ce4, 0x9fc2c25d, 0xbdd3d36e, 0x43acacef, 0xc46262a6, 0x399191a8, 0x319595a4, 0xd3e4e437, 0xf279798b, 0xd5e7e732, 0x8bc8c843, 0x6e373759, 0xda6d6db7, 0x018d8d8c, 0xb1d5d564, 0x9c4e4ed2, 0x49a9a9e0, 0xd86c6cb4, 0xac5656fa, 0xf3f4f407, 0xcfeaea25, 0xca6565af, 0xf47a7a8e, 0x47aeaee9, 0x10080818, 0x6fbabad5, 0xf0787888, 0x4a25256f, 0x5c2e2e72, 0x381c1c24, 0x57a6a6f1, 0x73b4b4c7, 0x97c6c651, 0xcbe8e823, 0xa1dddd7c, 0xe874749c, 0x3e1f1f21, 0x964b4bdd, 0x61bdbddc, 0x0d8b8b86, 0x0f8a8a85, 0xe0707090, 0x7c3e3e42, 0x71b5b5c4, 0xcc6666aa, 0x904848d8, 0x06030305, 0xf7f6f601, 0x1c0e0e12, 0xc26161a3, 0x6a35355f, 0xae5757f9, 0x69b9b9d0, 0x17868691, 0x99c1c158, 0x3a1d1d27, 0x279e9eb9, 0xd9e1e138, 0xebf8f813, 0x2b9898b3, 0x22111133, 0xd26969bb, 0xa9d9d970, 0x078e8e89, 0x339494a7, 0x2d9b9bb6, 0x3c1e1e22, 0x15878792, 0xc9e9e920, 0x87cece49, 0xaa5555ff, 0x50282878, 0xa5dfdf7a, 0x038c8c8f, 0x59a1a1f8, 0x09898980, 0x1a0d0d17, 0x65bfbfda, 0xd7e6e631, 0x844242c6, 0xd06868b8, 0x824141c3, 0x299999b0, 0x5a2d2d77, 0x1e0f0f11, 0x7bb0b0cb, 0xa85454fc, 0x6dbbbbd6, 0x2c16163a];
+    var T2 = [0xa5c66363, 0x84f87c7c, 0x99ee7777, 0x8df67b7b, 0x0dfff2f2, 0xbdd66b6b, 0xb1de6f6f, 0x5491c5c5, 0x50603030, 0x03020101, 0xa9ce6767, 0x7d562b2b, 0x19e7fefe, 0x62b5d7d7, 0xe64dabab, 0x9aec7676, 0x458fcaca, 0x9d1f8282, 0x4089c9c9, 0x87fa7d7d, 0x15effafa, 0xebb25959, 0xc98e4747, 0x0bfbf0f0, 0xec41adad, 0x67b3d4d4, 0xfd5fa2a2, 0xea45afaf, 0xbf239c9c, 0xf753a4a4, 0x96e47272, 0x5b9bc0c0, 0xc275b7b7, 0x1ce1fdfd, 0xae3d9393, 0x6a4c2626, 0x5a6c3636, 0x417e3f3f, 0x02f5f7f7, 0x4f83cccc, 0x5c683434, 0xf451a5a5, 0x34d1e5e5, 0x08f9f1f1, 0x93e27171, 0x73abd8d8, 0x53623131, 0x3f2a1515, 0x0c080404, 0x5295c7c7, 0x65462323, 0x5e9dc3c3, 0x28301818, 0xa1379696, 0x0f0a0505, 0xb52f9a9a, 0x090e0707, 0x36241212, 0x9b1b8080, 0x3ddfe2e2, 0x26cdebeb, 0x694e2727, 0xcd7fb2b2, 0x9fea7575, 0x1b120909, 0x9e1d8383, 0x74582c2c, 0x2e341a1a, 0x2d361b1b, 0xb2dc6e6e, 0xeeb45a5a, 0xfb5ba0a0, 0xf6a45252, 0x4d763b3b, 0x61b7d6d6, 0xce7db3b3, 0x7b522929, 0x3edde3e3, 0x715e2f2f, 0x97138484, 0xf5a65353, 0x68b9d1d1, 0x00000000, 0x2cc1eded, 0x60402020, 0x1fe3fcfc, 0xc879b1b1, 0xedb65b5b, 0xbed46a6a, 0x468dcbcb, 0xd967bebe, 0x4b723939, 0xde944a4a, 0xd4984c4c, 0xe8b05858, 0x4a85cfcf, 0x6bbbd0d0, 0x2ac5efef, 0xe54faaaa, 0x16edfbfb, 0xc5864343, 0xd79a4d4d, 0x55663333, 0x94118585, 0xcf8a4545, 0x10e9f9f9, 0x06040202, 0x81fe7f7f, 0xf0a05050, 0x44783c3c, 0xba259f9f, 0xe34ba8a8, 0xf3a25151, 0xfe5da3a3, 0xc0804040, 0x8a058f8f, 0xad3f9292, 0xbc219d9d, 0x48703838, 0x04f1f5f5, 0xdf63bcbc, 0xc177b6b6, 0x75afdada, 0x63422121, 0x30201010, 0x1ae5ffff, 0x0efdf3f3, 0x6dbfd2d2, 0x4c81cdcd, 0x14180c0c, 0x35261313, 0x2fc3ecec, 0xe1be5f5f, 0xa2359797, 0xcc884444, 0x392e1717, 0x5793c4c4, 0xf255a7a7, 0x82fc7e7e, 0x477a3d3d, 0xacc86464, 0xe7ba5d5d, 0x2b321919, 0x95e67373, 0xa0c06060, 0x98198181, 0xd19e4f4f, 0x7fa3dcdc, 0x66442222, 0x7e542a2a, 0xab3b9090, 0x830b8888, 0xca8c4646, 0x29c7eeee, 0xd36bb8b8, 0x3c281414, 0x79a7dede, 0xe2bc5e5e, 0x1d160b0b, 0x76addbdb, 0x3bdbe0e0, 0x56643232, 0x4e743a3a, 0x1e140a0a, 0xdb924949, 0x0a0c0606, 0x6c482424, 0xe4b85c5c, 0x5d9fc2c2, 0x6ebdd3d3, 0xef43acac, 0xa6c46262, 0xa8399191, 0xa4319595, 0x37d3e4e4, 0x8bf27979, 0x32d5e7e7, 0x438bc8c8, 0x596e3737, 0xb7da6d6d, 0x8c018d8d, 0x64b1d5d5, 0xd29c4e4e, 0xe049a9a9, 0xb4d86c6c, 0xfaac5656, 0x07f3f4f4, 0x25cfeaea, 0xafca6565, 0x8ef47a7a, 0xe947aeae, 0x18100808, 0xd56fbaba, 0x88f07878, 0x6f4a2525, 0x725c2e2e, 0x24381c1c, 0xf157a6a6, 0xc773b4b4, 0x5197c6c6, 0x23cbe8e8, 0x7ca1dddd, 0x9ce87474, 0x213e1f1f, 0xdd964b4b, 0xdc61bdbd, 0x860d8b8b, 0x850f8a8a, 0x90e07070, 0x427c3e3e, 0xc471b5b5, 0xaacc6666, 0xd8904848, 0x05060303, 0x01f7f6f6, 0x121c0e0e, 0xa3c26161, 0x5f6a3535, 0xf9ae5757, 0xd069b9b9, 0x91178686, 0x5899c1c1, 0x273a1d1d, 0xb9279e9e, 0x38d9e1e1, 0x13ebf8f8, 0xb32b9898, 0x33221111, 0xbbd26969, 0x70a9d9d9, 0x89078e8e, 0xa7339494, 0xb62d9b9b, 0x223c1e1e, 0x92158787, 0x20c9e9e9, 0x4987cece, 0xffaa5555, 0x78502828, 0x7aa5dfdf, 0x8f038c8c, 0xf859a1a1, 0x80098989, 0x171a0d0d, 0xda65bfbf, 0x31d7e6e6, 0xc6844242, 0xb8d06868, 0xc3824141, 0xb0299999, 0x775a2d2d, 0x111e0f0f, 0xcb7bb0b0, 0xfca85454, 0xd66dbbbb, 0x3a2c1616];
+    var T3 = [0x63a5c663, 0x7c84f87c, 0x7799ee77, 0x7b8df67b, 0xf20dfff2, 0x6bbdd66b, 0x6fb1de6f, 0xc55491c5, 0x30506030, 0x01030201, 0x67a9ce67, 0x2b7d562b, 0xfe19e7fe, 0xd762b5d7, 0xabe64dab, 0x769aec76, 0xca458fca, 0x829d1f82, 0xc94089c9, 0x7d87fa7d, 0xfa15effa, 0x59ebb259, 0x47c98e47, 0xf00bfbf0, 0xadec41ad, 0xd467b3d4, 0xa2fd5fa2, 0xafea45af, 0x9cbf239c, 0xa4f753a4, 0x7296e472, 0xc05b9bc0, 0xb7c275b7, 0xfd1ce1fd, 0x93ae3d93, 0x266a4c26, 0x365a6c36, 0x3f417e3f, 0xf702f5f7, 0xcc4f83cc, 0x345c6834, 0xa5f451a5, 0xe534d1e5, 0xf108f9f1, 0x7193e271, 0xd873abd8, 0x31536231, 0x153f2a15, 0x040c0804, 0xc75295c7, 0x23654623, 0xc35e9dc3, 0x18283018, 0x96a13796, 0x050f0a05, 0x9ab52f9a, 0x07090e07, 0x12362412, 0x809b1b80, 0xe23ddfe2, 0xeb26cdeb, 0x27694e27, 0xb2cd7fb2, 0x759fea75, 0x091b1209, 0x839e1d83, 0x2c74582c, 0x1a2e341a, 0x1b2d361b, 0x6eb2dc6e, 0x5aeeb45a, 0xa0fb5ba0, 0x52f6a452, 0x3b4d763b, 0xd661b7d6, 0xb3ce7db3, 0x297b5229, 0xe33edde3, 0x2f715e2f, 0x84971384, 0x53f5a653, 0xd168b9d1, 0x00000000, 0xed2cc1ed, 0x20604020, 0xfc1fe3fc, 0xb1c879b1, 0x5bedb65b, 0x6abed46a, 0xcb468dcb, 0xbed967be, 0x394b7239, 0x4ade944a, 0x4cd4984c, 0x58e8b058, 0xcf4a85cf, 0xd06bbbd0, 0xef2ac5ef, 0xaae54faa, 0xfb16edfb, 0x43c58643, 0x4dd79a4d, 0x33556633, 0x85941185, 0x45cf8a45, 0xf910e9f9, 0x02060402, 0x7f81fe7f, 0x50f0a050, 0x3c44783c, 0x9fba259f, 0xa8e34ba8, 0x51f3a251, 0xa3fe5da3, 0x40c08040, 0x8f8a058f, 0x92ad3f92, 0x9dbc219d, 0x38487038, 0xf504f1f5, 0xbcdf63bc, 0xb6c177b6, 0xda75afda, 0x21634221, 0x10302010, 0xff1ae5ff, 0xf30efdf3, 0xd26dbfd2, 0xcd4c81cd, 0x0c14180c, 0x13352613, 0xec2fc3ec, 0x5fe1be5f, 0x97a23597, 0x44cc8844, 0x17392e17, 0xc45793c4, 0xa7f255a7, 0x7e82fc7e, 0x3d477a3d, 0x64acc864, 0x5de7ba5d, 0x192b3219, 0x7395e673, 0x60a0c060, 0x81981981, 0x4fd19e4f, 0xdc7fa3dc, 0x22664422, 0x2a7e542a, 0x90ab3b90, 0x88830b88, 0x46ca8c46, 0xee29c7ee, 0xb8d36bb8, 0x143c2814, 0xde79a7de, 0x5ee2bc5e, 0x0b1d160b, 0xdb76addb, 0xe03bdbe0, 0x32566432, 0x3a4e743a, 0x0a1e140a, 0x49db9249, 0x060a0c06, 0x246c4824, 0x5ce4b85c, 0xc25d9fc2, 0xd36ebdd3, 0xacef43ac, 0x62a6c462, 0x91a83991, 0x95a43195, 0xe437d3e4, 0x798bf279, 0xe732d5e7, 0xc8438bc8, 0x37596e37, 0x6db7da6d, 0x8d8c018d, 0xd564b1d5, 0x4ed29c4e, 0xa9e049a9, 0x6cb4d86c, 0x56faac56, 0xf407f3f4, 0xea25cfea, 0x65afca65, 0x7a8ef47a, 0xaee947ae, 0x08181008, 0xbad56fba, 0x7888f078, 0x256f4a25, 0x2e725c2e, 0x1c24381c, 0xa6f157a6, 0xb4c773b4, 0xc65197c6, 0xe823cbe8, 0xdd7ca1dd, 0x749ce874, 0x1f213e1f, 0x4bdd964b, 0xbddc61bd, 0x8b860d8b, 0x8a850f8a, 0x7090e070, 0x3e427c3e, 0xb5c471b5, 0x66aacc66, 0x48d89048, 0x03050603, 0xf601f7f6, 0x0e121c0e, 0x61a3c261, 0x355f6a35, 0x57f9ae57, 0xb9d069b9, 0x86911786, 0xc15899c1, 0x1d273a1d, 0x9eb9279e, 0xe138d9e1, 0xf813ebf8, 0x98b32b98, 0x11332211, 0x69bbd269, 0xd970a9d9, 0x8e89078e, 0x94a73394, 0x9bb62d9b, 0x1e223c1e, 0x87921587, 0xe920c9e9, 0xce4987ce, 0x55ffaa55, 0x28785028, 0xdf7aa5df, 0x8c8f038c, 0xa1f859a1, 0x89800989, 0x0d171a0d, 0xbfda65bf, 0xe631d7e6, 0x42c68442, 0x68b8d068, 0x41c38241, 0x99b02999, 0x2d775a2d, 0x0f111e0f, 0xb0cb7bb0, 0x54fca854, 0xbbd66dbb, 0x163a2c16];
+    var T4 = [0x6363a5c6, 0x7c7c84f8, 0x777799ee, 0x7b7b8df6, 0xf2f20dff, 0x6b6bbdd6, 0x6f6fb1de, 0xc5c55491, 0x30305060, 0x01010302, 0x6767a9ce, 0x2b2b7d56, 0xfefe19e7, 0xd7d762b5, 0xababe64d, 0x76769aec, 0xcaca458f, 0x82829d1f, 0xc9c94089, 0x7d7d87fa, 0xfafa15ef, 0x5959ebb2, 0x4747c98e, 0xf0f00bfb, 0xadadec41, 0xd4d467b3, 0xa2a2fd5f, 0xafafea45, 0x9c9cbf23, 0xa4a4f753, 0x727296e4, 0xc0c05b9b, 0xb7b7c275, 0xfdfd1ce1, 0x9393ae3d, 0x26266a4c, 0x36365a6c, 0x3f3f417e, 0xf7f702f5, 0xcccc4f83, 0x34345c68, 0xa5a5f451, 0xe5e534d1, 0xf1f108f9, 0x717193e2, 0xd8d873ab, 0x31315362, 0x15153f2a, 0x04040c08, 0xc7c75295, 0x23236546, 0xc3c35e9d, 0x18182830, 0x9696a137, 0x05050f0a, 0x9a9ab52f, 0x0707090e, 0x12123624, 0x80809b1b, 0xe2e23ddf, 0xebeb26cd, 0x2727694e, 0xb2b2cd7f, 0x75759fea, 0x09091b12, 0x83839e1d, 0x2c2c7458, 0x1a1a2e34, 0x1b1b2d36, 0x6e6eb2dc, 0x5a5aeeb4, 0xa0a0fb5b, 0x5252f6a4, 0x3b3b4d76, 0xd6d661b7, 0xb3b3ce7d, 0x29297b52, 0xe3e33edd, 0x2f2f715e, 0x84849713, 0x5353f5a6, 0xd1d168b9, 0x00000000, 0xeded2cc1, 0x20206040, 0xfcfc1fe3, 0xb1b1c879, 0x5b5bedb6, 0x6a6abed4, 0xcbcb468d, 0xbebed967, 0x39394b72, 0x4a4ade94, 0x4c4cd498, 0x5858e8b0, 0xcfcf4a85, 0xd0d06bbb, 0xefef2ac5, 0xaaaae54f, 0xfbfb16ed, 0x4343c586, 0x4d4dd79a, 0x33335566, 0x85859411, 0x4545cf8a, 0xf9f910e9, 0x02020604, 0x7f7f81fe, 0x5050f0a0, 0x3c3c4478, 0x9f9fba25, 0xa8a8e34b, 0x5151f3a2, 0xa3a3fe5d, 0x4040c080, 0x8f8f8a05, 0x9292ad3f, 0x9d9dbc21, 0x38384870, 0xf5f504f1, 0xbcbcdf63, 0xb6b6c177, 0xdada75af, 0x21216342, 0x10103020, 0xffff1ae5, 0xf3f30efd, 0xd2d26dbf, 0xcdcd4c81, 0x0c0c1418, 0x13133526, 0xecec2fc3, 0x5f5fe1be, 0x9797a235, 0x4444cc88, 0x1717392e, 0xc4c45793, 0xa7a7f255, 0x7e7e82fc, 0x3d3d477a, 0x6464acc8, 0x5d5de7ba, 0x19192b32, 0x737395e6, 0x6060a0c0, 0x81819819, 0x4f4fd19e, 0xdcdc7fa3, 0x22226644, 0x2a2a7e54, 0x9090ab3b, 0x8888830b, 0x4646ca8c, 0xeeee29c7, 0xb8b8d36b, 0x14143c28, 0xdede79a7, 0x5e5ee2bc, 0x0b0b1d16, 0xdbdb76ad, 0xe0e03bdb, 0x32325664, 0x3a3a4e74, 0x0a0a1e14, 0x4949db92, 0x06060a0c, 0x24246c48, 0x5c5ce4b8, 0xc2c25d9f, 0xd3d36ebd, 0xacacef43, 0x6262a6c4, 0x9191a839, 0x9595a431, 0xe4e437d3, 0x79798bf2, 0xe7e732d5, 0xc8c8438b, 0x3737596e, 0x6d6db7da, 0x8d8d8c01, 0xd5d564b1, 0x4e4ed29c, 0xa9a9e049, 0x6c6cb4d8, 0x5656faac, 0xf4f407f3, 0xeaea25cf, 0x6565afca, 0x7a7a8ef4, 0xaeaee947, 0x08081810, 0xbabad56f, 0x787888f0, 0x25256f4a, 0x2e2e725c, 0x1c1c2438, 0xa6a6f157, 0xb4b4c773, 0xc6c65197, 0xe8e823cb, 0xdddd7ca1, 0x74749ce8, 0x1f1f213e, 0x4b4bdd96, 0xbdbddc61, 0x8b8b860d, 0x8a8a850f, 0x707090e0, 0x3e3e427c, 0xb5b5c471, 0x6666aacc, 0x4848d890, 0x03030506, 0xf6f601f7, 0x0e0e121c, 0x6161a3c2, 0x35355f6a, 0x5757f9ae, 0xb9b9d069, 0x86869117, 0xc1c15899, 0x1d1d273a, 0x9e9eb927, 0xe1e138d9, 0xf8f813eb, 0x9898b32b, 0x11113322, 0x6969bbd2, 0xd9d970a9, 0x8e8e8907, 0x9494a733, 0x9b9bb62d, 0x1e1e223c, 0x87879215, 0xe9e920c9, 0xcece4987, 0x5555ffaa, 0x28287850, 0xdfdf7aa5, 0x8c8c8f03, 0xa1a1f859, 0x89898009, 0x0d0d171a, 0xbfbfda65, 0xe6e631d7, 0x4242c684, 0x6868b8d0, 0x4141c382, 0x9999b029, 0x2d2d775a, 0x0f0f111e, 0xb0b0cb7b, 0x5454fca8, 0xbbbbd66d, 0x16163a2c];
+
+    // Transformations for decryption
+    var T5 = [0x51f4a750, 0x7e416553, 0x1a17a4c3, 0x3a275e96, 0x3bab6bcb, 0x1f9d45f1, 0xacfa58ab, 0x4be30393, 0x2030fa55, 0xad766df6, 0x88cc7691, 0xf5024c25, 0x4fe5d7fc, 0xc52acbd7, 0x26354480, 0xb562a38f, 0xdeb15a49, 0x25ba1b67, 0x45ea0e98, 0x5dfec0e1, 0xc32f7502, 0x814cf012, 0x8d4697a3, 0x6bd3f9c6, 0x038f5fe7, 0x15929c95, 0xbf6d7aeb, 0x955259da, 0xd4be832d, 0x587421d3, 0x49e06929, 0x8ec9c844, 0x75c2896a, 0xf48e7978, 0x99583e6b, 0x27b971dd, 0xbee14fb6, 0xf088ad17, 0xc920ac66, 0x7dce3ab4, 0x63df4a18, 0xe51a3182, 0x97513360, 0x62537f45, 0xb16477e0, 0xbb6bae84, 0xfe81a01c, 0xf9082b94, 0x70486858, 0x8f45fd19, 0x94de6c87, 0x527bf8b7, 0xab73d323, 0x724b02e2, 0xe31f8f57, 0x6655ab2a, 0xb2eb2807, 0x2fb5c203, 0x86c57b9a, 0xd33708a5, 0x302887f2, 0x23bfa5b2, 0x02036aba, 0xed16825c, 0x8acf1c2b, 0xa779b492, 0xf307f2f0, 0x4e69e2a1, 0x65daf4cd, 0x0605bed5, 0xd134621f, 0xc4a6fe8a, 0x342e539d, 0xa2f355a0, 0x058ae132, 0xa4f6eb75, 0x0b83ec39, 0x4060efaa, 0x5e719f06, 0xbd6e1051, 0x3e218af9, 0x96dd063d, 0xdd3e05ae, 0x4de6bd46, 0x91548db5, 0x71c45d05, 0x0406d46f, 0x605015ff, 0x1998fb24, 0xd6bde997, 0x894043cc, 0x67d99e77, 0xb0e842bd, 0x07898b88, 0xe7195b38, 0x79c8eedb, 0xa17c0a47, 0x7c420fe9, 0xf8841ec9, 0x00000000, 0x09808683, 0x322bed48, 0x1e1170ac, 0x6c5a724e, 0xfd0efffb, 0x0f853856, 0x3daed51e, 0x362d3927, 0x0a0fd964, 0x685ca621, 0x9b5b54d1, 0x24362e3a, 0x0c0a67b1, 0x9357e70f, 0xb4ee96d2, 0x1b9b919e, 0x80c0c54f, 0x61dc20a2, 0x5a774b69, 0x1c121a16, 0xe293ba0a, 0xc0a02ae5, 0x3c22e043, 0x121b171d, 0x0e090d0b, 0xf28bc7ad, 0x2db6a8b9, 0x141ea9c8, 0x57f11985, 0xaf75074c, 0xee99ddbb, 0xa37f60fd, 0xf701269f, 0x5c72f5bc, 0x44663bc5, 0x5bfb7e34, 0x8b432976, 0xcb23c6dc, 0xb6edfc68, 0xb8e4f163, 0xd731dcca, 0x42638510, 0x13972240, 0x84c61120, 0x854a247d, 0xd2bb3df8, 0xaef93211, 0xc729a16d, 0x1d9e2f4b, 0xdcb230f3, 0x0d8652ec, 0x77c1e3d0, 0x2bb3166c, 0xa970b999, 0x119448fa, 0x47e96422, 0xa8fc8cc4, 0xa0f03f1a, 0x567d2cd8, 0x223390ef, 0x87494ec7, 0xd938d1c1, 0x8ccaa2fe, 0x98d40b36, 0xa6f581cf, 0xa57ade28, 0xdab78e26, 0x3fadbfa4, 0x2c3a9de4, 0x5078920d, 0x6a5fcc9b, 0x547e4662, 0xf68d13c2, 0x90d8b8e8, 0x2e39f75e, 0x82c3aff5, 0x9f5d80be, 0x69d0937c, 0x6fd52da9, 0xcf2512b3, 0xc8ac993b, 0x10187da7, 0xe89c636e, 0xdb3bbb7b, 0xcd267809, 0x6e5918f4, 0xec9ab701, 0x834f9aa8, 0xe6956e65, 0xaaffe67e, 0x21bccf08, 0xef15e8e6, 0xbae79bd9, 0x4a6f36ce, 0xea9f09d4, 0x29b07cd6, 0x31a4b2af, 0x2a3f2331, 0xc6a59430, 0x35a266c0, 0x744ebc37, 0xfc82caa6, 0xe090d0b0, 0x33a7d815, 0xf104984a, 0x41ecdaf7, 0x7fcd500e, 0x1791f62f, 0x764dd68d, 0x43efb04d, 0xccaa4d54, 0xe49604df, 0x9ed1b5e3, 0x4c6a881b, 0xc12c1fb8, 0x4665517f, 0x9d5eea04, 0x018c355d, 0xfa877473, 0xfb0b412e, 0xb3671d5a, 0x92dbd252, 0xe9105633, 0x6dd64713, 0x9ad7618c, 0x37a10c7a, 0x59f8148e, 0xeb133c89, 0xcea927ee, 0xb761c935, 0xe11ce5ed, 0x7a47b13c, 0x9cd2df59, 0x55f2733f, 0x1814ce79, 0x73c737bf, 0x53f7cdea, 0x5ffdaa5b, 0xdf3d6f14, 0x7844db86, 0xcaaff381, 0xb968c43e, 0x3824342c, 0xc2a3405f, 0x161dc372, 0xbce2250c, 0x283c498b, 0xff0d9541, 0x39a80171, 0x080cb3de, 0xd8b4e49c, 0x6456c190, 0x7bcb8461, 0xd532b670, 0x486c5c74, 0xd0b85742];
+    var T6 = [0x5051f4a7, 0x537e4165, 0xc31a17a4, 0x963a275e, 0xcb3bab6b, 0xf11f9d45, 0xabacfa58, 0x934be303, 0x552030fa, 0xf6ad766d, 0x9188cc76, 0x25f5024c, 0xfc4fe5d7, 0xd7c52acb, 0x80263544, 0x8fb562a3, 0x49deb15a, 0x6725ba1b, 0x9845ea0e, 0xe15dfec0, 0x02c32f75, 0x12814cf0, 0xa38d4697, 0xc66bd3f9, 0xe7038f5f, 0x9515929c, 0xebbf6d7a, 0xda955259, 0x2dd4be83, 0xd3587421, 0x2949e069, 0x448ec9c8, 0x6a75c289, 0x78f48e79, 0x6b99583e, 0xdd27b971, 0xb6bee14f, 0x17f088ad, 0x66c920ac, 0xb47dce3a, 0x1863df4a, 0x82e51a31, 0x60975133, 0x4562537f, 0xe0b16477, 0x84bb6bae, 0x1cfe81a0, 0x94f9082b, 0x58704868, 0x198f45fd, 0x8794de6c, 0xb7527bf8, 0x23ab73d3, 0xe2724b02, 0x57e31f8f, 0x2a6655ab, 0x07b2eb28, 0x032fb5c2, 0x9a86c57b, 0xa5d33708, 0xf2302887, 0xb223bfa5, 0xba02036a, 0x5ced1682, 0x2b8acf1c, 0x92a779b4, 0xf0f307f2, 0xa14e69e2, 0xcd65daf4, 0xd50605be, 0x1fd13462, 0x8ac4a6fe, 0x9d342e53, 0xa0a2f355, 0x32058ae1, 0x75a4f6eb, 0x390b83ec, 0xaa4060ef, 0x065e719f, 0x51bd6e10, 0xf93e218a, 0x3d96dd06, 0xaedd3e05, 0x464de6bd, 0xb591548d, 0x0571c45d, 0x6f0406d4, 0xff605015, 0x241998fb, 0x97d6bde9, 0xcc894043, 0x7767d99e, 0xbdb0e842, 0x8807898b, 0x38e7195b, 0xdb79c8ee, 0x47a17c0a, 0xe97c420f, 0xc9f8841e, 0x00000000, 0x83098086, 0x48322bed, 0xac1e1170, 0x4e6c5a72, 0xfbfd0eff, 0x560f8538, 0x1e3daed5, 0x27362d39, 0x640a0fd9, 0x21685ca6, 0xd19b5b54, 0x3a24362e, 0xb10c0a67, 0x0f9357e7, 0xd2b4ee96, 0x9e1b9b91, 0x4f80c0c5, 0xa261dc20, 0x695a774b, 0x161c121a, 0x0ae293ba, 0xe5c0a02a, 0x433c22e0, 0x1d121b17, 0x0b0e090d, 0xadf28bc7, 0xb92db6a8, 0xc8141ea9, 0x8557f119, 0x4caf7507, 0xbbee99dd, 0xfda37f60, 0x9ff70126, 0xbc5c72f5, 0xc544663b, 0x345bfb7e, 0x768b4329, 0xdccb23c6, 0x68b6edfc, 0x63b8e4f1, 0xcad731dc, 0x10426385, 0x40139722, 0x2084c611, 0x7d854a24, 0xf8d2bb3d, 0x11aef932, 0x6dc729a1, 0x4b1d9e2f, 0xf3dcb230, 0xec0d8652, 0xd077c1e3, 0x6c2bb316, 0x99a970b9, 0xfa119448, 0x2247e964, 0xc4a8fc8c, 0x1aa0f03f, 0xd8567d2c, 0xef223390, 0xc787494e, 0xc1d938d1, 0xfe8ccaa2, 0x3698d40b, 0xcfa6f581, 0x28a57ade, 0x26dab78e, 0xa43fadbf, 0xe42c3a9d, 0x0d507892, 0x9b6a5fcc, 0x62547e46, 0xc2f68d13, 0xe890d8b8, 0x5e2e39f7, 0xf582c3af, 0xbe9f5d80, 0x7c69d093, 0xa96fd52d, 0xb3cf2512, 0x3bc8ac99, 0xa710187d, 0x6ee89c63, 0x7bdb3bbb, 0x09cd2678, 0xf46e5918, 0x01ec9ab7, 0xa8834f9a, 0x65e6956e, 0x7eaaffe6, 0x0821bccf, 0xe6ef15e8, 0xd9bae79b, 0xce4a6f36, 0xd4ea9f09, 0xd629b07c, 0xaf31a4b2, 0x312a3f23, 0x30c6a594, 0xc035a266, 0x37744ebc, 0xa6fc82ca, 0xb0e090d0, 0x1533a7d8, 0x4af10498, 0xf741ecda, 0x0e7fcd50, 0x2f1791f6, 0x8d764dd6, 0x4d43efb0, 0x54ccaa4d, 0xdfe49604, 0xe39ed1b5, 0x1b4c6a88, 0xb8c12c1f, 0x7f466551, 0x049d5eea, 0x5d018c35, 0x73fa8774, 0x2efb0b41, 0x5ab3671d, 0x5292dbd2, 0x33e91056, 0x136dd647, 0x8c9ad761, 0x7a37a10c, 0x8e59f814, 0x89eb133c, 0xeecea927, 0x35b761c9, 0xede11ce5, 0x3c7a47b1, 0x599cd2df, 0x3f55f273, 0x791814ce, 0xbf73c737, 0xea53f7cd, 0x5b5ffdaa, 0x14df3d6f, 0x867844db, 0x81caaff3, 0x3eb968c4, 0x2c382434, 0x5fc2a340, 0x72161dc3, 0x0cbce225, 0x8b283c49, 0x41ff0d95, 0x7139a801, 0xde080cb3, 0x9cd8b4e4, 0x906456c1, 0x617bcb84, 0x70d532b6, 0x74486c5c, 0x42d0b857];
+    var T7 = [0xa75051f4, 0x65537e41, 0xa4c31a17, 0x5e963a27, 0x6bcb3bab, 0x45f11f9d, 0x58abacfa, 0x03934be3, 0xfa552030, 0x6df6ad76, 0x769188cc, 0x4c25f502, 0xd7fc4fe5, 0xcbd7c52a, 0x44802635, 0xa38fb562, 0x5a49deb1, 0x1b6725ba, 0x0e9845ea, 0xc0e15dfe, 0x7502c32f, 0xf012814c, 0x97a38d46, 0xf9c66bd3, 0x5fe7038f, 0x9c951592, 0x7aebbf6d, 0x59da9552, 0x832dd4be, 0x21d35874, 0x692949e0, 0xc8448ec9, 0x896a75c2, 0x7978f48e, 0x3e6b9958, 0x71dd27b9, 0x4fb6bee1, 0xad17f088, 0xac66c920, 0x3ab47dce, 0x4a1863df, 0x3182e51a, 0x33609751, 0x7f456253, 0x77e0b164, 0xae84bb6b, 0xa01cfe81, 0x2b94f908, 0x68587048, 0xfd198f45, 0x6c8794de, 0xf8b7527b, 0xd323ab73, 0x02e2724b, 0x8f57e31f, 0xab2a6655, 0x2807b2eb, 0xc2032fb5, 0x7b9a86c5, 0x08a5d337, 0x87f23028, 0xa5b223bf, 0x6aba0203, 0x825ced16, 0x1c2b8acf, 0xb492a779, 0xf2f0f307, 0xe2a14e69, 0xf4cd65da, 0xbed50605, 0x621fd134, 0xfe8ac4a6, 0x539d342e, 0x55a0a2f3, 0xe132058a, 0xeb75a4f6, 0xec390b83, 0xefaa4060, 0x9f065e71, 0x1051bd6e, 0x8af93e21, 0x063d96dd, 0x05aedd3e, 0xbd464de6, 0x8db59154, 0x5d0571c4, 0xd46f0406, 0x15ff6050, 0xfb241998, 0xe997d6bd, 0x43cc8940, 0x9e7767d9, 0x42bdb0e8, 0x8b880789, 0x5b38e719, 0xeedb79c8, 0x0a47a17c, 0x0fe97c42, 0x1ec9f884, 0x00000000, 0x86830980, 0xed48322b, 0x70ac1e11, 0x724e6c5a, 0xfffbfd0e, 0x38560f85, 0xd51e3dae, 0x3927362d, 0xd9640a0f, 0xa621685c, 0x54d19b5b, 0x2e3a2436, 0x67b10c0a, 0xe70f9357, 0x96d2b4ee, 0x919e1b9b, 0xc54f80c0, 0x20a261dc, 0x4b695a77, 0x1a161c12, 0xba0ae293, 0x2ae5c0a0, 0xe0433c22, 0x171d121b, 0x0d0b0e09, 0xc7adf28b, 0xa8b92db6, 0xa9c8141e, 0x198557f1, 0x074caf75, 0xddbbee99, 0x60fda37f, 0x269ff701, 0xf5bc5c72, 0x3bc54466, 0x7e345bfb, 0x29768b43, 0xc6dccb23, 0xfc68b6ed, 0xf163b8e4, 0xdccad731, 0x85104263, 0x22401397, 0x112084c6, 0x247d854a, 0x3df8d2bb, 0x3211aef9, 0xa16dc729, 0x2f4b1d9e, 0x30f3dcb2, 0x52ec0d86, 0xe3d077c1, 0x166c2bb3, 0xb999a970, 0x48fa1194, 0x642247e9, 0x8cc4a8fc, 0x3f1aa0f0, 0x2cd8567d, 0x90ef2233, 0x4ec78749, 0xd1c1d938, 0xa2fe8cca, 0x0b3698d4, 0x81cfa6f5, 0xde28a57a, 0x8e26dab7, 0xbfa43fad, 0x9de42c3a, 0x920d5078, 0xcc9b6a5f, 0x4662547e, 0x13c2f68d, 0xb8e890d8, 0xf75e2e39, 0xaff582c3, 0x80be9f5d, 0x937c69d0, 0x2da96fd5, 0x12b3cf25, 0x993bc8ac, 0x7da71018, 0x636ee89c, 0xbb7bdb3b, 0x7809cd26, 0x18f46e59, 0xb701ec9a, 0x9aa8834f, 0x6e65e695, 0xe67eaaff, 0xcf0821bc, 0xe8e6ef15, 0x9bd9bae7, 0x36ce4a6f, 0x09d4ea9f, 0x7cd629b0, 0xb2af31a4, 0x23312a3f, 0x9430c6a5, 0x66c035a2, 0xbc37744e, 0xcaa6fc82, 0xd0b0e090, 0xd81533a7, 0x984af104, 0xdaf741ec, 0x500e7fcd, 0xf62f1791, 0xd68d764d, 0xb04d43ef, 0x4d54ccaa, 0x04dfe496, 0xb5e39ed1, 0x881b4c6a, 0x1fb8c12c, 0x517f4665, 0xea049d5e, 0x355d018c, 0x7473fa87, 0x412efb0b, 0x1d5ab367, 0xd25292db, 0x5633e910, 0x47136dd6, 0x618c9ad7, 0x0c7a37a1, 0x148e59f8, 0x3c89eb13, 0x27eecea9, 0xc935b761, 0xe5ede11c, 0xb13c7a47, 0xdf599cd2, 0x733f55f2, 0xce791814, 0x37bf73c7, 0xcdea53f7, 0xaa5b5ffd, 0x6f14df3d, 0xdb867844, 0xf381caaf, 0xc43eb968, 0x342c3824, 0x405fc2a3, 0xc372161d, 0x250cbce2, 0x498b283c, 0x9541ff0d, 0x017139a8, 0xb3de080c, 0xe49cd8b4, 0xc1906456, 0x84617bcb, 0xb670d532, 0x5c74486c, 0x5742d0b8];
+    var T8 = [0xf4a75051, 0x4165537e, 0x17a4c31a, 0x275e963a, 0xab6bcb3b, 0x9d45f11f, 0xfa58abac, 0xe303934b, 0x30fa5520, 0x766df6ad, 0xcc769188, 0x024c25f5, 0xe5d7fc4f, 0x2acbd7c5, 0x35448026, 0x62a38fb5, 0xb15a49de, 0xba1b6725, 0xea0e9845, 0xfec0e15d, 0x2f7502c3, 0x4cf01281, 0x4697a38d, 0xd3f9c66b, 0x8f5fe703, 0x929c9515, 0x6d7aebbf, 0x5259da95, 0xbe832dd4, 0x7421d358, 0xe0692949, 0xc9c8448e, 0xc2896a75, 0x8e7978f4, 0x583e6b99, 0xb971dd27, 0xe14fb6be, 0x88ad17f0, 0x20ac66c9, 0xce3ab47d, 0xdf4a1863, 0x1a3182e5, 0x51336097, 0x537f4562, 0x6477e0b1, 0x6bae84bb, 0x81a01cfe, 0x082b94f9, 0x48685870, 0x45fd198f, 0xde6c8794, 0x7bf8b752, 0x73d323ab, 0x4b02e272, 0x1f8f57e3, 0x55ab2a66, 0xeb2807b2, 0xb5c2032f, 0xc57b9a86, 0x3708a5d3, 0x2887f230, 0xbfa5b223, 0x036aba02, 0x16825ced, 0xcf1c2b8a, 0x79b492a7, 0x07f2f0f3, 0x69e2a14e, 0xdaf4cd65, 0x05bed506, 0x34621fd1, 0xa6fe8ac4, 0x2e539d34, 0xf355a0a2, 0x8ae13205, 0xf6eb75a4, 0x83ec390b, 0x60efaa40, 0x719f065e, 0x6e1051bd, 0x218af93e, 0xdd063d96, 0x3e05aedd, 0xe6bd464d, 0x548db591, 0xc45d0571, 0x06d46f04, 0x5015ff60, 0x98fb2419, 0xbde997d6, 0x4043cc89, 0xd99e7767, 0xe842bdb0, 0x898b8807, 0x195b38e7, 0xc8eedb79, 0x7c0a47a1, 0x420fe97c, 0x841ec9f8, 0x00000000, 0x80868309, 0x2bed4832, 0x1170ac1e, 0x5a724e6c, 0x0efffbfd, 0x8538560f, 0xaed51e3d, 0x2d392736, 0x0fd9640a, 0x5ca62168, 0x5b54d19b, 0x362e3a24, 0x0a67b10c, 0x57e70f93, 0xee96d2b4, 0x9b919e1b, 0xc0c54f80, 0xdc20a261, 0x774b695a, 0x121a161c, 0x93ba0ae2, 0xa02ae5c0, 0x22e0433c, 0x1b171d12, 0x090d0b0e, 0x8bc7adf2, 0xb6a8b92d, 0x1ea9c814, 0xf1198557, 0x75074caf, 0x99ddbbee, 0x7f60fda3, 0x01269ff7, 0x72f5bc5c, 0x663bc544, 0xfb7e345b, 0x4329768b, 0x23c6dccb, 0xedfc68b6, 0xe4f163b8, 0x31dccad7, 0x63851042, 0x97224013, 0xc6112084, 0x4a247d85, 0xbb3df8d2, 0xf93211ae, 0x29a16dc7, 0x9e2f4b1d, 0xb230f3dc, 0x8652ec0d, 0xc1e3d077, 0xb3166c2b, 0x70b999a9, 0x9448fa11, 0xe9642247, 0xfc8cc4a8, 0xf03f1aa0, 0x7d2cd856, 0x3390ef22, 0x494ec787, 0x38d1c1d9, 0xcaa2fe8c, 0xd40b3698, 0xf581cfa6, 0x7ade28a5, 0xb78e26da, 0xadbfa43f, 0x3a9de42c, 0x78920d50, 0x5fcc9b6a, 0x7e466254, 0x8d13c2f6, 0xd8b8e890, 0x39f75e2e, 0xc3aff582, 0x5d80be9f, 0xd0937c69, 0xd52da96f, 0x2512b3cf, 0xac993bc8, 0x187da710, 0x9c636ee8, 0x3bbb7bdb, 0x267809cd, 0x5918f46e, 0x9ab701ec, 0x4f9aa883, 0x956e65e6, 0xffe67eaa, 0xbccf0821, 0x15e8e6ef, 0xe79bd9ba, 0x6f36ce4a, 0x9f09d4ea, 0xb07cd629, 0xa4b2af31, 0x3f23312a, 0xa59430c6, 0xa266c035, 0x4ebc3774, 0x82caa6fc, 0x90d0b0e0, 0xa7d81533, 0x04984af1, 0xecdaf741, 0xcd500e7f, 0x91f62f17, 0x4dd68d76, 0xefb04d43, 0xaa4d54cc, 0x9604dfe4, 0xd1b5e39e, 0x6a881b4c, 0x2c1fb8c1, 0x65517f46, 0x5eea049d, 0x8c355d01, 0x877473fa, 0x0b412efb, 0x671d5ab3, 0xdbd25292, 0x105633e9, 0xd647136d, 0xd7618c9a, 0xa10c7a37, 0xf8148e59, 0x133c89eb, 0xa927eece, 0x61c935b7, 0x1ce5ede1, 0x47b13c7a, 0xd2df599c, 0xf2733f55, 0x14ce7918, 0xc737bf73, 0xf7cdea53, 0xfdaa5b5f, 0x3d6f14df, 0x44db8678, 0xaff381ca, 0x68c43eb9, 0x24342c38, 0xa3405fc2, 0x1dc37216, 0xe2250cbc, 0x3c498b28, 0x0d9541ff, 0xa8017139, 0x0cb3de08, 0xb4e49cd8, 0x56c19064, 0xcb84617b, 0x32b670d5, 0x6c5c7448, 0xb85742d0];
+
+    // Transformations for decryption key expansion
+    var U1 = [0x00000000, 0x0e090d0b, 0x1c121a16, 0x121b171d, 0x3824342c, 0x362d3927, 0x24362e3a, 0x2a3f2331, 0x70486858, 0x7e416553, 0x6c5a724e, 0x62537f45, 0x486c5c74, 0x4665517f, 0x547e4662, 0x5a774b69, 0xe090d0b0, 0xee99ddbb, 0xfc82caa6, 0xf28bc7ad, 0xd8b4e49c, 0xd6bde997, 0xc4a6fe8a, 0xcaaff381, 0x90d8b8e8, 0x9ed1b5e3, 0x8ccaa2fe, 0x82c3aff5, 0xa8fc8cc4, 0xa6f581cf, 0xb4ee96d2, 0xbae79bd9, 0xdb3bbb7b, 0xd532b670, 0xc729a16d, 0xc920ac66, 0xe31f8f57, 0xed16825c, 0xff0d9541, 0xf104984a, 0xab73d323, 0xa57ade28, 0xb761c935, 0xb968c43e, 0x9357e70f, 0x9d5eea04, 0x8f45fd19, 0x814cf012, 0x3bab6bcb, 0x35a266c0, 0x27b971dd, 0x29b07cd6, 0x038f5fe7, 0x0d8652ec, 0x1f9d45f1, 0x119448fa, 0x4be30393, 0x45ea0e98, 0x57f11985, 0x59f8148e, 0x73c737bf, 0x7dce3ab4, 0x6fd52da9, 0x61dc20a2, 0xad766df6, 0xa37f60fd, 0xb16477e0, 0xbf6d7aeb, 0x955259da, 0x9b5b54d1, 0x894043cc, 0x87494ec7, 0xdd3e05ae, 0xd33708a5, 0xc12c1fb8, 0xcf2512b3, 0xe51a3182, 0xeb133c89, 0xf9082b94, 0xf701269f, 0x4de6bd46, 0x43efb04d, 0x51f4a750, 0x5ffdaa5b, 0x75c2896a, 0x7bcb8461, 0x69d0937c, 0x67d99e77, 0x3daed51e, 0x33a7d815, 0x21bccf08, 0x2fb5c203, 0x058ae132, 0x0b83ec39, 0x1998fb24, 0x1791f62f, 0x764dd68d, 0x7844db86, 0x6a5fcc9b, 0x6456c190, 0x4e69e2a1, 0x4060efaa, 0x527bf8b7, 0x5c72f5bc, 0x0605bed5, 0x080cb3de, 0x1a17a4c3, 0x141ea9c8, 0x3e218af9, 0x302887f2, 0x223390ef, 0x2c3a9de4, 0x96dd063d, 0x98d40b36, 0x8acf1c2b, 0x84c61120, 0xaef93211, 0xa0f03f1a, 0xb2eb2807, 0xbce2250c, 0xe6956e65, 0xe89c636e, 0xfa877473, 0xf48e7978, 0xdeb15a49, 0xd0b85742, 0xc2a3405f, 0xccaa4d54, 0x41ecdaf7, 0x4fe5d7fc, 0x5dfec0e1, 0x53f7cdea, 0x79c8eedb, 0x77c1e3d0, 0x65daf4cd, 0x6bd3f9c6, 0x31a4b2af, 0x3fadbfa4, 0x2db6a8b9, 0x23bfa5b2, 0x09808683, 0x07898b88, 0x15929c95, 0x1b9b919e, 0xa17c0a47, 0xaf75074c, 0xbd6e1051, 0xb3671d5a, 0x99583e6b, 0x97513360, 0x854a247d, 0x8b432976, 0xd134621f, 0xdf3d6f14, 0xcd267809, 0xc32f7502, 0xe9105633, 0xe7195b38, 0xf5024c25, 0xfb0b412e, 0x9ad7618c, 0x94de6c87, 0x86c57b9a, 0x88cc7691, 0xa2f355a0, 0xacfa58ab, 0xbee14fb6, 0xb0e842bd, 0xea9f09d4, 0xe49604df, 0xf68d13c2, 0xf8841ec9, 0xd2bb3df8, 0xdcb230f3, 0xcea927ee, 0xc0a02ae5, 0x7a47b13c, 0x744ebc37, 0x6655ab2a, 0x685ca621, 0x42638510, 0x4c6a881b, 0x5e719f06, 0x5078920d, 0x0a0fd964, 0x0406d46f, 0x161dc372, 0x1814ce79, 0x322bed48, 0x3c22e043, 0x2e39f75e, 0x2030fa55, 0xec9ab701, 0xe293ba0a, 0xf088ad17, 0xfe81a01c, 0xd4be832d, 0xdab78e26, 0xc8ac993b, 0xc6a59430, 0x9cd2df59, 0x92dbd252, 0x80c0c54f, 0x8ec9c844, 0xa4f6eb75, 0xaaffe67e, 0xb8e4f163, 0xb6edfc68, 0x0c0a67b1, 0x02036aba, 0x10187da7, 0x1e1170ac, 0x342e539d, 0x3a275e96, 0x283c498b, 0x26354480, 0x7c420fe9, 0x724b02e2, 0x605015ff, 0x6e5918f4, 0x44663bc5, 0x4a6f36ce, 0x587421d3, 0x567d2cd8, 0x37a10c7a, 0x39a80171, 0x2bb3166c, 0x25ba1b67, 0x0f853856, 0x018c355d, 0x13972240, 0x1d9e2f4b, 0x47e96422, 0x49e06929, 0x5bfb7e34, 0x55f2733f, 0x7fcd500e, 0x71c45d05, 0x63df4a18, 0x6dd64713, 0xd731dcca, 0xd938d1c1, 0xcb23c6dc, 0xc52acbd7, 0xef15e8e6, 0xe11ce5ed, 0xf307f2f0, 0xfd0efffb, 0xa779b492, 0xa970b999, 0xbb6bae84, 0xb562a38f, 0x9f5d80be, 0x91548db5, 0x834f9aa8, 0x8d4697a3];
+    var U2 = [0x00000000, 0x0b0e090d, 0x161c121a, 0x1d121b17, 0x2c382434, 0x27362d39, 0x3a24362e, 0x312a3f23, 0x58704868, 0x537e4165, 0x4e6c5a72, 0x4562537f, 0x74486c5c, 0x7f466551, 0x62547e46, 0x695a774b, 0xb0e090d0, 0xbbee99dd, 0xa6fc82ca, 0xadf28bc7, 0x9cd8b4e4, 0x97d6bde9, 0x8ac4a6fe, 0x81caaff3, 0xe890d8b8, 0xe39ed1b5, 0xfe8ccaa2, 0xf582c3af, 0xc4a8fc8c, 0xcfa6f581, 0xd2b4ee96, 0xd9bae79b, 0x7bdb3bbb, 0x70d532b6, 0x6dc729a1, 0x66c920ac, 0x57e31f8f, 0x5ced1682, 0x41ff0d95, 0x4af10498, 0x23ab73d3, 0x28a57ade, 0x35b761c9, 0x3eb968c4, 0x0f9357e7, 0x049d5eea, 0x198f45fd, 0x12814cf0, 0xcb3bab6b, 0xc035a266, 0xdd27b971, 0xd629b07c, 0xe7038f5f, 0xec0d8652, 0xf11f9d45, 0xfa119448, 0x934be303, 0x9845ea0e, 0x8557f119, 0x8e59f814, 0xbf73c737, 0xb47dce3a, 0xa96fd52d, 0xa261dc20, 0xf6ad766d, 0xfda37f60, 0xe0b16477, 0xebbf6d7a, 0xda955259, 0xd19b5b54, 0xcc894043, 0xc787494e, 0xaedd3e05, 0xa5d33708, 0xb8c12c1f, 0xb3cf2512, 0x82e51a31, 0x89eb133c, 0x94f9082b, 0x9ff70126, 0x464de6bd, 0x4d43efb0, 0x5051f4a7, 0x5b5ffdaa, 0x6a75c289, 0x617bcb84, 0x7c69d093, 0x7767d99e, 0x1e3daed5, 0x1533a7d8, 0x0821bccf, 0x032fb5c2, 0x32058ae1, 0x390b83ec, 0x241998fb, 0x2f1791f6, 0x8d764dd6, 0x867844db, 0x9b6a5fcc, 0x906456c1, 0xa14e69e2, 0xaa4060ef, 0xb7527bf8, 0xbc5c72f5, 0xd50605be, 0xde080cb3, 0xc31a17a4, 0xc8141ea9, 0xf93e218a, 0xf2302887, 0xef223390, 0xe42c3a9d, 0x3d96dd06, 0x3698d40b, 0x2b8acf1c, 0x2084c611, 0x11aef932, 0x1aa0f03f, 0x07b2eb28, 0x0cbce225, 0x65e6956e, 0x6ee89c63, 0x73fa8774, 0x78f48e79, 0x49deb15a, 0x42d0b857, 0x5fc2a340, 0x54ccaa4d, 0xf741ecda, 0xfc4fe5d7, 0xe15dfec0, 0xea53f7cd, 0xdb79c8ee, 0xd077c1e3, 0xcd65daf4, 0xc66bd3f9, 0xaf31a4b2, 0xa43fadbf, 0xb92db6a8, 0xb223bfa5, 0x83098086, 0x8807898b, 0x9515929c, 0x9e1b9b91, 0x47a17c0a, 0x4caf7507, 0x51bd6e10, 0x5ab3671d, 0x6b99583e, 0x60975133, 0x7d854a24, 0x768b4329, 0x1fd13462, 0x14df3d6f, 0x09cd2678, 0x02c32f75, 0x33e91056, 0x38e7195b, 0x25f5024c, 0x2efb0b41, 0x8c9ad761, 0x8794de6c, 0x9a86c57b, 0x9188cc76, 0xa0a2f355, 0xabacfa58, 0xb6bee14f, 0xbdb0e842, 0xd4ea9f09, 0xdfe49604, 0xc2f68d13, 0xc9f8841e, 0xf8d2bb3d, 0xf3dcb230, 0xeecea927, 0xe5c0a02a, 0x3c7a47b1, 0x37744ebc, 0x2a6655ab, 0x21685ca6, 0x10426385, 0x1b4c6a88, 0x065e719f, 0x0d507892, 0x640a0fd9, 0x6f0406d4, 0x72161dc3, 0x791814ce, 0x48322bed, 0x433c22e0, 0x5e2e39f7, 0x552030fa, 0x01ec9ab7, 0x0ae293ba, 0x17f088ad, 0x1cfe81a0, 0x2dd4be83, 0x26dab78e, 0x3bc8ac99, 0x30c6a594, 0x599cd2df, 0x5292dbd2, 0x4f80c0c5, 0x448ec9c8, 0x75a4f6eb, 0x7eaaffe6, 0x63b8e4f1, 0x68b6edfc, 0xb10c0a67, 0xba02036a, 0xa710187d, 0xac1e1170, 0x9d342e53, 0x963a275e, 0x8b283c49, 0x80263544, 0xe97c420f, 0xe2724b02, 0xff605015, 0xf46e5918, 0xc544663b, 0xce4a6f36, 0xd3587421, 0xd8567d2c, 0x7a37a10c, 0x7139a801, 0x6c2bb316, 0x6725ba1b, 0x560f8538, 0x5d018c35, 0x40139722, 0x4b1d9e2f, 0x2247e964, 0x2949e069, 0x345bfb7e, 0x3f55f273, 0x0e7fcd50, 0x0571c45d, 0x1863df4a, 0x136dd647, 0xcad731dc, 0xc1d938d1, 0xdccb23c6, 0xd7c52acb, 0xe6ef15e8, 0xede11ce5, 0xf0f307f2, 0xfbfd0eff, 0x92a779b4, 0x99a970b9, 0x84bb6bae, 0x8fb562a3, 0xbe9f5d80, 0xb591548d, 0xa8834f9a, 0xa38d4697];
+    var U3 = [0x00000000, 0x0d0b0e09, 0x1a161c12, 0x171d121b, 0x342c3824, 0x3927362d, 0x2e3a2436, 0x23312a3f, 0x68587048, 0x65537e41, 0x724e6c5a, 0x7f456253, 0x5c74486c, 0x517f4665, 0x4662547e, 0x4b695a77, 0xd0b0e090, 0xddbbee99, 0xcaa6fc82, 0xc7adf28b, 0xe49cd8b4, 0xe997d6bd, 0xfe8ac4a6, 0xf381caaf, 0xb8e890d8, 0xb5e39ed1, 0xa2fe8cca, 0xaff582c3, 0x8cc4a8fc, 0x81cfa6f5, 0x96d2b4ee, 0x9bd9bae7, 0xbb7bdb3b, 0xb670d532, 0xa16dc729, 0xac66c920, 0x8f57e31f, 0x825ced16, 0x9541ff0d, 0x984af104, 0xd323ab73, 0xde28a57a, 0xc935b761, 0xc43eb968, 0xe70f9357, 0xea049d5e, 0xfd198f45, 0xf012814c, 0x6bcb3bab, 0x66c035a2, 0x71dd27b9, 0x7cd629b0, 0x5fe7038f, 0x52ec0d86, 0x45f11f9d, 0x48fa1194, 0x03934be3, 0x0e9845ea, 0x198557f1, 0x148e59f8, 0x37bf73c7, 0x3ab47dce, 0x2da96fd5, 0x20a261dc, 0x6df6ad76, 0x60fda37f, 0x77e0b164, 0x7aebbf6d, 0x59da9552, 0x54d19b5b, 0x43cc8940, 0x4ec78749, 0x05aedd3e, 0x08a5d337, 0x1fb8c12c, 0x12b3cf25, 0x3182e51a, 0x3c89eb13, 0x2b94f908, 0x269ff701, 0xbd464de6, 0xb04d43ef, 0xa75051f4, 0xaa5b5ffd, 0x896a75c2, 0x84617bcb, 0x937c69d0, 0x9e7767d9, 0xd51e3dae, 0xd81533a7, 0xcf0821bc, 0xc2032fb5, 0xe132058a, 0xec390b83, 0xfb241998, 0xf62f1791, 0xd68d764d, 0xdb867844, 0xcc9b6a5f, 0xc1906456, 0xe2a14e69, 0xefaa4060, 0xf8b7527b, 0xf5bc5c72, 0xbed50605, 0xb3de080c, 0xa4c31a17, 0xa9c8141e, 0x8af93e21, 0x87f23028, 0x90ef2233, 0x9de42c3a, 0x063d96dd, 0x0b3698d4, 0x1c2b8acf, 0x112084c6, 0x3211aef9, 0x3f1aa0f0, 0x2807b2eb, 0x250cbce2, 0x6e65e695, 0x636ee89c, 0x7473fa87, 0x7978f48e, 0x5a49deb1, 0x5742d0b8, 0x405fc2a3, 0x4d54ccaa, 0xdaf741ec, 0xd7fc4fe5, 0xc0e15dfe, 0xcdea53f7, 0xeedb79c8, 0xe3d077c1, 0xf4cd65da, 0xf9c66bd3, 0xb2af31a4, 0xbfa43fad, 0xa8b92db6, 0xa5b223bf, 0x86830980, 0x8b880789, 0x9c951592, 0x919e1b9b, 0x0a47a17c, 0x074caf75, 0x1051bd6e, 0x1d5ab367, 0x3e6b9958, 0x33609751, 0x247d854a, 0x29768b43, 0x621fd134, 0x6f14df3d, 0x7809cd26, 0x7502c32f, 0x5633e910, 0x5b38e719, 0x4c25f502, 0x412efb0b, 0x618c9ad7, 0x6c8794de, 0x7b9a86c5, 0x769188cc, 0x55a0a2f3, 0x58abacfa, 0x4fb6bee1, 0x42bdb0e8, 0x09d4ea9f, 0x04dfe496, 0x13c2f68d, 0x1ec9f884, 0x3df8d2bb, 0x30f3dcb2, 0x27eecea9, 0x2ae5c0a0, 0xb13c7a47, 0xbc37744e, 0xab2a6655, 0xa621685c, 0x85104263, 0x881b4c6a, 0x9f065e71, 0x920d5078, 0xd9640a0f, 0xd46f0406, 0xc372161d, 0xce791814, 0xed48322b, 0xe0433c22, 0xf75e2e39, 0xfa552030, 0xb701ec9a, 0xba0ae293, 0xad17f088, 0xa01cfe81, 0x832dd4be, 0x8e26dab7, 0x993bc8ac, 0x9430c6a5, 0xdf599cd2, 0xd25292db, 0xc54f80c0, 0xc8448ec9, 0xeb75a4f6, 0xe67eaaff, 0xf163b8e4, 0xfc68b6ed, 0x67b10c0a, 0x6aba0203, 0x7da71018, 0x70ac1e11, 0x539d342e, 0x5e963a27, 0x498b283c, 0x44802635, 0x0fe97c42, 0x02e2724b, 0x15ff6050, 0x18f46e59, 0x3bc54466, 0x36ce4a6f, 0x21d35874, 0x2cd8567d, 0x0c7a37a1, 0x017139a8, 0x166c2bb3, 0x1b6725ba, 0x38560f85, 0x355d018c, 0x22401397, 0x2f4b1d9e, 0x642247e9, 0x692949e0, 0x7e345bfb, 0x733f55f2, 0x500e7fcd, 0x5d0571c4, 0x4a1863df, 0x47136dd6, 0xdccad731, 0xd1c1d938, 0xc6dccb23, 0xcbd7c52a, 0xe8e6ef15, 0xe5ede11c, 0xf2f0f307, 0xfffbfd0e, 0xb492a779, 0xb999a970, 0xae84bb6b, 0xa38fb562, 0x80be9f5d, 0x8db59154, 0x9aa8834f, 0x97a38d46];
+    var U4 = [0x00000000, 0x090d0b0e, 0x121a161c, 0x1b171d12, 0x24342c38, 0x2d392736, 0x362e3a24, 0x3f23312a, 0x48685870, 0x4165537e, 0x5a724e6c, 0x537f4562, 0x6c5c7448, 0x65517f46, 0x7e466254, 0x774b695a, 0x90d0b0e0, 0x99ddbbee, 0x82caa6fc, 0x8bc7adf2, 0xb4e49cd8, 0xbde997d6, 0xa6fe8ac4, 0xaff381ca, 0xd8b8e890, 0xd1b5e39e, 0xcaa2fe8c, 0xc3aff582, 0xfc8cc4a8, 0xf581cfa6, 0xee96d2b4, 0xe79bd9ba, 0x3bbb7bdb, 0x32b670d5, 0x29a16dc7, 0x20ac66c9, 0x1f8f57e3, 0x16825ced, 0x0d9541ff, 0x04984af1, 0x73d323ab, 0x7ade28a5, 0x61c935b7, 0x68c43eb9, 0x57e70f93, 0x5eea049d, 0x45fd198f, 0x4cf01281, 0xab6bcb3b, 0xa266c035, 0xb971dd27, 0xb07cd629, 0x8f5fe703, 0x8652ec0d, 0x9d45f11f, 0x9448fa11, 0xe303934b, 0xea0e9845, 0xf1198557, 0xf8148e59, 0xc737bf73, 0xce3ab47d, 0xd52da96f, 0xdc20a261, 0x766df6ad, 0x7f60fda3, 0x6477e0b1, 0x6d7aebbf, 0x5259da95, 0x5b54d19b, 0x4043cc89, 0x494ec787, 0x3e05aedd, 0x3708a5d3, 0x2c1fb8c1, 0x2512b3cf, 0x1a3182e5, 0x133c89eb, 0x082b94f9, 0x01269ff7, 0xe6bd464d, 0xefb04d43, 0xf4a75051, 0xfdaa5b5f, 0xc2896a75, 0xcb84617b, 0xd0937c69, 0xd99e7767, 0xaed51e3d, 0xa7d81533, 0xbccf0821, 0xb5c2032f, 0x8ae13205, 0x83ec390b, 0x98fb2419, 0x91f62f17, 0x4dd68d76, 0x44db8678, 0x5fcc9b6a, 0x56c19064, 0x69e2a14e, 0x60efaa40, 0x7bf8b752, 0x72f5bc5c, 0x05bed506, 0x0cb3de08, 0x17a4c31a, 0x1ea9c814, 0x218af93e, 0x2887f230, 0x3390ef22, 0x3a9de42c, 0xdd063d96, 0xd40b3698, 0xcf1c2b8a, 0xc6112084, 0xf93211ae, 0xf03f1aa0, 0xeb2807b2, 0xe2250cbc, 0x956e65e6, 0x9c636ee8, 0x877473fa, 0x8e7978f4, 0xb15a49de, 0xb85742d0, 0xa3405fc2, 0xaa4d54cc, 0xecdaf741, 0xe5d7fc4f, 0xfec0e15d, 0xf7cdea53, 0xc8eedb79, 0xc1e3d077, 0xdaf4cd65, 0xd3f9c66b, 0xa4b2af31, 0xadbfa43f, 0xb6a8b92d, 0xbfa5b223, 0x80868309, 0x898b8807, 0x929c9515, 0x9b919e1b, 0x7c0a47a1, 0x75074caf, 0x6e1051bd, 0x671d5ab3, 0x583e6b99, 0x51336097, 0x4a247d85, 0x4329768b, 0x34621fd1, 0x3d6f14df, 0x267809cd, 0x2f7502c3, 0x105633e9, 0x195b38e7, 0x024c25f5, 0x0b412efb, 0xd7618c9a, 0xde6c8794, 0xc57b9a86, 0xcc769188, 0xf355a0a2, 0xfa58abac, 0xe14fb6be, 0xe842bdb0, 0x9f09d4ea, 0x9604dfe4, 0x8d13c2f6, 0x841ec9f8, 0xbb3df8d2, 0xb230f3dc, 0xa927eece, 0xa02ae5c0, 0x47b13c7a, 0x4ebc3774, 0x55ab2a66, 0x5ca62168, 0x63851042, 0x6a881b4c, 0x719f065e, 0x78920d50, 0x0fd9640a, 0x06d46f04, 0x1dc37216, 0x14ce7918, 0x2bed4832, 0x22e0433c, 0x39f75e2e, 0x30fa5520, 0x9ab701ec, 0x93ba0ae2, 0x88ad17f0, 0x81a01cfe, 0xbe832dd4, 0xb78e26da, 0xac993bc8, 0xa59430c6, 0xd2df599c, 0xdbd25292, 0xc0c54f80, 0xc9c8448e, 0xf6eb75a4, 0xffe67eaa, 0xe4f163b8, 0xedfc68b6, 0x0a67b10c, 0x036aba02, 0x187da710, 0x1170ac1e, 0x2e539d34, 0x275e963a, 0x3c498b28, 0x35448026, 0x420fe97c, 0x4b02e272, 0x5015ff60, 0x5918f46e, 0x663bc544, 0x6f36ce4a, 0x7421d358, 0x7d2cd856, 0xa10c7a37, 0xa8017139, 0xb3166c2b, 0xba1b6725, 0x8538560f, 0x8c355d01, 0x97224013, 0x9e2f4b1d, 0xe9642247, 0xe0692949, 0xfb7e345b, 0xf2733f55, 0xcd500e7f, 0xc45d0571, 0xdf4a1863, 0xd647136d, 0x31dccad7, 0x38d1c1d9, 0x23c6dccb, 0x2acbd7c5, 0x15e8e6ef, 0x1ce5ede1, 0x07f2f0f3, 0x0efffbfd, 0x79b492a7, 0x70b999a9, 0x6bae84bb, 0x62a38fb5, 0x5d80be9f, 0x548db591, 0x4f9aa883, 0x4697a38d];
+
+    function convertToInt32(bytes) {
+        var result = [];
+        for (var i = 0; i < bytes.length; i += 4) {
+            result.push(
+                (bytes[i    ] << 24) |
+                (bytes[i + 1] << 16) |
+                (bytes[i + 2] <<  8) |
+                bytes[i + 3]
+            );
+        }
+        return result;
+    }
+
+    var AES = function(key) {
+        if (!(this instanceof AES)) {
+            throw Error('AES must be instanitated with `new`');
+        }
+
+        Object.defineProperty(this, 'key', {
+            value: coerceArray(key, true)
+        });
+
+        this._prepare();
+    }
+
+
+    AES.prototype._prepare = function() {
+
+        var rounds = numberOfRounds[this.key.length];
+        if (rounds == null) {
+            throw new Error('invalid key size (must be 16, 24 or 32 bytes)');
+        }
+
+        // encryption round keys
+        this._Ke = [];
+
+        // decryption round keys
+        this._Kd = [];
+
+        for (var i = 0; i <= rounds; i++) {
+            this._Ke.push([0, 0, 0, 0]);
+            this._Kd.push([0, 0, 0, 0]);
+        }
+
+        var roundKeyCount = (rounds + 1) * 4;
+        var KC = this.key.length / 4;
+
+        // convert the key into ints
+        var tk = convertToInt32(this.key);
+
+        // copy values into round key arrays
+        var index;
+        for (var i = 0; i < KC; i++) {
+            index = i >> 2;
+            this._Ke[index][i % 4] = tk[i];
+            this._Kd[rounds - index][i % 4] = tk[i];
+        }
+
+        // key expansion (fips-197 section 5.2)
+        var rconpointer = 0;
+        var t = KC, tt;
+        while (t < roundKeyCount) {
+            tt = tk[KC - 1];
+            tk[0] ^= ((S[(tt >> 16) & 0xFF] << 24) ^
+            (S[(tt >>  8) & 0xFF] << 16) ^
+            (S[ tt        & 0xFF] <<  8) ^
+            S[(tt >> 24) & 0xFF]        ^
+            (rcon[rconpointer] << 24));
+            rconpointer += 1;
+
+            // key expansion (for non-256 bit)
+            if (KC != 8) {
+                for (var i = 1; i < KC; i++) {
+                    tk[i] ^= tk[i - 1];
+                }
+
+                // key expansion for 256-bit keys is "slightly different" (fips-197)
+            } else {
+                for (var i = 1; i < (KC / 2); i++) {
+                    tk[i] ^= tk[i - 1];
+                }
+                tt = tk[(KC / 2) - 1];
+
+                tk[KC / 2] ^= (S[ tt        & 0xFF]        ^
+                (S[(tt >>  8) & 0xFF] <<  8) ^
+                (S[(tt >> 16) & 0xFF] << 16) ^
+                (S[(tt >> 24) & 0xFF] << 24));
+
+                for (var i = (KC / 2) + 1; i < KC; i++) {
+                    tk[i] ^= tk[i - 1];
+                }
+            }
+
+            // copy values into round key arrays
+            var i = 0, r, c;
+            while (i < KC && t < roundKeyCount) {
+                r = t >> 2;
+                c = t % 4;
+                this._Ke[r][c] = tk[i];
+                this._Kd[rounds - r][c] = tk[i++];
+                t++;
+            }
+        }
+
+        // inverse-cipher-ify the decryption round key (fips-197 section 5.3)
+        for (var r = 1; r < rounds; r++) {
+            for (var c = 0; c < 4; c++) {
+                tt = this._Kd[r][c];
+                this._Kd[r][c] = (U1[(tt >> 24) & 0xFF] ^
+                U2[(tt >> 16) & 0xFF] ^
+                U3[(tt >>  8) & 0xFF] ^
+                U4[ tt        & 0xFF]);
+            }
+        }
+    }
+
+    AES.prototype.encrypt = function(plaintext) {
+        if (plaintext.length != 16) {
+            throw new Error('invalid plaintext size (must be 16 bytes)');
+        }
+
+        var rounds = this._Ke.length - 1;
+        var a = [0, 0, 0, 0];
+
+        // convert plaintext to (ints ^ key)
+        var t = convertToInt32(plaintext);
+        for (var i = 0; i < 4; i++) {
+            t[i] ^= this._Ke[0][i];
+        }
+
+        // apply round transforms
+        for (var r = 1; r < rounds; r++) {
+            for (var i = 0; i < 4; i++) {
+                a[i] = (T1[(t[ i         ] >> 24) & 0xff] ^
+                T2[(t[(i + 1) % 4] >> 16) & 0xff] ^
+                T3[(t[(i + 2) % 4] >>  8) & 0xff] ^
+                T4[ t[(i + 3) % 4]        & 0xff] ^
+                this._Ke[r][i]);
+            }
+            t = a.slice();
+        }
+
+        // the last round is special
+        var result = createArray(16), tt;
+        for (var i = 0; i < 4; i++) {
+            tt = this._Ke[rounds][i];
+            result[4 * i    ] = (S[(t[ i         ] >> 24) & 0xff] ^ (tt >> 24)) & 0xff;
+            result[4 * i + 1] = (S[(t[(i + 1) % 4] >> 16) & 0xff] ^ (tt >> 16)) & 0xff;
+            result[4 * i + 2] = (S[(t[(i + 2) % 4] >>  8) & 0xff] ^ (tt >>  8)) & 0xff;
+            result[4 * i + 3] = (S[ t[(i + 3) % 4]        & 0xff] ^  tt       ) & 0xff;
+        }
+
+        return result;
+    }
+
+    AES.prototype.decrypt = function(ciphertext) {
+        if (ciphertext.length != 16) {
+            throw new Error('invalid ciphertext size (must be 16 bytes)');
+        }
+
+        var rounds = this._Kd.length - 1;
+        var a = [0, 0, 0, 0];
+
+        // convert plaintext to (ints ^ key)
+        var t = convertToInt32(ciphertext);
+        for (var i = 0; i < 4; i++) {
+            t[i] ^= this._Kd[0][i];
+        }
+
+        // apply round transforms
+        for (var r = 1; r < rounds; r++) {
+            for (var i = 0; i < 4; i++) {
+                a[i] = (T5[(t[ i          ] >> 24) & 0xff] ^
+                T6[(t[(i + 3) % 4] >> 16) & 0xff] ^
+                T7[(t[(i + 2) % 4] >>  8) & 0xff] ^
+                T8[ t[(i + 1) % 4]        & 0xff] ^
+                this._Kd[r][i]);
+            }
+            t = a.slice();
+        }
+
+        // the last round is special
+        var result = createArray(16), tt;
+        for (var i = 0; i < 4; i++) {
+            tt = this._Kd[rounds][i];
+            result[4 * i    ] = (Si[(t[ i         ] >> 24) & 0xff] ^ (tt >> 24)) & 0xff;
+            result[4 * i + 1] = (Si[(t[(i + 3) % 4] >> 16) & 0xff] ^ (tt >> 16)) & 0xff;
+            result[4 * i + 2] = (Si[(t[(i + 2) % 4] >>  8) & 0xff] ^ (tt >>  8)) & 0xff;
+            result[4 * i + 3] = (Si[ t[(i + 1) % 4]        & 0xff] ^  tt       ) & 0xff;
+        }
+
+        return result;
+    }
+
+
+    /**
+     *  Mode Of Operation - Electonic Codebook (ECB)
+     */
+    var ModeOfOperationECB = function(key) {
+        if (!(this instanceof ModeOfOperationECB)) {
+            throw Error('AES must be instanitated with `new`');
+        }
+
+        this.description = "Electronic Code Block";
+        this.name = "ecb";
+
+        this._aes = new AES(key);
+    }
+
+    ModeOfOperationECB.prototype.encrypt = function(plaintext) {
+        plaintext = coerceArray(plaintext);
+
+        if ((plaintext.length % 16) !== 0) {
+            throw new Error('invalid plaintext size (must be multiple of 16 bytes)');
+        }
+
+        var ciphertext = createArray(plaintext.length);
+        var block = createArray(16);
+
+        for (var i = 0; i < plaintext.length; i += 16) {
+            copyArray(plaintext, block, 0, i, i + 16);
+            block = this._aes.encrypt(block);
+            copyArray(block, ciphertext, i);
+        }
+
+        return ciphertext;
+    }
+
+    ModeOfOperationECB.prototype.decrypt = function(ciphertext) {
+        ciphertext = coerceArray(ciphertext);
+
+        if ((ciphertext.length % 16) !== 0) {
+            throw new Error('invalid ciphertext size (must be multiple of 16 bytes)');
+        }
+
+        var plaintext = createArray(ciphertext.length);
+        var block = createArray(16);
+
+        for (var i = 0; i < ciphertext.length; i += 16) {
+            copyArray(ciphertext, block, 0, i, i + 16);
+            block = this._aes.decrypt(block);
+            copyArray(block, plaintext, i);
+        }
+
+        return plaintext;
+    }
+
+
+    /**
+     *  Mode Of Operation - Cipher Block Chaining (CBC)
+     */
+    var ModeOfOperationCBC = function(key, iv) {
+        if (!(this instanceof ModeOfOperationCBC)) {
+            throw Error('AES must be instanitated with `new`');
+        }
+
+        this.description = "Cipher Block Chaining";
+        this.name = "cbc";
+
+        if (!iv) {
+            iv = createArray(16);
+
+        } else if (iv.length != 16) {
+            throw new Error('invalid initialation vector size (must be 16 bytes)');
+        }
+
+        this._lastCipherblock = coerceArray(iv, true);
+
+        this._aes = new AES(key);
+    }
+
+    ModeOfOperationCBC.prototype.encrypt = function(plaintext) {
+        plaintext = coerceArray(plaintext);
+
+        if ((plaintext.length % 16) !== 0) {
+            throw new Error('invalid plaintext size (must be multiple of 16 bytes)');
+        }
+
+        var ciphertext = createArray(plaintext.length);
+        var block = createArray(16);
+
+        for (var i = 0; i < plaintext.length; i += 16) {
+            copyArray(plaintext, block, 0, i, i + 16);
+
+            for (var j = 0; j < 16; j++) {
+                block[j] ^= this._lastCipherblock[j];
+            }
+
+            this._lastCipherblock = this._aes.encrypt(block);
+            copyArray(this._lastCipherblock, ciphertext, i);
+        }
+
+        return ciphertext;
+    }
+
+    ModeOfOperationCBC.prototype.decrypt = function(ciphertext) {
+        ciphertext = coerceArray(ciphertext);
+
+        if ((ciphertext.length % 16) !== 0) {
+            throw new Error('invalid ciphertext size (must be multiple of 16 bytes)');
+        }
+
+        var plaintext = createArray(ciphertext.length);
+        var block = createArray(16);
+
+        for (var i = 0; i < ciphertext.length; i += 16) {
+            copyArray(ciphertext, block, 0, i, i + 16);
+            block = this._aes.decrypt(block);
+
+            for (var j = 0; j < 16; j++) {
+                plaintext[i + j] = block[j] ^ this._lastCipherblock[j];
+            }
+
+            copyArray(ciphertext, this._lastCipherblock, 0, i, i + 16);
+        }
+
+        return plaintext;
+    }
+
+
+    /**
+     *  Mode Of Operation - Cipher Feedback (CFB)
+     */
+    var ModeOfOperationCFB = function(key, iv, segmentSize) {
+        if (!(this instanceof ModeOfOperationCFB)) {
+            throw Error('AES must be instanitated with `new`');
+        }
+
+        this.description = "Cipher Feedback";
+        this.name = "cfb";
+
+        if (!iv) {
+            iv = createArray(16);
+
+        } else if (iv.length != 16) {
+            throw new Error('invalid initialation vector size (must be 16 size)');
+        }
+
+        if (!segmentSize) { segmentSize = 1; }
+
+        this.segmentSize = segmentSize;
+
+        this._shiftRegister = coerceArray(iv, true);
+
+        this._aes = new AES(key);
+    }
+
+    ModeOfOperationCFB.prototype.encrypt = function(plaintext) {
+        if ((plaintext.length % this.segmentSize) != 0) {
+            throw new Error('invalid plaintext size (must be segmentSize bytes)');
+        }
+
+        var encrypted = coerceArray(plaintext, true);
+
+        var xorSegment;
+        for (var i = 0; i < encrypted.length; i += this.segmentSize) {
+            xorSegment = this._aes.encrypt(this._shiftRegister);
+            for (var j = 0; j < this.segmentSize; j++) {
+                encrypted[i + j] ^= xorSegment[j];
+            }
+
+            // Shift the register
+            copyArray(this._shiftRegister, this._shiftRegister, 0, this.segmentSize);
+            copyArray(encrypted, this._shiftRegister, 16 - this.segmentSize, i, i + this.segmentSize);
+        }
+
+        return encrypted;
+    }
+
+    ModeOfOperationCFB.prototype.decrypt = function(ciphertext) {
+        if ((ciphertext.length % this.segmentSize) != 0) {
+            throw new Error('invalid ciphertext size (must be segmentSize bytes)');
+        }
+
+        var plaintext = coerceArray(ciphertext, true);
+
+        var xorSegment;
+        for (var i = 0; i < plaintext.length; i += this.segmentSize) {
+            xorSegment = this._aes.encrypt(this._shiftRegister);
+
+            for (var j = 0; j < this.segmentSize; j++) {
+                plaintext[i + j] ^= xorSegment[j];
+            }
+
+            // Shift the register
+            copyArray(this._shiftRegister, this._shiftRegister, 0, this.segmentSize);
+            copyArray(ciphertext, this._shiftRegister, 16 - this.segmentSize, i, i + this.segmentSize);
+        }
+
+        return plaintext;
+    }
+
+    /**
+     *  Mode Of Operation - Output Feedback (OFB)
+     */
+    var ModeOfOperationOFB = function(key, iv) {
+        if (!(this instanceof ModeOfOperationOFB)) {
+            throw Error('AES must be instanitated with `new`');
+        }
+
+        this.description = "Output Feedback";
+        this.name = "ofb";
+
+        if (!iv) {
+            iv = createArray(16);
+
+        } else if (iv.length != 16) {
+            throw new Error('invalid initialation vector size (must be 16 bytes)');
+        }
+
+        this._lastPrecipher = coerceArray(iv, true);
+        this._lastPrecipherIndex = 16;
+
+        this._aes = new AES(key);
+    }
+
+    ModeOfOperationOFB.prototype.encrypt = function(plaintext) {
+        var encrypted = coerceArray(plaintext, true);
+
+        for (var i = 0; i < encrypted.length; i++) {
+            if (this._lastPrecipherIndex === 16) {
+                this._lastPrecipher = this._aes.encrypt(this._lastPrecipher);
+                this._lastPrecipherIndex = 0;
+            }
+            encrypted[i] ^= this._lastPrecipher[this._lastPrecipherIndex++];
+        }
+
+        return encrypted;
+    }
+
+    // Decryption is symetric
+    ModeOfOperationOFB.prototype.decrypt = ModeOfOperationOFB.prototype.encrypt;
+
+
+    /**
+     *  Counter object for CTR common mode of operation
+     */
+    var Counter = function(initialValue) {
+        if (!(this instanceof Counter)) {
+            throw Error('Counter must be instanitated with `new`');
+        }
+
+        // We allow 0, but anything false-ish uses the default 1
+        if (initialValue !== 0 && !initialValue) { initialValue = 1; }
+
+        if (typeof(initialValue) === 'number') {
+            this._counter = createArray(16);
+            this.setValue(initialValue);
+
+        } else {
+            this.setBytes(initialValue);
+        }
+    }
+
+    Counter.prototype.setValue = function(value) {
+        if (typeof(value) !== 'number' || parseInt(value) != value) {
+            throw new Error('invalid counter value (must be an integer)');
+        }
+
+        for (var index = 15; index >= 0; --index) {
+            this._counter[index] = value % 256;
+            value = value >> 8;
+        }
+    }
+
+    Counter.prototype.setBytes = function(bytes) {
+        bytes = coerceArray(bytes, true);
+
+        if (bytes.length != 16) {
+            throw new Error('invalid counter bytes size (must be 16 bytes)');
+        }
+
+        this._counter = bytes;
+    };
+
+    Counter.prototype.increment = function() {
+        for (var i = 15; i >= 0; i--) {
+            if (this._counter[i] === 255) {
+                this._counter[i] = 0;
+            } else {
+                this._counter[i]++;
+                break;
+            }
+        }
+    }
+
+
+    /**
+     *  Mode Of Operation - Counter (CTR)
+     */
+    var ModeOfOperationCTR = function(key, counter) {
+        if (!(this instanceof ModeOfOperationCTR)) {
+            throw Error('AES must be instanitated with `new`');
+        }
+
+        this.description = "Counter";
+        this.name = "ctr";
+
+        if (!(counter instanceof Counter)) {
+            counter = new Counter(counter)
+        }
+
+        this._counter = counter;
+
+        this._remainingCounter = null;
+        this._remainingCounterIndex = 16;
+
+        this._aes = new AES(key);
+    }
+
+    ModeOfOperationCTR.prototype.encrypt = function(plaintext) {
+        var encrypted = coerceArray(plaintext, true);
+
+        for (var i = 0; i < encrypted.length; i++) {
+            if (this._remainingCounterIndex === 16) {
+                this._remainingCounter = this._aes.encrypt(this._counter._counter);
+                this._remainingCounterIndex = 0;
+                this._counter.increment();
+            }
+            encrypted[i] ^= this._remainingCounter[this._remainingCounterIndex++];
+        }
+
+        return encrypted;
+    }
+
+    // Decryption is symetric
+    ModeOfOperationCTR.prototype.decrypt = ModeOfOperationCTR.prototype.encrypt;
+
+
+    ///////////////////////
+    // Padding
+
+    // See:https://tools.ietf.org/html/rfc2315
+    function pkcs7pad(data) {
+        data = coerceArray(data, true);
+        var padder = 16 - (data.length % 16);
+        var result = createArray(data.length + padder);
+        copyArray(data, result);
+        for (var i = data.length; i < result.length; i++) {
+            result[i] = padder;
+        }
+        return result;
+    }
+
+    function pkcs7strip(data) {
+        data = coerceArray(data, true);
+        if (data.length < 16) { throw new Error('PKCS#7 invalid length'); }
+
+        var padder = data[data.length - 1];
+        if (padder > 16) { throw new Error('PKCS#7 padding byte out of range'); }
+
+        var length = data.length - padder;
+        for (var i = 0; i < padder; i++) {
+            if (data[length + i] !== padder) {
+                throw new Error('PKCS#7 invalid padding byte');
+            }
+        }
+
+        var result = createArray(length);
+        copyArray(data, result, 0, 0, length);
+        return result;
+    }
+
+    ///////////////////////
+    // Exporting
+
+
+    // The block cipher
+    var aesjs = {
+        AES: AES,
+        Counter: Counter,
+
+        ModeOfOperation: {
+            ecb: ModeOfOperationECB,
+            cbc: ModeOfOperationCBC,
+            cfb: ModeOfOperationCFB,
+            ofb: ModeOfOperationOFB,
+            ctr: ModeOfOperationCTR
+        },
+
+        utils: {
+            hex: convertHex,
+            utf8: convertUtf8
+        },
+
+        padding: {
+            pkcs7: {
+                pad: pkcs7pad,
+                strip: pkcs7strip
+            }
+        },
+
+        _arrayTest: {
+            coerceArray: coerceArray,
+            createArray: createArray,
+            copyArray: copyArray,
+        }
+    };
+
+
+    // node.js
+    if (typeof exports !== 'undefined') {
+        module.exports = aesjs
+
+        // RequireJS/AMD
+        // http://www.requirejs.org/docs/api.html
+        // https://github.com/amdjs/amdjs-api/wiki/AMD
+    } else if (typeof(define) === 'function' && define.amd) {
+        define(aesjs);
+
+        // Web Browsers
+    } else {
+
+        // If there was an existing library at "aesjs" make sure it's still available
+        if (root.aesjs) {
+            aesjs._aesjs = root.aesjs;
+        }
+
+        root.aesjs = aesjs;
+    }
+
+
+})(this);
+!function (e) {
+    if ("object" == typeof exports && "undefined" != typeof module)module.exports = e(); else if ("function" == typeof define && define.amd)define([], e); else {
+        var t;
+        t = "undefined" != typeof window ? window : "undefined" != typeof global ? global : "undefined" != typeof self ? self : this, t.ellipticjs = e()
+    }
+}(function () {
+    return function e(t, r, d) {
+        function i(n, a) {
+            if (!r[n]) {
+                if (!t[n]) {
+                    var s = "function" == typeof require && require;
+                    if (!a && s)return s(n, !0);
+                    if (f)return f(n, !0);
+                    var c = new Error("Cannot find module '" + n + "'");
+                    throw c.code = "MODULE_NOT_FOUND", c
+                }
+                var h = r[n] = {exports: {}};
+                t[n][0].call(h.exports, function (e) {
+                    var r = t[n][1][e];
+                    return i(r ? r : e)
+                }, h, h.exports, e, t, r, d)
+            }
+            return r[n].exports
+        }
+
+        for (var f = "function" == typeof require && require, n = 0; n < d.length; n++)i(d[n]);
+        return i
+    }({
+        1: [function (e, t, r) {
+            "use strict";
+            var d = r;
+            d.version = e("../package.json").version, d.utils = e("./elliptic/utils"), d.rand = e("brorand"), d.hmacDRBG = e("./elliptic/hmac-drbg"), d.curve = e("./elliptic/curve"), d.curves = e("./elliptic/curves"), d.ec = e("./elliptic/ec")
+        }, {
+            "../package.json": 23,
+            "./elliptic/curve": 4,
+            "./elliptic/curves": 7,
+            "./elliptic/ec": 8,
+            "./elliptic/hmac-drbg": 11,
+            "./elliptic/utils": 13,
+            brorand: 15
+        }],
+        2: [function (e, t) {
+            "use strict";
+            function r(e, t) {
+                this.type = e, this.p = new i(t.p, 16), this.red = t.prime ? i.red(t.prime) : i.mont(this.p), this.zero = new i(0).toRed(this.red), this.one = new i(1).toRed(this.red), this.two = new i(2).toRed(this.red), this.n = t.n && new i(t.n, 16), this.g = t.g && this.pointFromJSON(t.g, t.gRed), this._wnafT1 = new Array(4), this._wnafT2 = new Array(4), this._wnafT3 = new Array(4), this._wnafT4 = new Array(4)
+            }
+
+            function d(e, t) {
+                this.curve = e, this.type = t, this.precomputed = null
+            }
+
+            var i = e("bn.js"), f = e("../../elliptic"), n = f.utils.getNAF, a = f.utils.getJSF, s = f.utils.assert;
+            t.exports = r, r.prototype.point = function () {
+                throw new Error("Not implemented")
+            }, r.prototype.validate = function () {
+                throw new Error("Not implemented")
+            }, r.prototype._fixedNafMul = function (e, t) {
+                var r = e._getDoubles(), d = n(t, 1), i = (1 << r.step + 1) - (r.step % 2 === 0 ? 2 : 1);
+                i /= 3;
+                for (var f = [], a = 0; a < d.length; a += r.step) {
+                    for (var s = 0, t = a + r.step - 1; t >= a; t--)s = (s << 1) + d[t];
+                    f.push(s)
+                }
+                for (var c = this.jpoint(null, null, null), h = this.jpoint(null, null, null), o = i; o > 0; o--) {
+                    for (var a = 0; a < f.length; a++) {
+                        var s = f[a];
+                        s === o ? h = h.mixedAdd(r.points[a]) : s === -o && (h = h.mixedAdd(r.points[a].neg()))
+                    }
+                    c = c.add(h)
+                }
+                return c.toP()
+            }, r.prototype._wnafMul = function (e, t) {
+                var r = 4, d = e._getNAFPoints(r);
+                r = d.wnd;
+                for (var i = d.points, f = n(t, r), a = this.jpoint(null, null, null), c = f.length - 1; c >= 0; c--) {
+                    for (var t = 0; c >= 0 && 0 === f[c]; c--)t++;
+                    if (c >= 0 && t++, a = a.dblp(t), 0 > c)break;
+                    var h = f[c];
+                    s(0 !== h), a = "affine" === e.type ? a.mixedAdd(h > 0 ? i[h - 1 >> 1] : i[-h - 1 >> 1].neg()) : a.add(h > 0 ? i[h - 1 >> 1] : i[-h - 1 >> 1].neg())
+                }
+                return "affine" === e.type ? a.toP() : a
+            }, r.prototype._wnafMulAdd = function (e, t, r, d) {
+                for (var i = this._wnafT1, f = this._wnafT2, s = this._wnafT3, c = 0, h = 0; d > h; h++) {
+                    var o = t[h], b = o._getNAFPoints(e);
+                    i[h] = b.wnd, f[h] = b.points
+                }
+                for (var h = d - 1; h >= 1; h -= 2) {
+                    var u = h - 1, p = h;
+                    if (1 === i[u] && 1 === i[p]) {
+                        var l = [t[u], null, null, t[p]];
+                        0 === t[u].y.cmp(t[p].y) ? (l[1] = t[u].add(t[p]), l[2] = t[u].toJ().mixedAdd(t[p].neg())) : 0 === t[u].y.cmp(t[p].y.redNeg()) ? (l[1] = t[u].toJ().mixedAdd(t[p]), l[2] = t[u].add(t[p].neg())) : (l[1] = t[u].toJ().mixedAdd(t[p]), l[2] = t[u].toJ().mixedAdd(t[p].neg()));
+                        var v = [-3, -1, -5, -7, 0, 7, 5, 1, 3], g = a(r[u], r[p]);
+                        c = Math.max(g[0].length, c), s[u] = new Array(c), s[p] = new Array(c);
+                        for (var m = 0; c > m; m++) {
+                            var y = 0 | g[0][m], w = 0 | g[1][m];
+                            s[u][m] = v[3 * (y + 1) + (w + 1)], s[p][m] = 0, f[u] = l
+                        }
+                    } else s[u] = n(r[u], i[u]), s[p] = n(r[p], i[p]), c = Math.max(s[u].length, c), c = Math.max(s[p].length, c)
+                }
+                for (var S = this.jpoint(null, null, null), _ = this._wnafT4, h = c; h >= 0; h--) {
+                    for (var A = 0; h >= 0;) {
+                        for (var x = !0, m = 0; d > m; m++)_[m] = 0 | s[m][h], 0 !== _[m] && (x = !1);
+                        if (!x)break;
+                        A++, h--
+                    }
+                    if (h >= 0 && A++, S = S.dblp(A), 0 > h)break;
+                    for (var m = 0; d > m; m++) {
+                        var o, M = _[m];
+                        0 !== M && (M > 0 ? o = f[m][M - 1 >> 1] : 0 > M && (o = f[m][-M - 1 >> 1].neg()), S = "affine" === o.type ? S.mixedAdd(o) : S.add(o))
+                    }
+                }
+                for (var h = 0; d > h; h++)f[h] = null;
+                return S.toP()
+            }, r.BasePoint = d, d.prototype.validate = function () {
+                return this.curve.validate(this)
+            }, d.prototype.precompute = function (e) {
+                if (this.precomputed)return this;
+                var t = {doubles: null, naf: null, beta: null};
+                return t.naf = this._getNAFPoints(8), t.doubles = this._getDoubles(4, e), t.beta = this._getBeta(), this.precomputed = t, this
+            }, d.prototype._getDoubles = function (e, t) {
+                if (this.precomputed && this.precomputed.doubles)return this.precomputed.doubles;
+                for (var r = [this], d = this, i = 0; t > i; i += e) {
+                    for (var f = 0; e > f; f++)d = d.dbl();
+                    r.push(d)
+                }
+                return {step: e, points: r}
+            }, d.prototype._getNAFPoints = function (e) {
+                if (this.precomputed && this.precomputed.naf)return this.precomputed.naf;
+                for (var t = [this], r = (1 << e) - 1, d = 1 === r ? null : this.dbl(), i = 1; r > i; i++)t[i] = t[i - 1].add(d);
+                return {wnd: e, points: t}
+            }, d.prototype._getBeta = function () {
+                return null
+            }, d.prototype.dblp = function (e) {
+                for (var t = this, r = 0; e > r; r++)t = t.dbl();
+                return t
+            }
+        }, {"../../elliptic": 1, "bn.js": 14}],
+        3: [function (e, t) {
+            "use strict";
+            function r(e) {
+                this.twisted = 1 !== (0 | e.a), this.mOneA = this.twisted && -1 === (0 | e.a), this.extended = this.mOneA, s.call(this, "edwards", e), this.a = new n(e.a, 16).mod(this.red.m).toRed(this.red), this.c = new n(e.c, 16).toRed(this.red), this.c2 = this.c.redSqr(), this.d = new n(e.d, 16).toRed(this.red), this.dd = this.d.redAdd(this.d), c(!this.twisted || 0 === this.c.fromRed().cmpn(1)), this.oneC = 1 === (0 | e.c)
+            }
+
+            function d(e, t, r, d, i) {
+                s.BasePoint.call(this, e, "projective"), null === t && null === r && null === d ? (this.x = this.curve.zero, this.y = this.curve.one, this.z = this.curve.one, this.t = this.curve.zero, this.zOne = !0) : (this.x = new n(t, 16), this.y = new n(r, 16), this.z = d ? new n(d, 16) : this.curve.one, this.t = i && new n(i, 16), this.x.red || (this.x = this.x.toRed(this.curve.red)), this.y.red || (this.y = this.y.toRed(this.curve.red)), this.z.red || (this.z = this.z.toRed(this.curve.red)), this.t && !this.t.red && (this.t = this.t.toRed(this.curve.red)), this.zOne = this.z === this.curve.one, this.curve.extended && !this.t && (this.t = this.x.redMul(this.y), this.zOne || (this.t = this.t.redMul(this.z.redInvm()))))
+            }
+
+            var i = e("../curve"), f = e("../../elliptic"), n = e("bn.js"), a = e("inherits"), s = i.base, c = f.utils.assert;
+            a(r, s), t.exports = r, r.prototype._mulA = function (e) {
+                return this.mOneA ? e.redNeg() : this.a.redMul(e)
+            }, r.prototype._mulC = function (e) {
+                return this.oneC ? e : this.c.redMul(e)
+            }, r.prototype.jpoint = function (e, t, r, d) {
+                return this.point(e, t, r, d)
+            }, r.prototype.pointFromX = function (e, t) {
+                t = new n(t, 16), t.red || (t = t.toRed(this.red));
+                var r = t.redSqr(), d = this.c2.redSub(this.a.redMul(r)), f = this.one.redSub(this.c2.redMul(this.d).redMul(r)), a = d.redMul(f.redInvm()).redSqrt(), s = a.fromRed().isOdd();
+                return (e && !s || !e && s) && (a = a.redNeg()), this.point(t, a, i.one)
+            }, r.prototype.validate = function (e) {
+                if (e.isInfinity())return !0;
+                e.normalize();
+                var t = e.x.redSqr(), r = e.y.redSqr(), d = t.redMul(this.a).redAdd(r), i = this.c2.redMul(this.one.redAdd(this.d.redMul(t).redMul(r)));
+                return 0 === d.cmp(i)
+            }, a(d, s.BasePoint), r.prototype.pointFromJSON = function (e) {
+                return d.fromJSON(this, e)
+            }, r.prototype.point = function (e, t, r, i) {
+                return new d(this, e, t, r, i)
+            }, d.fromJSON = function (e, t) {
+                return new d(e, t[0], t[1], t[2])
+            }, d.prototype.inspect = function () {
+                return this.isInfinity() ? "<EC Point Infinity>" : "<EC Point x: " + this.x.fromRed().toString(16, 2) + " y: " + this.y.fromRed().toString(16, 2) + " z: " + this.z.fromRed().toString(16, 2) + ">"
+            }, d.prototype.isInfinity = function () {
+                return 0 === this.x.cmpn(0) && 0 === this.y.cmp(this.z)
+            }, d.prototype._extDbl = function () {
+                var e = this.x.redSqr(), t = this.y.redSqr(), r = this.z.redSqr();
+                r = r.redIAdd(r);
+                var d = this.curve._mulA(e), i = this.x.redAdd(this.y).redSqr().redISub(e).redISub(t), f = d.redAdd(t), n = f.redSub(r), a = d.redSub(t), s = i.redMul(n), c = f.redMul(a), h = i.redMul(a), o = n.redMul(f);
+                return this.curve.point(s, c, o, h)
+            }, d.prototype._projDbl = function () {
+                var e, t, r, d = this.x.redAdd(this.y).redSqr(), i = this.x.redSqr(), f = this.y.redSqr();
+                if (this.curve.twisted) {
+                    var n = this.curve._mulA(i), a = n.redAdd(f);
+                    if (this.zOne)e = d.redSub(i).redSub(f).redMul(a.redSub(this.curve.two)), t = a.redMul(n.redSub(f)), r = a.redSqr().redSub(a).redSub(a); else {
+                        var s = this.z.redSqr(), c = a.redSub(s).redISub(s);
+                        e = d.redSub(i).redISub(f).redMul(c), t = a.redMul(n.redSub(f)), r = a.redMul(c)
+                    }
+                } else {
+                    var n = i.redAdd(f), s = this.curve._mulC(this.c.redMul(this.z)).redSqr(), c = n.redSub(s).redSub(s);
+                    e = this.curve._mulC(d.redISub(n)).redMul(c), t = this.curve._mulC(n).redMul(i.redISub(f)), r = n.redMul(c)
+                }
+                return this.curve.point(e, t, r)
+            }, d.prototype.dbl = function () {
+                return this.isInfinity() ? this : this.curve.extended ? this._extDbl() : this._projDbl()
+            }, d.prototype._extAdd = function (e) {
+                var t = this.y.redSub(this.x).redMul(e.y.redSub(e.x)), r = this.y.redAdd(this.x).redMul(e.y.redAdd(e.x)), d = this.t.redMul(this.curve.dd).redMul(e.t), i = this.z.redMul(e.z.redAdd(e.z)), f = r.redSub(t), n = i.redSub(d), a = i.redAdd(d), s = r.redAdd(t), c = f.redMul(n), h = a.redMul(s), o = f.redMul(s), b = n.redMul(a);
+                return this.curve.point(c, h, b, o)
+            }, d.prototype._projAdd = function (e) {
+                var t, r, d = this.z.redMul(e.z), i = d.redSqr(), f = this.x.redMul(e.x), n = this.y.redMul(e.y), a = this.curve.d.redMul(f).redMul(n), s = i.redSub(a), c = i.redAdd(a), h = this.x.redAdd(this.y).redMul(e.x.redAdd(e.y)).redISub(f).redISub(n), o = d.redMul(s).redMul(h);
+                return this.curve.twisted ? (t = d.redMul(c).redMul(n.redSub(this.curve._mulA(f))), r = s.redMul(c)) : (t = d.redMul(c).redMul(n.redSub(f)), r = this.curve._mulC(s).redMul(c)), this.curve.point(o, t, r)
+            }, d.prototype.add = function (e) {
+                return this.isInfinity() ? e : e.isInfinity() ? this : this.curve.extended ? this._extAdd(e) : this._projAdd(e)
+            }, d.prototype.mul = function (e) {
+                return this.precomputed && this.precomputed.doubles ? this.curve._fixedNafMul(this, e) : this.curve._wnafMul(this, e)
+            }, d.prototype.mulAdd = function (e, t, r) {
+                return this.curve._wnafMulAdd(1, [this, t], [e, r], 2)
+            }, d.prototype.normalize = function () {
+                if (this.zOne)return this;
+                var e = this.z.redInvm();
+                return this.x = this.x.redMul(e), this.y = this.y.redMul(e), this.t && (this.t = this.t.redMul(e)), this.z = this.curve.one, this.zOne = !0, this
+            }, d.prototype.neg = function () {
+                return this.curve.point(this.x.redNeg(), this.y, this.z, this.t && this.t.redNeg())
+            }, d.prototype.getX = function () {
+                return this.normalize(), this.x.fromRed()
+            }, d.prototype.getY = function () {
+                return this.normalize(), this.y.fromRed()
+            }, d.prototype.toP = d.prototype.normalize, d.prototype.mixedAdd = d.prototype.add
+        }, {"../../elliptic": 1, "../curve": 4, "bn.js": 14, inherits: 22}],
+        4: [function (e, t, r) {
+            "use strict";
+            var d = r;
+            d.base = e("./base"), d["short"] = e("./short"), d.mont = e("./mont"), d.edwards = e("./edwards")
+        }, {"./base": 2, "./edwards": 3, "./mont": 5, "./short": 6}],
+        5: [function (e, t) {
+            "use strict";
+            function r(e) {
+                a.call(this, "mont", e), this.a = new f(e.a, 16).toRed(this.red), this.b = new f(e.b, 16).toRed(this.red), this.i4 = new f(4).toRed(this.red).redInvm(), this.two = new f(2).toRed(this.red), this.a24 = this.i4.redMul(this.a.redAdd(this.two))
+            }
+
+            function d(e, t, r) {
+                a.BasePoint.call(this, e, "projective"), null === t && null === r ? (this.x = this.curve.one, this.z = this.curve.zero) : (this.x = new f(t, 16), this.z = new f(r, 16), this.x.red || (this.x = this.x.toRed(this.curve.red)), this.z.red || (this.z = this.z.toRed(this.curve.red)))
+            }
+
+            var i = e("../curve"), f = e("bn.js"), n = e("inherits"), a = i.base;
+            n(r, a), t.exports = r, r.prototype.validate = function (e) {
+                var t = e.normalize().x, r = t.redSqr(), d = r.redMul(t).redAdd(r.redMul(this.a)).redAdd(t), i = d.redSqrt();
+                return 0 === i.redSqr().cmp(d)
+            }, n(d, a.BasePoint), r.prototype.point = function (e, t) {
+                return new d(this, e, t)
+            }, r.prototype.pointFromJSON = function (e) {
+                return d.fromJSON(this, e)
+            }, d.prototype.precompute = function () {
+            }, d.fromJSON = function (e, t) {
+                return new d(e, t[0], t[1] || e.one)
+            }, d.prototype.inspect = function () {
+                return this.isInfinity() ? "<EC Point Infinity>" : "<EC Point x: " + this.x.fromRed().toString(16, 2) + " z: " + this.z.fromRed().toString(16, 2) + ">"
+            }, d.prototype.isInfinity = function () {
+                return 0 === this.z.cmpn(0)
+            }, d.prototype.dbl = function () {
+                var e = this.x.redAdd(this.z), t = e.redSqr(), r = this.x.redSub(this.z), d = r.redSqr(), i = t.redSub(d), f = t.redMul(d), n = i.redMul(d.redAdd(this.curve.a24.redMul(i)));
+                return this.curve.point(f, n)
+            }, d.prototype.add = function () {
+                throw new Error("Not supported on Montgomery curve")
+            }, d.prototype.diffAdd = function (e, t) {
+                var r = this.x.redAdd(this.z), d = this.x.redSub(this.z), i = e.x.redAdd(e.z), f = e.x.redSub(e.z), n = f.redMul(r), a = i.redMul(d), s = t.z.redMul(n.redAdd(a).redSqr()), c = t.x.redMul(n.redISub(a).redSqr());
+                return this.curve.point(s, c)
+            }, d.prototype.mul = function (e) {
+                for (var t = e.clone(), r = this, d = this.curve.point(null, null), i = this, f = []; 0 !== t.cmpn(0); t.ishrn(1))f.push(t.andln(1));
+                for (var n = f.length - 1; n >= 0; n--)0 === f[n] ? (r = r.diffAdd(d, i), d = d.dbl()) : (d = r.diffAdd(d, i), r = r.dbl());
+                return d
+            }, d.prototype.mulAdd = function () {
+                throw new Error("Not supported on Montgomery curve")
+            }, d.prototype.normalize = function () {
+                return this.x = this.x.redMul(this.z.redInvm()), this.z = this.curve.one, this
+            }, d.prototype.getX = function () {
+                return this.normalize(), this.x.fromRed()
+            }
+        }, {"../curve": 4, "bn.js": 14, inherits: 22}],
+        6: [function (e, t) {
+            "use strict";
+            function r(e) {
+                c.call(this, "short", e), this.a = new a(e.a, 16).toRed(this.red), this.b = new a(e.b, 16).toRed(this.red), this.tinv = this.two.redInvm(), this.zeroA = 0 === this.a.fromRed().cmpn(0), this.threeA = 0 === this.a.fromRed().sub(this.p).cmpn(-3), this.endo = this._getEndomorphism(e), this._endoWnafT1 = new Array(4), this._endoWnafT2 = new Array(4)
+            }
+
+            function d(e, t, r, d) {
+                c.BasePoint.call(this, e, "affine"), null === t && null === r ? (this.x = null, this.y = null, this.inf = !0) : (this.x = new a(t, 16), this.y = new a(r, 16), d && (this.x.forceRed(this.curve.red), this.y.forceRed(this.curve.red)), this.x.red || (this.x = this.x.toRed(this.curve.red)), this.y.red || (this.y = this.y.toRed(this.curve.red)), this.inf = !1)
+            }
+
+            function i(e, t, r, d) {
+                c.BasePoint.call(this, e, "jacobian"), null === t && null === r && null === d ? (this.x = this.curve.one, this.y = this.curve.one, this.z = new a(0)) : (this.x = new a(t, 16), this.y = new a(r, 16), this.z = new a(d, 16)), this.x.red || (this.x = this.x.toRed(this.curve.red)), this.y.red || (this.y = this.y.toRed(this.curve.red)), this.z.red || (this.z = this.z.toRed(this.curve.red)), this.zOne = this.z === this.curve.one
+            }
+
+            var f = e("../curve"), n = e("../../elliptic"), a = e("bn.js"), s = e("inherits"), c = f.base, h = n.utils.assert;
+            s(r, c), t.exports = r, r.prototype._getEndomorphism = function (e) {
+                if (this.zeroA && this.g && this.n && 1 === this.p.modn(3)) {
+                    var t, r;
+                    if (e.beta)t = new a(e.beta, 16).toRed(this.red); else {
+                        var d = this._getEndoRoots(this.p);
+                        t = d[0].cmp(d[1]) < 0 ? d[0] : d[1], t = t.toRed(this.red)
+                    }
+                    if (e.lambda)r = new a(e.lambda, 16); else {
+                        var i = this._getEndoRoots(this.n);
+                        0 === this.g.mul(i[0]).x.cmp(this.g.x.redMul(t)) ? r = i[0] : (r = i[1], h(0 === this.g.mul(r).x.cmp(this.g.x.redMul(t))))
+                    }
+                    var f;
+                    return f = e.basis ? e.basis.map(function (e) {
+                        return {a: new a(e.a, 16), b: new a(e.b, 16)}
+                    }) : this._getEndoBasis(r), {beta: t, lambda: r, basis: f}
+                }
+            }, r.prototype._getEndoRoots = function (e) {
+                var t = e === this.p ? this.red : a.mont(e), r = new a(2).toRed(t).redInvm(), d = r.redNeg(), i = new a(3).toRed(t).redNeg().redSqrt().redMul(r), f = d.redAdd(i).fromRed(), n = d.redSub(i).fromRed();
+                return [f, n]
+            }, r.prototype._getEndoBasis = function (e) {
+                for (var t, r, d, i, f, n, s, c, h, o = this.n.shrn(Math.floor(this.n.bitLength() / 2)), b = e, u = this.n.clone(), p = new a(1), l = new a(0), v = new a(0), g = new a(1), m = 0; 0 !== b.cmpn(0);) {
+                    var y = u.div(b);
+                    c = u.sub(y.mul(b)), h = v.sub(y.mul(p));
+                    var w = g.sub(y.mul(l));
+                    if (!d && c.cmp(o) < 0)t = s.neg(), r = p, d = c.neg(), i = h; else if (d && 2 === ++m)break;
+                    s = c, u = b, b = c, v = p, p = h, g = l, l = w
+                }
+                f = c.neg(), n = h;
+                var S = d.sqr().add(i.sqr()), _ = f.sqr().add(n.sqr());
+                return _.cmp(S) >= 0 && (f = t, n = r), d.sign && (d = d.neg(), i = i.neg()), f.sign && (f = f.neg(), n = n.neg()), [{
+                    a: d,
+                    b: i
+                }, {a: f, b: n}]
+            }, r.prototype._endoSplit = function (e) {
+                var t = this.endo.basis, r = t[0], d = t[1], i = d.b.mul(e).divRound(this.n), f = r.b.neg().mul(e).divRound(this.n), n = i.mul(r.a), a = f.mul(d.a), s = i.mul(r.b), c = f.mul(d.b), h = e.sub(n).sub(a), o = s.add(c).neg();
+                return {k1: h, k2: o}
+            }, r.prototype.pointFromX = function (e, t) {
+                t = new a(t, 16), t.red || (t = t.toRed(this.red));
+                var r = t.redSqr().redMul(t).redIAdd(t.redMul(this.a)).redIAdd(this.b), d = r.redSqrt(), i = d.fromRed().isOdd();
+                return (e && !i || !e && i) && (d = d.redNeg()), this.point(t, d)
+            }, r.prototype.validate = function (e) {
+                if (e.inf)return !0;
+                var t = e.x, r = e.y, d = this.a.redMul(t), i = t.redSqr().redMul(t).redIAdd(d).redIAdd(this.b);
+                return 0 === r.redSqr().redISub(i).cmpn(0)
+            }, r.prototype._endoWnafMulAdd = function (e, t) {
+                for (var r = this._endoWnafT1, d = this._endoWnafT2, i = 0; i < e.length; i++) {
+                    var f = this._endoSplit(t[i]), n = e[i], a = n._getBeta();
+                    f.k1.sign && (f.k1.sign = !f.k1.sign, n = n.neg(!0)), f.k2.sign && (f.k2.sign = !f.k2.sign, a = a.neg(!0)), r[2 * i] = n, r[2 * i + 1] = a, d[2 * i] = f.k1, d[2 * i + 1] = f.k2
+                }
+                for (var s = this._wnafMulAdd(1, r, d, 2 * i), c = 0; 2 * i > c; c++)r[c] = null, d[c] = null;
+                return s
+            }, s(d, c.BasePoint), r.prototype.point = function (e, t, r) {
+                return new d(this, e, t, r)
+            }, r.prototype.pointFromJSON = function (e, t) {
+                return d.fromJSON(this, e, t)
+            }, d.prototype._getBeta = function () {
+                if (this.curve.endo) {
+                    var e = this.precomputed;
+                    if (e && e.beta)return e.beta;
+                    var t = this.curve.point(this.x.redMul(this.curve.endo.beta), this.y);
+                    if (e) {
+                        var r = this.curve, d = function (e) {
+                            return r.point(e.x.redMul(r.endo.beta), e.y)
+                        };
+                        e.beta = t, t.precomputed = {
+                            beta: null,
+                            naf: e.naf && {wnd: e.naf.wnd, points: e.naf.points.map(d)},
+                            doubles: e.doubles && {step: e.doubles.step, points: e.doubles.points.map(d)}
+                        }
+                    }
+                    return t
+                }
+            }, d.prototype.toJSON = function () {
+                return this.precomputed ? [this.x, this.y, this.precomputed && {
+                    doubles: this.precomputed.doubles && {
+                        step: this.precomputed.doubles.step,
+                        points: this.precomputed.doubles.points.slice(1)
+                    },
+                    naf: this.precomputed.naf && {
+                        wnd: this.precomputed.naf.wnd,
+                        points: this.precomputed.naf.points.slice(1)
+                    }
+                }] : [this.x, this.y]
+            }, d.fromJSON = function (e, t, r) {
+                function d(t) {
+                    return e.point(t[0], t[1], r)
+                }
+
+                "string" == typeof t && (t = JSON.parse(t));
+                var i = e.point(t[0], t[1], r);
+                if (!t[2])return i;
+                var f = t[2];
+                return i.precomputed = {
+                    beta: null,
+                    doubles: f.doubles && {step: f.doubles.step, points: [i].concat(f.doubles.points.map(d))},
+                    naf: f.naf && {wnd: f.naf.wnd, points: [i].concat(f.naf.points.map(d))}
+                }, i
+            }, d.prototype.inspect = function () {
+                return this.isInfinity() ? "<EC Point Infinity>" : "<EC Point x: " + this.x.fromRed().toString(16, 2) + " y: " + this.y.fromRed().toString(16, 2) + ">"
+            }, d.prototype.isInfinity = function () {
+                return this.inf
+            }, d.prototype.add = function (e) {
+                if (this.inf)return e;
+                if (e.inf)return this;
+                if (this.eq(e))return this.dbl();
+                if (this.neg().eq(e))return this.curve.point(null, null);
+                if (0 === this.x.cmp(e.x))return this.curve.point(null, null);
+                var t = this.y.redSub(e.y);
+                0 !== t.cmpn(0) && (t = t.redMul(this.x.redSub(e.x).redInvm()));
+                var r = t.redSqr().redISub(this.x).redISub(e.x), d = t.redMul(this.x.redSub(r)).redISub(this.y);
+                return this.curve.point(r, d)
+            }, d.prototype.dbl = function () {
+                if (this.inf)return this;
+                var e = this.y.redAdd(this.y);
+                if (0 === e.cmpn(0))return this.curve.point(null, null);
+                var t = this.curve.a, r = this.x.redSqr(), d = e.redInvm(), i = r.redAdd(r).redIAdd(r).redIAdd(t).redMul(d), f = i.redSqr().redISub(this.x.redAdd(this.x)), n = i.redMul(this.x.redSub(f)).redISub(this.y);
+                return this.curve.point(f, n)
+            }, d.prototype.getX = function () {
+                return this.x.fromRed()
+            }, d.prototype.getY = function () {
+                return this.y.fromRed()
+            }, d.prototype.mul = function (e) {
+                return e = new a(e, 16), this.precomputed && this.precomputed.doubles ? this.curve._fixedNafMul(this, e) : this.curve.endo ? this.curve._endoWnafMulAdd([this], [e]) : this.curve._wnafMul(this, e)
+            }, d.prototype.mulAdd = function (e, t, r) {
+                var d = [this, t], i = [e, r];
+                return this.curve.endo ? this.curve._endoWnafMulAdd(d, i) : this.curve._wnafMulAdd(1, d, i, 2)
+            }, d.prototype.eq = function (e) {
+                return this === e || this.inf === e.inf && (this.inf || 0 === this.x.cmp(e.x) && 0 === this.y.cmp(e.y))
+            }, d.prototype.neg = function (e) {
+                if (this.inf)return this;
+                var t = this.curve.point(this.x, this.y.redNeg());
+                if (e && this.precomputed) {
+                    var r = this.precomputed, d = function (e) {
+                        return e.neg()
+                    };
+                    t.precomputed = {
+                        naf: r.naf && {wnd: r.naf.wnd, points: r.naf.points.map(d)},
+                        doubles: r.doubles && {step: r.doubles.step, points: r.doubles.points.map(d)}
+                    }
+                }
+                return t
+            }, d.prototype.toJ = function () {
+                if (this.inf)return this.curve.jpoint(null, null, null);
+                var e = this.curve.jpoint(this.x, this.y, this.curve.one);
+                return e
+            }, s(i, c.BasePoint), r.prototype.jpoint = function (e, t, r) {
+                return new i(this, e, t, r)
+            }, i.prototype.toP = function () {
+                if (this.isInfinity())return this.curve.point(null, null);
+                var e = this.z.redInvm(), t = e.redSqr(), r = this.x.redMul(t), d = this.y.redMul(t).redMul(e);
+                return this.curve.point(r, d)
+            }, i.prototype.neg = function () {
+                return this.curve.jpoint(this.x, this.y.redNeg(), this.z)
+            }, i.prototype.add = function (e) {
+                if (this.isInfinity())return e;
+                if (e.isInfinity())return this;
+                var t = e.z.redSqr(), r = this.z.redSqr(), d = this.x.redMul(t), i = e.x.redMul(r), f = this.y.redMul(t.redMul(e.z)), n = e.y.redMul(r.redMul(this.z)), a = d.redSub(i), s = f.redSub(n);
+                if (0 === a.cmpn(0))return 0 !== s.cmpn(0) ? this.curve.jpoint(null, null, null) : this.dbl();
+                var c = a.redSqr(), h = c.redMul(a), o = d.redMul(c), b = s.redSqr().redIAdd(h).redISub(o).redISub(o), u = s.redMul(o.redISub(b)).redISub(f.redMul(h)), p = this.z.redMul(e.z).redMul(a);
+                return this.curve.jpoint(b, u, p)
+            }, i.prototype.mixedAdd = function (e) {
+                if (this.isInfinity())return e.toJ();
+                if (e.isInfinity())return this;
+                var t = this.z.redSqr(), r = this.x, d = e.x.redMul(t), i = this.y, f = e.y.redMul(t).redMul(this.z), n = r.redSub(d), a = i.redSub(f);
+                if (0 === n.cmpn(0))return 0 !== a.cmpn(0) ? this.curve.jpoint(null, null, null) : this.dbl();
+                var s = n.redSqr(), c = s.redMul(n), h = r.redMul(s), o = a.redSqr().redIAdd(c).redISub(h).redISub(h), b = a.redMul(h.redISub(o)).redISub(i.redMul(c)), u = this.z.redMul(n);
+                return this.curve.jpoint(o, b, u)
+            }, i.prototype.dblp = function (e) {
+                if (0 === e)return this;
+                if (this.isInfinity())return this;
+                if (!e)return this.dbl();
+                if (this.curve.zeroA || this.curve.threeA) {
+                    for (var t = this, r = 0; e > r; r++)t = t.dbl();
+                    return t
+                }
+                for (var d = this.curve.a, i = this.curve.tinv, f = this.x, n = this.y, a = this.z, s = a.redSqr().redSqr(), c = n.redAdd(n), r = 0; e > r; r++) {
+                    var h = f.redSqr(), o = c.redSqr(), b = o.redSqr(), u = h.redAdd(h).redIAdd(h).redIAdd(d.redMul(s)), p = f.redMul(o), l = u.redSqr().redISub(p.redAdd(p)), v = p.redISub(l), g = u.redMul(v);
+                    g = g.redIAdd(g).redISub(b);
+                    var m = c.redMul(a);
+                    e > r + 1 && (s = s.redMul(b)), f = l, a = m, c = g
+                }
+                return this.curve.jpoint(f, c.redMul(i), a)
+            }, i.prototype.dbl = function () {
+                return this.isInfinity() ? this : this.curve.zeroA ? this._zeroDbl() : this.curve.threeA ? this._threeDbl() : this._dbl()
+            }, i.prototype._zeroDbl = function () {
+                var e, t, r;
+                if (this.zOne) {
+                    var d = this.x.redSqr(), i = this.y.redSqr(), f = i.redSqr(), n = this.x.redAdd(i).redSqr().redISub(d).redISub(f);
+                    n = n.redIAdd(n);
+                    var a = d.redAdd(d).redIAdd(d), s = a.redSqr().redISub(n).redISub(n), c = f.redIAdd(f);
+                    c = c.redIAdd(c), c = c.redIAdd(c), e = s, t = a.redMul(n.redISub(s)).redISub(c), r = this.y.redAdd(this.y)
+                } else {
+                    var h = this.x.redSqr(), o = this.y.redSqr(), b = o.redSqr(), u = this.x.redAdd(o).redSqr().redISub(h).redISub(b);
+                    u = u.redIAdd(u);
+                    var p = h.redAdd(h).redIAdd(h), l = p.redSqr(), v = b.redIAdd(b);
+                    v = v.redIAdd(v), v = v.redIAdd(v), e = l.redISub(u).redISub(u), t = p.redMul(u.redISub(e)).redISub(v), r = this.y.redMul(this.z), r = r.redIAdd(r)
+                }
+                return this.curve.jpoint(e, t, r)
+            }, i.prototype._threeDbl = function () {
+                var e, t, r;
+                if (this.zOne) {
+                    var d = this.x.redSqr(), i = this.y.redSqr(), f = i.redSqr(), n = this.x.redAdd(i).redSqr().redISub(d).redISub(f);
+                    n = n.redIAdd(n);
+                    var a = d.redAdd(d).redIAdd(d).redIAdd(this.curve.a), s = a.redSqr().redISub(n).redISub(n);
+                    e = s;
+                    var c = f.redIAdd(f);
+                    c = c.redIAdd(c), c = c.redIAdd(c), t = a.redMul(n.redISub(s)).redISub(c), r = this.y.redAdd(this.y)
+                } else {
+                    var h = this.z.redSqr(), o = this.y.redSqr(), b = this.x.redMul(o), u = this.x.redSub(h).redMul(this.x.redAdd(h));
+                    u = u.redAdd(u).redIAdd(u);
+                    var p = b.redIAdd(b);
+                    p = p.redIAdd(p);
+                    var l = p.redAdd(p);
+                    e = u.redSqr().redISub(l), r = this.y.redAdd(this.z).redSqr().redISub(o).redISub(h);
+                    var v = o.redSqr();
+                    v = v.redIAdd(v), v = v.redIAdd(v), v = v.redIAdd(v), t = u.redMul(p.redISub(e)).redISub(v)
+                }
+                return this.curve.jpoint(e, t, r)
+            }, i.prototype._dbl = function () {
+                var e = this.curve.a, t = this.x, r = this.y, d = this.z, i = d.redSqr().redSqr(), f = t.redSqr(), n = r.redSqr(), a = f.redAdd(f).redIAdd(f).redIAdd(e.redMul(i)), s = t.redAdd(t);
+                s = s.redIAdd(s);
+                var c = s.redMul(n), h = a.redSqr().redISub(c.redAdd(c)), o = c.redISub(h), b = n.redSqr();
+                b = b.redIAdd(b), b = b.redIAdd(b), b = b.redIAdd(b);
+                var u = a.redMul(o).redISub(b), p = r.redAdd(r).redMul(d);
+                return this.curve.jpoint(h, u, p)
+            }, i.prototype.trpl = function () {
+                if (!this.curve.zeroA)return this.dbl().add(this);
+                var e = this.x.redSqr(), t = this.y.redSqr(), r = this.z.redSqr(), d = t.redSqr(), i = e.redAdd(e).redIAdd(e), f = i.redSqr(), n = this.x.redAdd(t).redSqr().redISub(e).redISub(d);
+                n = n.redIAdd(n), n = n.redAdd(n).redIAdd(n), n = n.redISub(f);
+                var a = n.redSqr(), s = d.redIAdd(d);
+                s = s.redIAdd(s), s = s.redIAdd(s), s = s.redIAdd(s);
+                var c = i.redIAdd(n).redSqr().redISub(f).redISub(a).redISub(s), h = t.redMul(c);
+                h = h.redIAdd(h), h = h.redIAdd(h);
+                var o = this.x.redMul(a).redISub(h);
+                o = o.redIAdd(o), o = o.redIAdd(o);
+                var b = this.y.redMul(c.redMul(s.redISub(c)).redISub(n.redMul(a)));
+                b = b.redIAdd(b), b = b.redIAdd(b), b = b.redIAdd(b);
+                var u = this.z.redAdd(n).redSqr().redISub(r).redISub(a);
+                return this.curve.jpoint(o, b, u)
+            }, i.prototype.mul = function (e, t) {
+                return e = new a(e, t), this.curve._wnafMul(this, e)
+            }, i.prototype.eq = function (e) {
+                if ("affine" === e.type)return this.eq(e.toJ());
+                if (this === e)return !0;
+                var t = this.z.redSqr(), r = e.z.redSqr();
+                if (0 !== this.x.redMul(r).redISub(e.x.redMul(t)).cmpn(0))return !1;
+                var d = t.redMul(this.z), i = r.redMul(e.z);
+                return 0 === this.y.redMul(i).redISub(e.y.redMul(d)).cmpn(0)
+            }, i.prototype.inspect = function () {
+                return this.isInfinity() ? "<EC JPoint Infinity>" : "<EC JPoint x: " + this.x.toString(16, 2) + " y: " + this.y.toString(16, 2) + " z: " + this.z.toString(16, 2) + ">"
+            }, i.prototype.isInfinity = function () {
+                return 0 === this.z.cmpn(0)
+            }
+        }, {"../../elliptic": 1, "../curve": 4, "bn.js": 14, inherits: 22}],
+        7: [function (e, t, r) {
+            "use strict";
+            function d(e) {
+                this.curve = "short" === e.type ? new a.curve["short"](e) : "edwards" === e.type ? new a.curve.edwards(e) : new a.curve.mont(e), this.g = this.curve.g, this.n = this.curve.n, this.hash = e.hash, s(this.g.validate(), "Invalid curve"), s(this.g.mul(this.n).isInfinity(), "Invalid curve, G*N != O")
+            }
+
+            function i(e, t) {
+                Object.defineProperty(f, e, {
+                    configurable: !0, enumerable: !0, get: function () {
+                        var r = new d(t);
+                        return Object.defineProperty(f, e, {configurable: !0, enumerable: !0, value: r}), r
+                    }
+                })
+            }
+
+            var f = r, n = e("hash.js"), a = e("../elliptic"), s = a.utils.assert;
+            f.PresetCurve = d, i("p192", {
+                type: "short",
+                prime: "p192",
+                p: "ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff",
+                a: "ffffffff ffffffff ffffffff fffffffe ffffffff fffffffc",
+                b: "64210519 e59c80e7 0fa7e9ab 72243049 feb8deec c146b9b1",
+                n: "ffffffff ffffffff ffffffff 99def836 146bc9b1 b4d22831",
+                hash: n.sha256,
+                gRed: !1,
+                g: ["188da80e b03090f6 7cbf20eb 43a18800 f4ff0afd 82ff1012", "07192b95 ffc8da78 631011ed 6b24cdd5 73f977a1 1e794811"]
+            }), i("p224", {
+                type: "short",
+                prime: "p224",
+                p: "ffffffff ffffffff ffffffff ffffffff 00000000 00000000 00000001",
+                a: "ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff fffffffe",
+                b: "b4050a85 0c04b3ab f5413256 5044b0b7 d7bfd8ba 270b3943 2355ffb4",
+                n: "ffffffff ffffffff ffffffff ffff16a2 e0b8f03e 13dd2945 5c5c2a3d",
+                hash: n.sha256,
+                gRed: !1,
+                g: ["b70e0cbd 6bb4bf7f 321390b9 4a03c1d3 56c21122 343280d6 115c1d21", "bd376388 b5f723fb 4c22dfe6 cd4375a0 5a074764 44d58199 85007e34"]
+            }), i("p256", {
+                type: "short",
+                prime: null,
+                p: "ffffffff 00000001 00000000 00000000 00000000 ffffffff ffffffff ffffffff",
+                a: "ffffffff 00000001 00000000 00000000 00000000 ffffffff ffffffff fffffffc",
+                b: "5ac635d8 aa3a93e7 b3ebbd55 769886bc 651d06b0 cc53b0f6 3bce3c3e 27d2604b",
+                n: "ffffffff 00000000 ffffffff ffffffff bce6faad a7179e84 f3b9cac2 fc632551",
+                hash: n.sha256,
+                gRed: !1,
+                g: ["6b17d1f2 e12c4247 f8bce6e5 63a440f2 77037d81 2deb33a0 f4a13945 d898c296", "4fe342e2 fe1a7f9b 8ee7eb4a 7c0f9e16 2bce3357 6b315ece cbb64068 37bf51f5"]
+            }), i("curve25519", {
+                type: "mont",
+                prime: "p25519",
+                p: "7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed",
+                a: "76d06",
+                b: "0",
+                n: "1000000000000000 0000000000000000 14def9dea2f79cd6 5812631a5cf5d3ed",
+                hash: n.sha256,
+                gRed: !1,
+                g: ["9"]
+            }), i("ed25519", {
+                type: "edwards",
+                prime: "p25519",
+                p: "7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed",
+                a: "-1",
+                c: "1",
+                d: "52036cee2b6ffe73 8cc740797779e898 00700a4d4141d8ab 75eb4dca135978a3",
+                n: "1000000000000000 0000000000000000 14def9dea2f79cd6 5812631a5cf5d3ed",
+                hash: n.sha256,
+                gRed: !1,
+                g: ["216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51a", "6666666666666666666666666666666666666666666666666666666666666658"]
+            });
+            var c;
+            try {
+                c = e("./precomputed/secp256k1")
+            } catch (h) {
+                c = void 0
+            }
+            i("secp256k1", {
+                type: "short",
+                prime: "k256",
+                p: "ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe fffffc2f",
+                a: "0",
+                b: "7",
+                n: "ffffffff ffffffff ffffffff fffffffe baaedce6 af48a03b bfd25e8c d0364141",
+                h: "1",
+                hash: n.sha256,
+                beta: "7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee",
+                lambda: "5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72",
+                basis: [{
+                    a: "3086d221a7d46bcde86c90e49284eb15",
+                    b: "-e4437ed6010e88286f547fa90abfe4c3"
+                }, {a: "114ca50f7a8e2f3f657c1108d9d44cfd8", b: "3086d221a7d46bcde86c90e49284eb15"}],
+                gRed: !1,
+                g: ["79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798", "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8", c]
+            })
+        }, {"../elliptic": 1, "./precomputed/secp256k1": 12, "hash.js": 16}],
+        8: [function (e, t) {
+            "use strict";
+            function r(e) {
+                return this instanceof r ? ("string" == typeof e && (n(i.curves.hasOwnProperty(e), "Unknown curve " + e), e = i.curves[e]), e instanceof i.curves.PresetCurve && (e = {curve: e}), this.curve = e.curve.curve, this.n = this.curve.n, this.nh = this.n.shrn(1), this.g = this.curve.g, this.g = e.curve.g, this.g.precompute(e.curve.n.bitLength() + 1), void(this.hash = e.hash || e.curve.hash)) : new r(e)
+            }
+
+            var d = e("bn.js"), i = e("../../elliptic"), f = i.utils, n = f.assert, a = e("./key"), s = e("./signature");
+            t.exports = r, r.prototype.keyPair = function (e) {
+                return new a(this, e)
+            }, r.prototype.keyFromPrivate = function (e, t) {
+                return a.fromPrivate(this, e, t)
+            }, r.prototype.keyFromPublic = function (e, t) {
+                return a.fromPublic(this, e, t)
+            }, r.prototype.genKeyPair = function (e) {
+                e || (e = {});
+                for (var t = new i.hmacDRBG({
+                    hash: this.hash,
+                    pers: e.pers,
+                    entropy: e.entropy || i.rand(this.hash.hmacStrength),
+                    nonce: this.n.toArray()
+                }), r = this.n.byteLength(), f = this.n.sub(new d(2)); ;) {
+                    var n = new d(t.generate(r));
+                    if (!(n.cmp(f) > 0))return n.iaddn(1), this.keyFromPrivate(n)
+                }
+            }, r.prototype._truncateToN = function (e, t) {
+                var r = 8 * e.byteLength() - this.n.bitLength();
+                return r > 0 && (e = e.shrn(r)), !t && e.cmp(this.n) >= 0 ? e.sub(this.n) : e
+            }, r.prototype.sign = function (e, t, r, f) {
+                "object" == typeof r && (f = r, r = null), f || (f = {}), t = this.keyFromPrivate(t, r), e = this._truncateToN(new d(e, 16));
+                for (var n = this.n.byteLength(), a = t.getPrivate().toArray(), c = a.length; 21 > c; c++)a.unshift(0);
+                for (var h = e.toArray(), c = h.length; n > c; c++)h.unshift(0);
+                for (var o = new i.hmacDRBG({hash: this.hash, entropy: a, nonce: h}), b = this.n.sub(new d(1)); ;) {
+                    var u = new d(o.generate(this.n.byteLength()));
+                    if (u = this._truncateToN(u, !0), !(u.cmpn(1) <= 0 || u.cmp(b) >= 0)) {
+                        var p = this.g.mul(u);
+                        if (!p.isInfinity()) {
+                            var l = p.getX().mod(this.n);
+                            if (0 !== l.cmpn(0)) {
+                                var v = u.invm(this.n).mul(l.mul(t.getPrivate()).iadd(e)).mod(this.n);
+                                if (0 !== v.cmpn(0))return f.canonical && v.cmp(this.nh) > 0 && (v = this.n.sub(v)), new s({
+                                    r: l,
+                                    s: v
+                                })
+                            }
+                        }
+                    }
+                }
+            }, r.prototype.verify = function (e, t, r, i) {
+                e = this._truncateToN(new d(e, 16)), r = this.keyFromPublic(r, i), t = new s(t, "hex");
+                var f = t.r, n = t.s;
+                if (f.cmpn(1) < 0 || f.cmp(this.n) >= 0)return !1;
+                if (n.cmpn(1) < 0 || n.cmp(this.n) >= 0)return !1;
+                var a = n.invm(this.n), c = a.mul(e).mod(this.n), h = a.mul(f).mod(this.n), o = this.g.mulAdd(c, r.getPublic(), h);
+                return o.isInfinity() ? !1 : 0 === o.getX().mod(this.n).cmp(f)
+            }
+        }, {"../../elliptic": 1, "./key": 9, "./signature": 10, "bn.js": 14}],
+        9: [function (e, t) {
+            "use strict";
+            function r(e, t) {
+                this.ec = e, this.priv = null, this.pub = null, t.priv && this._importPrivate(t.priv, t.privEnc), t.pub && this._importPublic(t.pub, t.pubEnc)
+            }
+
+            var d = e("bn.js"), i = e("../../elliptic"), f = i.utils;
+            t.exports = r, r.fromPublic = function (e, t, d) {
+                return t instanceof r ? t : new r(e, {pub: t, pubEnc: d})
+            }, r.fromPrivate = function (e, t, d) {
+                return t instanceof r ? t : new r(e, {priv: t, privEnc: d})
+            }, r.prototype.validate = function () {
+                var e = this.getPublic();
+                return e.isInfinity() ? {
+                    result: !1,
+                    reason: "Invalid public key"
+                } : e.validate() ? e.mul(this.ec.curve.n).isInfinity() ? {result: !0, reason: null} : {
+                    result: !1,
+                    reason: "Public key * N != O"
+                } : {result: !1, reason: "Public key is not a point"}
+            }, r.prototype.getPublic = function (e, t) {
+                if (this.pub || (this.pub = this.ec.g.mul(this.priv)), "string" == typeof e && (t = e, e = null), !t)return this.pub;
+                for (var r = this.ec.curve.p.byteLength(), d = this.pub.getX().toArray(), i = d.length; r > i; i++)d.unshift(0);
+                var n;
+                if ("mont" !== this.ec.curve.type)if (e)n = [this.pub.getY().isEven() ? 2 : 3].concat(d); else {
+                    for (var a = this.pub.getY().toArray(), i = a.length; r > i; i++)a.unshift(0);
+                    var n = [4].concat(d, a)
+                } else n = d;
+                return f.encode(n, t)
+            }, r.prototype.getPrivate = function (e) {
+                return "hex" === e ? this.priv.toString(16, 2) : this.priv
+            }, r.prototype._importPrivate = function (e, t) {
+                this.priv = new d(e, t || 16), this.priv = this.priv.mod(this.ec.curve.n)
+            }, r.prototype._importPublic = function (e, t) {
+                return e.x || e.y ? void(this.pub = this.ec.curve.point(e.x, e.y)) : (e = f.toArray(e, t), "mont" !== this.ec.curve.type ? this._importPublicShort(e) : this._importPublicMont(e))
+            }, r.prototype._importPublicShort = function (e) {
+                var t = this.ec.curve.p.byteLength();
+                4 === e[0] && e.length - 1 === 2 * t ? this.pub = this.ec.curve.point(e.slice(1, 1 + t), e.slice(1 + t, 1 + 2 * t)) : 2 !== e[0] && 3 !== e[0] || e.length - 1 !== t || (this.pub = this.ec.curve.pointFromX(3 === e[0], e.slice(1, 1 + t)))
+            }, r.prototype._importPublicMont = function (e) {
+                this.pub = this.ec.curve.point(e, 1)
+            }, r.prototype.derive = function (e) {
+                return e.mul(this.priv).getX()
+            }, r.prototype.sign = function (e) {
+                return this.ec.sign(e, this)
+            }, r.prototype.verify = function (e, t) {
+                return this.ec.verify(e, t, this)
+            }, r.prototype.inspect = function () {
+                return "<Key priv: " + (this.priv && this.priv.toString(16, 2)) + " pub: " + (this.pub && this.pub.inspect()) + " >"
+            }
+        }, {"../../elliptic": 1, "bn.js": 14}],
+        10: [function (e, t) {
+            "use strict";
+            function r(e, t) {
+                return e instanceof r ? e : void(this._importDER(e, t) || (n(e.r && e.s, "Signature without r or s"), this.r = new d(e.r, 16), this.s = new d(e.s, 16)))
+            }
+
+            var d = e("bn.js"), i = e("../../elliptic"), f = i.utils, n = f.assert;
+            t.exports = r, r.prototype._importDER = function (e, t) {
+                if (e = f.toArray(e, t), e.length < 6 || 48 !== e[0] || 2 !== e[2])return !1;
+                var r = e[1];
+                if (1 + r > e.length)return !1;
+                var i = e[3];
+                if (i >= 128)return !1;
+                if (4 + i + 2 >= e.length)return !1;
+                if (2 !== e[4 + i])return !1;
+                var n = e[5 + i];
+                return n >= 128 ? !1 : 4 + i + 2 + n > e.length ? !1 : (this.r = new d(e.slice(4, 4 + i)), this.s = new d(e.slice(4 + i + 2, 4 + i + 2 + n)), !0)
+            }, r.prototype.toDER = function (e) {
+                var t = this.r.toArray(), r = this.s.toArray();
+                128 & t[0] && (t = [0].concat(t)), 128 & r[0] && (r = [0].concat(r));
+                var d = t.length + r.length + 4, i = [48, d, 2, t.length];
+                return i = i.concat(t, [2, r.length], r), f.encode(i, e)
+            }
+        }, {"../../elliptic": 1, "bn.js": 14}],
+        11: [function (e, t) {
+            "use strict";
+            function r(e) {
+                if (!(this instanceof r))return new r(e);
+                this.hash = e.hash, this.predResist = !!e.predResist, this.outLen = this.hash.outSize, this.minEntropy = e.minEntropy || this.hash.hmacStrength, this.reseed = null, this.reseedInterval = null, this.K = null, this.V = null;
+                var t = f.toArray(e.entropy, e.entropyEnc), d = f.toArray(e.nonce, e.nonceEnc), i = f.toArray(e.pers, e.persEnc);
+                n(t.length >= this.minEntropy / 8, "Not enough entropy. Minimum is: " + this.minEntropy + " bits"), this._init(t, d, i)
+            }
+
+            var d = e("hash.js"), i = e("../elliptic"), f = i.utils, n = f.assert;
+            t.exports = r, r.prototype._init = function (e, t, r) {
+                var d = e.concat(t).concat(r);
+                this.K = new Array(this.outLen / 8), this.V = new Array(this.outLen / 8);
+                for (var i = 0; i < this.V.length; i++)this.K[i] = 0, this.V[i] = 1;
+                this._update(d), this.reseed = 1, this.reseedInterval = 281474976710656
+            }, r.prototype._hmac = function () {
+                return new d.hmac(this.hash, this.K)
+            }, r.prototype._update = function (e) {
+                var t = this._hmac().update(this.V).update([0]);
+                e && (t = t.update(e)), this.K = t.digest(), this.V = this._hmac().update(this.V).digest(), e && (this.K = this._hmac().update(this.V).update([1]).update(e).digest(), this.V = this._hmac().update(this.V).digest())
+            }, r.prototype.reseed = function (e, t, r, d) {
+                "string" != typeof t && (d = r, r = t, t = null), e = f.toBuffer(e, t), r = f.toBuffer(r, d), n(e.length >= this.minEntropy / 8, "Not enough entropy. Minimum is: " + this.minEntropy + " bits"), this._update(e.concat(r || [])), this.reseed = 1
+            }, r.prototype.generate = function (e, t, r, d) {
+                if (this.reseed > this.reseedInterval)throw new Error("Reseed is required");
+                "string" != typeof t && (d = r, r = t, t = null), r && (r = f.toArray(r, d), this._update(r));
+                for (var i = []; i.length < e;)this.V = this._hmac().update(this.V).digest(), i = i.concat(this.V);
+                var n = i.slice(0, e);
+                return this._update(r), this.reseed++, f.encode(n, t)
+            }
+        }, {"../elliptic": 1, "hash.js": 16}],
+        12: [function (e, t) {
+            t.exports = {
+                doubles: {
+                    step: 4,
+                    points: [["e60fce93b59e9ec53011aabc21c23e97b2a31369b87a5ae9c44ee89e2a6dec0a", "f7e3507399e595929db99f34f57937101296891e44d23f0be1f32cce69616821"], ["8282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508", "11f8a8098557dfe45e8256e830b60ace62d613ac2f7b17bed31b6eaff6e26caf"], ["175e159f728b865a72f99cc6c6fc846de0b93833fd2222ed73fce5b551e5b739", "d3506e0d9e3c79eba4ef97a51ff71f5eacb5955add24345c6efa6ffee9fed695"], ["363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff4640", "4e273adfc732221953b445397f3363145b9a89008199ecb62003c7f3bee9de9"], ["8b4b5f165df3c2be8c6244b5b745638843e4a781a15bcd1b69f79a55dffdf80c", "4aad0a6f68d308b4b3fbd7813ab0da04f9e336546162ee56b3eff0c65fd4fd36"], ["723cbaa6e5db996d6bf771c00bd548c7b700dbffa6c0e77bcb6115925232fcda", "96e867b5595cc498a921137488824d6e2660a0653779494801dc069d9eb39f5f"], ["eebfa4d493bebf98ba5feec812c2d3b50947961237a919839a533eca0e7dd7fa", "5d9a8ca3970ef0f269ee7edaf178089d9ae4cdc3a711f712ddfd4fdae1de8999"], ["100f44da696e71672791d0a09b7bde459f1215a29b3c03bfefd7835b39a48db0", "cdd9e13192a00b772ec8f3300c090666b7ff4a18ff5195ac0fbd5cd62bc65a09"], ["e1031be262c7ed1b1dc9227a4a04c017a77f8d4464f3b3852c8acde6e534fd2d", "9d7061928940405e6bb6a4176597535af292dd419e1ced79a44f18f29456a00d"], ["feea6cae46d55b530ac2839f143bd7ec5cf8b266a41d6af52d5e688d9094696d", "e57c6b6c97dce1bab06e4e12bf3ecd5c981c8957cc41442d3155debf18090088"], ["da67a91d91049cdcb367be4be6ffca3cfeed657d808583de33fa978bc1ec6cb1", "9bacaa35481642bc41f463f7ec9780e5dec7adc508f740a17e9ea8e27a68be1d"], ["53904faa0b334cdda6e000935ef22151ec08d0f7bb11069f57545ccc1a37b7c0", "5bc087d0bc80106d88c9eccac20d3c1c13999981e14434699dcb096b022771c8"], ["8e7bcd0bd35983a7719cca7764ca906779b53a043a9b8bcaeff959f43ad86047", "10b7770b2a3da4b3940310420ca9514579e88e2e47fd68b3ea10047e8460372a"], ["385eed34c1cdff21e6d0818689b81bde71a7f4f18397e6690a841e1599c43862", "283bebc3e8ea23f56701de19e9ebf4576b304eec2086dc8cc0458fe5542e5453"], ["6f9d9b803ecf191637c73a4413dfa180fddf84a5947fbc9c606ed86c3fac3a7", "7c80c68e603059ba69b8e2a30e45c4d47ea4dd2f5c281002d86890603a842160"], ["3322d401243c4e2582a2147c104d6ecbf774d163db0f5e5313b7e0e742d0e6bd", "56e70797e9664ef5bfb019bc4ddaf9b72805f63ea2873af624f3a2e96c28b2a0"], ["85672c7d2de0b7da2bd1770d89665868741b3f9af7643397721d74d28134ab83", "7c481b9b5b43b2eb6374049bfa62c2e5e77f17fcc5298f44c8e3094f790313a6"], ["948bf809b1988a46b06c9f1919413b10f9226c60f668832ffd959af60c82a0a", "53a562856dcb6646dc6b74c5d1c3418c6d4dff08c97cd2bed4cb7f88d8c8e589"], ["6260ce7f461801c34f067ce0f02873a8f1b0e44dfc69752accecd819f38fd8e8", "bc2da82b6fa5b571a7f09049776a1ef7ecd292238051c198c1a84e95b2b4ae17"], ["e5037de0afc1d8d43d8348414bbf4103043ec8f575bfdc432953cc8d2037fa2d", "4571534baa94d3b5f9f98d09fb990bddbd5f5b03ec481f10e0e5dc841d755bda"], ["e06372b0f4a207adf5ea905e8f1771b4e7e8dbd1c6a6c5b725866a0ae4fce725", "7a908974bce18cfe12a27bb2ad5a488cd7484a7787104870b27034f94eee31dd"], ["213c7a715cd5d45358d0bbf9dc0ce02204b10bdde2a3f58540ad6908d0559754", "4b6dad0b5ae462507013ad06245ba190bb4850f5f36a7eeddff2c27534b458f2"], ["4e7c272a7af4b34e8dbb9352a5419a87e2838c70adc62cddf0cc3a3b08fbd53c", "17749c766c9d0b18e16fd09f6def681b530b9614bff7dd33e0b3941817dcaae6"], ["fea74e3dbe778b1b10f238ad61686aa5c76e3db2be43057632427e2840fb27b6", "6e0568db9b0b13297cf674deccb6af93126b596b973f7b77701d3db7f23cb96f"], ["76e64113f677cf0e10a2570d599968d31544e179b760432952c02a4417bdde39", "c90ddf8dee4e95cf577066d70681f0d35e2a33d2b56d2032b4b1752d1901ac01"], ["c738c56b03b2abe1e8281baa743f8f9a8f7cc643df26cbee3ab150242bcbb891", "893fb578951ad2537f718f2eacbfbbbb82314eef7880cfe917e735d9699a84c3"], ["d895626548b65b81e264c7637c972877d1d72e5f3a925014372e9f6588f6c14b", "febfaa38f2bc7eae728ec60818c340eb03428d632bb067e179363ed75d7d991f"], ["b8da94032a957518eb0f6433571e8761ceffc73693e84edd49150a564f676e03", "2804dfa44805a1e4d7c99cc9762808b092cc584d95ff3b511488e4e74efdf6e7"], ["e80fea14441fb33a7d8adab9475d7fab2019effb5156a792f1a11778e3c0df5d", "eed1de7f638e00771e89768ca3ca94472d155e80af322ea9fcb4291b6ac9ec78"], ["a301697bdfcd704313ba48e51d567543f2a182031efd6915ddc07bbcc4e16070", "7370f91cfb67e4f5081809fa25d40f9b1735dbf7c0a11a130c0d1a041e177ea1"], ["90ad85b389d6b936463f9d0512678de208cc330b11307fffab7ac63e3fb04ed4", "e507a3620a38261affdcbd9427222b839aefabe1582894d991d4d48cb6ef150"], ["8f68b9d2f63b5f339239c1ad981f162ee88c5678723ea3351b7b444c9ec4c0da", "662a9f2dba063986de1d90c2b6be215dbbea2cfe95510bfdf23cbf79501fff82"], ["e4f3fb0176af85d65ff99ff9198c36091f48e86503681e3e6686fd5053231e11", "1e63633ad0ef4f1c1661a6d0ea02b7286cc7e74ec951d1c9822c38576feb73bc"], ["8c00fa9b18ebf331eb961537a45a4266c7034f2f0d4e1d0716fb6eae20eae29e", "efa47267fea521a1a9dc343a3736c974c2fadafa81e36c54e7d2a4c66702414b"], ["e7a26ce69dd4829f3e10cec0a9e98ed3143d084f308b92c0997fddfc60cb3e41", "2a758e300fa7984b471b006a1aafbb18d0a6b2c0420e83e20e8a9421cf2cfd51"], ["b6459e0ee3662ec8d23540c223bcbdc571cbcb967d79424f3cf29eb3de6b80ef", "67c876d06f3e06de1dadf16e5661db3c4b3ae6d48e35b2ff30bf0b61a71ba45"], ["d68a80c8280bb840793234aa118f06231d6f1fc67e73c5a5deda0f5b496943e8", "db8ba9fff4b586d00c4b1f9177b0e28b5b0e7b8f7845295a294c84266b133120"], ["324aed7df65c804252dc0270907a30b09612aeb973449cea4095980fc28d3d5d", "648a365774b61f2ff130c0c35aec1f4f19213b0c7e332843967224af96ab7c84"], ["4df9c14919cde61f6d51dfdbe5fee5dceec4143ba8d1ca888e8bd373fd054c96", "35ec51092d8728050974c23a1d85d4b5d506cdc288490192ebac06cad10d5d"], ["9c3919a84a474870faed8a9c1cc66021523489054d7f0308cbfc99c8ac1f98cd", "ddb84f0f4a4ddd57584f044bf260e641905326f76c64c8e6be7e5e03d4fc599d"], ["6057170b1dd12fdf8de05f281d8e06bb91e1493a8b91d4cc5a21382120a959e5", "9a1af0b26a6a4807add9a2daf71df262465152bc3ee24c65e899be932385a2a8"], ["a576df8e23a08411421439a4518da31880cef0fba7d4df12b1a6973eecb94266", "40a6bf20e76640b2c92b97afe58cd82c432e10a7f514d9f3ee8be11ae1b28ec8"], ["7778a78c28dec3e30a05fe9629de8c38bb30d1f5cf9a3a208f763889be58ad71", "34626d9ab5a5b22ff7098e12f2ff580087b38411ff24ac563b513fc1fd9f43ac"], ["928955ee637a84463729fd30e7afd2ed5f96274e5ad7e5cb09eda9c06d903ac", "c25621003d3f42a827b78a13093a95eeac3d26efa8a8d83fc5180e935bcd091f"], ["85d0fef3ec6db109399064f3a0e3b2855645b4a907ad354527aae75163d82751", "1f03648413a38c0be29d496e582cf5663e8751e96877331582c237a24eb1f962"], ["ff2b0dce97eece97c1c9b6041798b85dfdfb6d8882da20308f5404824526087e", "493d13fef524ba188af4c4dc54d07936c7b7ed6fb90e2ceb2c951e01f0c29907"], ["827fbbe4b1e880ea9ed2b2e6301b212b57f1ee148cd6dd28780e5e2cf856e241", "c60f9c923c727b0b71bef2c67d1d12687ff7a63186903166d605b68baec293ec"], ["eaa649f21f51bdbae7be4ae34ce6e5217a58fdce7f47f9aa7f3b58fa2120e2b3", "be3279ed5bbbb03ac69a80f89879aa5a01a6b965f13f7e59d47a5305ba5ad93d"], ["e4a42d43c5cf169d9391df6decf42ee541b6d8f0c9a137401e23632dda34d24f", "4d9f92e716d1c73526fc99ccfb8ad34ce886eedfa8d8e4f13a7f7131deba9414"], ["1ec80fef360cbdd954160fadab352b6b92b53576a88fea4947173b9d4300bf19", "aeefe93756b5340d2f3a4958a7abbf5e0146e77f6295a07b671cdc1cc107cefd"], ["146a778c04670c2f91b00af4680dfa8bce3490717d58ba889ddb5928366642be", "b318e0ec3354028add669827f9d4b2870aaa971d2f7e5ed1d0b297483d83efd0"], ["fa50c0f61d22e5f07e3acebb1aa07b128d0012209a28b9776d76a8793180eef9", "6b84c6922397eba9b72cd2872281a68a5e683293a57a213b38cd8d7d3f4f2811"], ["da1d61d0ca721a11b1a5bf6b7d88e8421a288ab5d5bba5220e53d32b5f067ec2", "8157f55a7c99306c79c0766161c91e2966a73899d279b48a655fba0f1ad836f1"], ["a8e282ff0c9706907215ff98e8fd416615311de0446f1e062a73b0610d064e13", "7f97355b8db81c09abfb7f3c5b2515888b679a3e50dd6bd6cef7c73111f4cc0c"], ["174a53b9c9a285872d39e56e6913cab15d59b1fa512508c022f382de8319497c", "ccc9dc37abfc9c1657b4155f2c47f9e6646b3a1d8cb9854383da13ac079afa73"], ["959396981943785c3d3e57edf5018cdbe039e730e4918b3d884fdff09475b7ba", "2e7e552888c331dd8ba0386a4b9cd6849c653f64c8709385e9b8abf87524f2fd"], ["d2a63a50ae401e56d645a1153b109a8fcca0a43d561fba2dbb51340c9d82b151", "e82d86fb6443fcb7565aee58b2948220a70f750af484ca52d4142174dcf89405"], ["64587e2335471eb890ee7896d7cfdc866bacbdbd3839317b3436f9b45617e073", "d99fcdd5bf6902e2ae96dd6447c299a185b90a39133aeab358299e5e9faf6589"], ["8481bde0e4e4d885b3a546d3e549de042f0aa6cea250e7fd358d6c86dd45e458", "38ee7b8cba5404dd84a25bf39cecb2ca900a79c42b262e556d64b1b59779057e"], ["13464a57a78102aa62b6979ae817f4637ffcfed3c4b1ce30bcd6303f6caf666b", "69be159004614580ef7e433453ccb0ca48f300a81d0942e13f495a907f6ecc27"], ["bc4a9df5b713fe2e9aef430bcc1dc97a0cd9ccede2f28588cada3a0d2d83f366", "d3a81ca6e785c06383937adf4b798caa6e8a9fbfa547b16d758d666581f33c1"], ["8c28a97bf8298bc0d23d8c749452a32e694b65e30a9472a3954ab30fe5324caa", "40a30463a3305193378fedf31f7cc0eb7ae784f0451cb9459e71dc73cbef9482"], ["8ea9666139527a8c1dd94ce4f071fd23c8b350c5a4bb33748c4ba111faccae0", "620efabbc8ee2782e24e7c0cfb95c5d735b783be9cf0f8e955af34a30e62b945"], ["dd3625faef5ba06074669716bbd3788d89bdde815959968092f76cc4eb9a9787", "7a188fa3520e30d461da2501045731ca941461982883395937f68d00c644a573"], ["f710d79d9eb962297e4f6232b40e8f7feb2bc63814614d692c12de752408221e", "ea98e67232d3b3295d3b535532115ccac8612c721851617526ae47a9c77bfc82"]]
+                },
+                naf: {
+                    wnd: 7,
+                    points: [["f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9", "388f7b0f632de8140fe337e62a37f3566500a99934c2231b6cb9fd7584b8e672"], ["2f8bde4d1a07209355b4a7250a5c5128e88b84bddc619ab7cba8d569b240efe4", "d8ac222636e5e3d6d4dba9dda6c9c426f788271bab0d6840dca87d3aa6ac62d6"], ["5cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc", "6aebca40ba255960a3178d6d861a54dba813d0b813fde7b5a5082628087264da"], ["acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe", "cc338921b0a7d9fd64380971763b61e9add888a4375f8e0f05cc262ac64f9c37"], ["774ae7f858a9411e5ef4246b70c65aac5649980be5c17891bbec17895da008cb", "d984a032eb6b5e190243dd56d7b7b365372db1e2dff9d6a8301d74c9c953c61b"], ["f28773c2d975288bc7d1d205c3748651b075fbc6610e58cddeeddf8f19405aa8", "ab0902e8d880a89758212eb65cdaf473a1a06da521fa91f29b5cb52db03ed81"], ["d7924d4f7d43ea965a465ae3095ff41131e5946f3c85f79e44adbcf8e27e080e", "581e2872a86c72a683842ec228cc6defea40af2bd896d3a5c504dc9ff6a26b58"], ["defdea4cdb677750a420fee807eacf21eb9898ae79b9768766e4faa04a2d4a34", "4211ab0694635168e997b0ead2a93daeced1f4a04a95c0f6cfb199f69e56eb77"], ["2b4ea0a797a443d293ef5cff444f4979f06acfebd7e86d277475656138385b6c", "85e89bc037945d93b343083b5a1c86131a01f60c50269763b570c854e5c09b7a"], ["352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5", "321eb4075348f534d59c18259dda3e1f4a1b3b2e71b1039c67bd3d8bcf81998c"], ["2fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f", "2de1068295dd865b64569335bd5dd80181d70ecfc882648423ba76b532b7d67"], ["9248279b09b4d68dab21a9b066edda83263c3d84e09572e269ca0cd7f5453714", "73016f7bf234aade5d1aa71bdea2b1ff3fc0de2a887912ffe54a32ce97cb3402"], ["daed4f2be3a8bf278e70132fb0beb7522f570e144bf615c07e996d443dee8729", "a69dce4a7d6c98e8d4a1aca87ef8d7003f83c230f3afa726ab40e52290be1c55"], ["c44d12c7065d812e8acf28d7cbb19f9011ecd9e9fdf281b0e6a3b5e87d22e7db", "2119a460ce326cdc76c45926c982fdac0e106e861edf61c5a039063f0e0e6482"], ["6a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4", "e022cf42c2bd4a708b3f5126f16a24ad8b33ba48d0423b6efd5e6348100d8a82"], ["1697ffa6fd9de627c077e3d2fe541084ce13300b0bec1146f95ae57f0d0bd6a5", "b9c398f186806f5d27561506e4557433a2cf15009e498ae7adee9d63d01b2396"], ["605bdb019981718b986d0f07e834cb0d9deb8360ffb7f61df982345ef27a7479", "2972d2de4f8d20681a78d93ec96fe23c26bfae84fb14db43b01e1e9056b8c49"], ["62d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d", "80fc06bd8cc5b01098088a1950eed0db01aa132967ab472235f5642483b25eaf"], ["80c60ad0040f27dade5b4b06c408e56b2c50e9f56b9b8b425e555c2f86308b6f", "1c38303f1cc5c30f26e66bad7fe72f70a65eed4cbe7024eb1aa01f56430bd57a"], ["7a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb", "d0e3fa9eca8726909559e0d79269046bdc59ea10c70ce2b02d499ec224dc7f7"], ["d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9", "eecf41253136e5f99966f21881fd656ebc4345405c520dbc063465b521409933"], ["49370a4b5f43412ea25f514e8ecdad05266115e4a7ecb1387231808f8b45963", "758f3f41afd6ed428b3081b0512fd62a54c3f3afbb5b6764b653052a12949c9a"], ["77f230936ee88cbbd73df930d64702ef881d811e0e1498e2f1c13eb1fc345d74", "958ef42a7886b6400a08266e9ba1b37896c95330d97077cbbe8eb3c7671c60d6"], ["f2dac991cc4ce4b9ea44887e5c7c0bce58c80074ab9d4dbaeb28531b7739f530", "e0dedc9b3b2f8dad4da1f32dec2531df9eb5fbeb0598e4fd1a117dba703a3c37"], ["463b3d9f662621fb1b4be8fbbe2520125a216cdfc9dae3debcba4850c690d45b", "5ed430d78c296c3543114306dd8622d7c622e27c970a1de31cb377b01af7307e"], ["f16f804244e46e2a09232d4aff3b59976b98fac14328a2d1a32496b49998f247", "cedabd9b82203f7e13d206fcdf4e33d92a6c53c26e5cce26d6579962c4e31df6"], ["caf754272dc84563b0352b7a14311af55d245315ace27c65369e15f7151d41d1", "cb474660ef35f5f2a41b643fa5e460575f4fa9b7962232a5c32f908318a04476"], ["2600ca4b282cb986f85d0f1709979d8b44a09c07cb86d7c124497bc86f082120", "4119b88753c15bd6a693b03fcddbb45d5ac6be74ab5f0ef44b0be9475a7e4b40"], ["7635ca72d7e8432c338ec53cd12220bc01c48685e24f7dc8c602a7746998e435", "91b649609489d613d1d5e590f78e6d74ecfc061d57048bad9e76f302c5b9c61"], ["754e3239f325570cdbbf4a87deee8a66b7f2b33479d468fbc1a50743bf56cc18", "673fb86e5bda30fb3cd0ed304ea49a023ee33d0197a695d0c5d98093c536683"], ["e3e6bd1071a1e96aff57859c82d570f0330800661d1c952f9fe2694691d9b9e8", "59c9e0bba394e76f40c0aa58379a3cb6a5a2283993e90c4167002af4920e37f5"], ["186b483d056a033826ae73d88f732985c4ccb1f32ba35f4b4cc47fdcf04aa6eb", "3b952d32c67cf77e2e17446e204180ab21fb8090895138b4a4a797f86e80888b"], ["df9d70a6b9876ce544c98561f4be4f725442e6d2b737d9c91a8321724ce0963f", "55eb2dafd84d6ccd5f862b785dc39d4ab157222720ef9da217b8c45cf2ba2417"], ["5edd5cc23c51e87a497ca815d5dce0f8ab52554f849ed8995de64c5f34ce7143", "efae9c8dbc14130661e8cec030c89ad0c13c66c0d17a2905cdc706ab7399a868"], ["290798c2b6476830da12fe02287e9e777aa3fba1c355b17a722d362f84614fba", "e38da76dcd440621988d00bcf79af25d5b29c094db2a23146d003afd41943e7a"], ["af3c423a95d9f5b3054754efa150ac39cd29552fe360257362dfdecef4053b45", "f98a3fd831eb2b749a93b0e6f35cfb40c8cd5aa667a15581bc2feded498fd9c6"], ["766dbb24d134e745cccaa28c99bf274906bb66b26dcf98df8d2fed50d884249a", "744b1152eacbe5e38dcc887980da38b897584a65fa06cedd2c924f97cbac5996"], ["59dbf46f8c94759ba21277c33784f41645f7b44f6c596a58ce92e666191abe3e", "c534ad44175fbc300f4ea6ce648309a042ce739a7919798cd85e216c4a307f6e"], ["f13ada95103c4537305e691e74e9a4a8dd647e711a95e73cb62dc6018cfd87b8", "e13817b44ee14de663bf4bc808341f326949e21a6a75c2570778419bdaf5733d"], ["7754b4fa0e8aced06d4167a2c59cca4cda1869c06ebadfb6488550015a88522c", "30e93e864e669d82224b967c3020b8fa8d1e4e350b6cbcc537a48b57841163a2"], ["948dcadf5990e048aa3874d46abef9d701858f95de8041d2a6828c99e2262519", "e491a42537f6e597d5d28a3224b1bc25df9154efbd2ef1d2cbba2cae5347d57e"], ["7962414450c76c1689c7b48f8202ec37fb224cf5ac0bfa1570328a8a3d7c77ab", "100b610ec4ffb4760d5c1fc133ef6f6b12507a051f04ac5760afa5b29db83437"], ["3514087834964b54b15b160644d915485a16977225b8847bb0dd085137ec47ca", "ef0afbb2056205448e1652c48e8127fc6039e77c15c2378b7e7d15a0de293311"], ["d3cc30ad6b483e4bc79ce2c9dd8bc54993e947eb8df787b442943d3f7b527eaf", "8b378a22d827278d89c5e9be8f9508ae3c2ad46290358630afb34db04eede0a4"], ["1624d84780732860ce1c78fcbfefe08b2b29823db913f6493975ba0ff4847610", "68651cf9b6da903e0914448c6cd9d4ca896878f5282be4c8cc06e2a404078575"], ["733ce80da955a8a26902c95633e62a985192474b5af207da6df7b4fd5fc61cd4", "f5435a2bd2badf7d485a4d8b8db9fcce3e1ef8e0201e4578c54673bc1dc5ea1d"], ["15d9441254945064cf1a1c33bbd3b49f8966c5092171e699ef258dfab81c045c", "d56eb30b69463e7234f5137b73b84177434800bacebfc685fc37bbe9efe4070d"], ["a1d0fcf2ec9de675b612136e5ce70d271c21417c9d2b8aaaac138599d0717940", "edd77f50bcb5a3cab2e90737309667f2641462a54070f3d519212d39c197a629"], ["e22fbe15c0af8ccc5780c0735f84dbe9a790badee8245c06c7ca37331cb36980", "a855babad5cd60c88b430a69f53a1a7a38289154964799be43d06d77d31da06"], ["311091dd9860e8e20ee13473c1155f5f69635e394704eaa74009452246cfa9b3", "66db656f87d1f04fffd1f04788c06830871ec5a64feee685bd80f0b1286d8374"], ["34c1fd04d301be89b31c0442d3e6ac24883928b45a9340781867d4232ec2dbdf", "9414685e97b1b5954bd46f730174136d57f1ceeb487443dc5321857ba73abee"], ["f219ea5d6b54701c1c14de5b557eb42a8d13f3abbcd08affcc2a5e6b049b8d63", "4cb95957e83d40b0f73af4544cccf6b1f4b08d3c07b27fb8d8c2962a400766d1"], ["d7b8740f74a8fbaab1f683db8f45de26543a5490bca627087236912469a0b448", "fa77968128d9c92ee1010f337ad4717eff15db5ed3c049b3411e0315eaa4593b"], ["32d31c222f8f6f0ef86f7c98d3a3335ead5bcd32abdd94289fe4d3091aa824bf", "5f3032f5892156e39ccd3d7915b9e1da2e6dac9e6f26e961118d14b8462e1661"], ["7461f371914ab32671045a155d9831ea8793d77cd59592c4340f86cbc18347b5", "8ec0ba238b96bec0cbdddcae0aa442542eee1ff50c986ea6b39847b3cc092ff6"], ["ee079adb1df1860074356a25aa38206a6d716b2c3e67453d287698bad7b2b2d6", "8dc2412aafe3be5c4c5f37e0ecc5f9f6a446989af04c4e25ebaac479ec1c8c1e"], ["16ec93e447ec83f0467b18302ee620f7e65de331874c9dc72bfd8616ba9da6b5", "5e4631150e62fb40d0e8c2a7ca5804a39d58186a50e497139626778e25b0674d"], ["eaa5f980c245f6f038978290afa70b6bd8855897f98b6aa485b96065d537bd99", "f65f5d3e292c2e0819a528391c994624d784869d7e6ea67fb18041024edc07dc"], ["78c9407544ac132692ee1910a02439958ae04877151342ea96c4b6b35a49f51", "f3e0319169eb9b85d5404795539a5e68fa1fbd583c064d2462b675f194a3ddb4"], ["494f4be219a1a77016dcd838431aea0001cdc8ae7a6fc688726578d9702857a5", "42242a969283a5f339ba7f075e36ba2af925ce30d767ed6e55f4b031880d562c"], ["a598a8030da6d86c6bc7f2f5144ea549d28211ea58faa70ebf4c1e665c1fe9b5", "204b5d6f84822c307e4b4a7140737aec23fc63b65b35f86a10026dbd2d864e6b"], ["c41916365abb2b5d09192f5f2dbeafec208f020f12570a184dbadc3e58595997", "4f14351d0087efa49d245b328984989d5caf9450f34bfc0ed16e96b58fa9913"], ["841d6063a586fa475a724604da03bc5b92a2e0d2e0a36acfe4c73a5514742881", "73867f59c0659e81904f9a1c7543698e62562d6744c169ce7a36de01a8d6154"], ["5e95bb399a6971d376026947f89bde2f282b33810928be4ded112ac4d70e20d5", "39f23f366809085beebfc71181313775a99c9aed7d8ba38b161384c746012865"], ["36e4641a53948fd476c39f8a99fd974e5ec07564b5315d8bf99471bca0ef2f66", "d2424b1b1abe4eb8164227b085c9aa9456ea13493fd563e06fd51cf5694c78fc"], ["336581ea7bfbbb290c191a2f507a41cf5643842170e914faeab27c2c579f726", "ead12168595fe1be99252129b6e56b3391f7ab1410cd1e0ef3dcdcabd2fda224"], ["8ab89816dadfd6b6a1f2634fcf00ec8403781025ed6890c4849742706bd43ede", "6fdcef09f2f6d0a044e654aef624136f503d459c3e89845858a47a9129cdd24e"], ["1e33f1a746c9c5778133344d9299fcaa20b0938e8acff2544bb40284b8c5fb94", "60660257dd11b3aa9c8ed618d24edff2306d320f1d03010e33a7d2057f3b3b6"], ["85b7c1dcb3cec1b7ee7f30ded79dd20a0ed1f4cc18cbcfcfa410361fd8f08f31", "3d98a9cdd026dd43f39048f25a8847f4fcafad1895d7a633c6fed3c35e999511"], ["29df9fbd8d9e46509275f4b125d6d45d7fbe9a3b878a7af872a2800661ac5f51", "b4c4fe99c775a606e2d8862179139ffda61dc861c019e55cd2876eb2a27d84b"], ["a0b1cae06b0a847a3fea6e671aaf8adfdfe58ca2f768105c8082b2e449fce252", "ae434102edde0958ec4b19d917a6a28e6b72da1834aff0e650f049503a296cf2"], ["4e8ceafb9b3e9a136dc7ff67e840295b499dfb3b2133e4ba113f2e4c0e121e5", "cf2174118c8b6d7a4b48f6d534ce5c79422c086a63460502b827ce62a326683c"], ["d24a44e047e19b6f5afb81c7ca2f69080a5076689a010919f42725c2b789a33b", "6fb8d5591b466f8fc63db50f1c0f1c69013f996887b8244d2cdec417afea8fa3"], ["ea01606a7a6c9cdd249fdfcfacb99584001edd28abbab77b5104e98e8e3b35d4", "322af4908c7312b0cfbfe369f7a7b3cdb7d4494bc2823700cfd652188a3ea98d"], ["af8addbf2b661c8a6c6328655eb96651252007d8c5ea31be4ad196de8ce2131f", "6749e67c029b85f52a034eafd096836b2520818680e26ac8f3dfbcdb71749700"], ["e3ae1974566ca06cc516d47e0fb165a674a3dabcfca15e722f0e3450f45889", "2aeabe7e4531510116217f07bf4d07300de97e4874f81f533420a72eeb0bd6a4"], ["591ee355313d99721cf6993ffed1e3e301993ff3ed258802075ea8ced397e246", "b0ea558a113c30bea60fc4775460c7901ff0b053d25ca2bdeee98f1a4be5d196"], ["11396d55fda54c49f19aa97318d8da61fa8584e47b084945077cf03255b52984", "998c74a8cd45ac01289d5833a7beb4744ff536b01b257be4c5767bea93ea57a4"], ["3c5d2a1ba39c5a1790000738c9e0c40b8dcdfd5468754b6405540157e017aa7a", "b2284279995a34e2f9d4de7396fc18b80f9b8b9fdd270f6661f79ca4c81bd257"], ["cc8704b8a60a0defa3a99a7299f2e9c3fbc395afb04ac078425ef8a1793cc030", "bdd46039feed17881d1e0862db347f8cf395b74fc4bcdc4e940b74e3ac1f1b13"], ["c533e4f7ea8555aacd9777ac5cad29b97dd4defccc53ee7ea204119b2889b197", "6f0a256bc5efdf429a2fb6242f1a43a2d9b925bb4a4b3a26bb8e0f45eb596096"], ["c14f8f2ccb27d6f109f6d08d03cc96a69ba8c34eec07bbcf566d48e33da6593", "c359d6923bb398f7fd4473e16fe1c28475b740dd098075e6c0e8649113dc3a38"], ["a6cbc3046bc6a450bac24789fa17115a4c9739ed75f8f21ce441f72e0b90e6ef", "21ae7f4680e889bb130619e2c0f95a360ceb573c70603139862afd617fa9b9f"], ["347d6d9a02c48927ebfb86c1359b1caf130a3c0267d11ce6344b39f99d43cc38", "60ea7f61a353524d1c987f6ecec92f086d565ab687870cb12689ff1e31c74448"], ["da6545d2181db8d983f7dcb375ef5866d47c67b1bf31c8cf855ef7437b72656a", "49b96715ab6878a79e78f07ce5680c5d6673051b4935bd897fea824b77dc208a"], ["c40747cc9d012cb1a13b8148309c6de7ec25d6945d657146b9d5994b8feb1111", "5ca560753be2a12fc6de6caf2cb489565db936156b9514e1bb5e83037e0fa2d4"], ["4e42c8ec82c99798ccf3a610be870e78338c7f713348bd34c8203ef4037f3502", "7571d74ee5e0fb92a7a8b33a07783341a5492144cc54bcc40a94473693606437"], ["3775ab7089bc6af823aba2e1af70b236d251cadb0c86743287522a1b3b0dedea", "be52d107bcfa09d8bcb9736a828cfa7fac8db17bf7a76a2c42ad961409018cf7"], ["cee31cbf7e34ec379d94fb814d3d775ad954595d1314ba8846959e3e82f74e26", "8fd64a14c06b589c26b947ae2bcf6bfa0149ef0be14ed4d80f448a01c43b1c6d"], ["b4f9eaea09b6917619f6ea6a4eb5464efddb58fd45b1ebefcdc1a01d08b47986", "39e5c9925b5a54b07433a4f18c61726f8bb131c012ca542eb24a8ac07200682a"], ["d4263dfc3d2df923a0179a48966d30ce84e2515afc3dccc1b77907792ebcc60e", "62dfaf07a0f78feb30e30d6295853ce189e127760ad6cf7fae164e122a208d54"], ["48457524820fa65a4f8d35eb6930857c0032acc0a4a2de422233eeda897612c4", "25a748ab367979d98733c38a1fa1c2e7dc6cc07db2d60a9ae7a76aaa49bd0f77"], ["dfeeef1881101f2cb11644f3a2afdfc2045e19919152923f367a1767c11cceda", "ecfb7056cf1de042f9420bab396793c0c390bde74b4bbdff16a83ae09a9a7517"], ["6d7ef6b17543f8373c573f44e1f389835d89bcbc6062ced36c82df83b8fae859", "cd450ec335438986dfefa10c57fea9bcc521a0959b2d80bbf74b190dca712d10"], ["e75605d59102a5a2684500d3b991f2e3f3c88b93225547035af25af66e04541f", "f5c54754a8f71ee540b9b48728473e314f729ac5308b06938360990e2bfad125"], ["eb98660f4c4dfaa06a2be453d5020bc99a0c2e60abe388457dd43fefb1ed620c", "6cb9a8876d9cb8520609af3add26cd20a0a7cd8a9411131ce85f44100099223e"], ["13e87b027d8514d35939f2e6892b19922154596941888336dc3563e3b8dba942", "fef5a3c68059a6dec5d624114bf1e91aac2b9da568d6abeb2570d55646b8adf1"], ["ee163026e9fd6fe017c38f06a5be6fc125424b371ce2708e7bf4491691e5764a", "1acb250f255dd61c43d94ccc670d0f58f49ae3fa15b96623e5430da0ad6c62b2"], ["b268f5ef9ad51e4d78de3a750c2dc89b1e626d43505867999932e5db33af3d80", "5f310d4b3c99b9ebb19f77d41c1dee018cf0d34fd4191614003e945a1216e423"], ["ff07f3118a9df035e9fad85eb6c7bfe42b02f01ca99ceea3bf7ffdba93c4750d", "438136d603e858a3a5c440c38eccbaddc1d2942114e2eddd4740d098ced1f0d8"], ["8d8b9855c7c052a34146fd20ffb658bea4b9f69e0d825ebec16e8c3ce2b526a1", "cdb559eedc2d79f926baf44fb84ea4d44bcf50fee51d7ceb30e2e7f463036758"], ["52db0b5384dfbf05bfa9d472d7ae26dfe4b851ceca91b1eba54263180da32b63", "c3b997d050ee5d423ebaf66a6db9f57b3180c902875679de924b69d84a7b375"], ["e62f9490d3d51da6395efd24e80919cc7d0f29c3f3fa48c6fff543becbd43352", "6d89ad7ba4876b0b22c2ca280c682862f342c8591f1daf5170e07bfd9ccafa7d"], ["7f30ea2476b399b4957509c88f77d0191afa2ff5cb7b14fd6d8e7d65aaab1193", "ca5ef7d4b231c94c3b15389a5f6311e9daff7bb67b103e9880ef4bff637acaec"], ["5098ff1e1d9f14fb46a210fada6c903fef0fb7b4a1dd1d9ac60a0361800b7a00", "9731141d81fc8f8084d37c6e7542006b3ee1b40d60dfe5362a5b132fd17ddc0"], ["32b78c7de9ee512a72895be6b9cbefa6e2f3c4ccce445c96b9f2c81e2778ad58", "ee1849f513df71e32efc3896ee28260c73bb80547ae2275ba497237794c8753c"], ["e2cb74fddc8e9fbcd076eef2a7c72b0ce37d50f08269dfc074b581550547a4f7", "d3aa2ed71c9dd2247a62df062736eb0baddea9e36122d2be8641abcb005cc4a4"], ["8438447566d4d7bedadc299496ab357426009a35f235cb141be0d99cd10ae3a8", "c4e1020916980a4da5d01ac5e6ad330734ef0d7906631c4f2390426b2edd791f"], ["4162d488b89402039b584c6fc6c308870587d9c46f660b878ab65c82c711d67e", "67163e903236289f776f22c25fb8a3afc1732f2b84b4e95dbda47ae5a0852649"], ["3fad3fa84caf0f34f0f89bfd2dcf54fc175d767aec3e50684f3ba4a4bf5f683d", "cd1bc7cb6cc407bb2f0ca647c718a730cf71872e7d0d2a53fa20efcdfe61826"], ["674f2600a3007a00568c1a7ce05d0816c1fb84bf1370798f1c69532faeb1a86b", "299d21f9413f33b3edf43b257004580b70db57da0b182259e09eecc69e0d38a5"], ["d32f4da54ade74abb81b815ad1fb3b263d82d6c692714bcff87d29bd5ee9f08f", "f9429e738b8e53b968e99016c059707782e14f4535359d582fc416910b3eea87"], ["30e4e670435385556e593657135845d36fbb6931f72b08cb1ed954f1e3ce3ff6", "462f9bce619898638499350113bbc9b10a878d35da70740dc695a559eb88db7b"], ["be2062003c51cc3004682904330e4dee7f3dcd10b01e580bf1971b04d4cad297", "62188bc49d61e5428573d48a74e1c655b1c61090905682a0d5558ed72dccb9bc"], ["93144423ace3451ed29e0fb9ac2af211cb6e84a601df5993c419859fff5df04a", "7c10dfb164c3425f5c71a3f9d7992038f1065224f72bb9d1d902a6d13037b47c"], ["b015f8044f5fcbdcf21ca26d6c34fb8197829205c7b7d2a7cb66418c157b112c", "ab8c1e086d04e813744a655b2df8d5f83b3cdc6faa3088c1d3aea1454e3a1d5f"], ["d5e9e1da649d97d89e4868117a465a3a4f8a18de57a140d36b3f2af341a21b52", "4cb04437f391ed73111a13cc1d4dd0db1693465c2240480d8955e8592f27447a"], ["d3ae41047dd7ca065dbf8ed77b992439983005cd72e16d6f996a5316d36966bb", "bd1aeb21ad22ebb22a10f0303417c6d964f8cdd7df0aca614b10dc14d125ac46"], ["463e2763d885f958fc66cdd22800f0a487197d0a82e377b49f80af87c897b065", "bfefacdb0e5d0fd7df3a311a94de062b26b80c61fbc97508b79992671ef7ca7f"], ["7985fdfd127c0567c6f53ec1bb63ec3158e597c40bfe747c83cddfc910641917", "603c12daf3d9862ef2b25fe1de289aed24ed291e0ec6708703a5bd567f32ed03"], ["74a1ad6b5f76e39db2dd249410eac7f99e74c59cb83d2d0ed5ff1543da7703e9", "cc6157ef18c9c63cd6193d83631bbea0093e0968942e8c33d5737fd790e0db08"], ["30682a50703375f602d416664ba19b7fc9bab42c72747463a71d0896b22f6da3", "553e04f6b018b4fa6c8f39e7f311d3176290d0e0f19ca73f17714d9977a22ff8"], ["9e2158f0d7c0d5f26c3791efefa79597654e7a2b2464f52b1ee6c1347769ef57", "712fcdd1b9053f09003a3481fa7762e9ffd7c8ef35a38509e2fbf2629008373"], ["176e26989a43c9cfeba4029c202538c28172e566e3c4fce7322857f3be327d66", "ed8cc9d04b29eb877d270b4878dc43c19aefd31f4eee09ee7b47834c1fa4b1c3"], ["75d46efea3771e6e68abb89a13ad747ecf1892393dfc4f1b7004788c50374da8", "9852390a99507679fd0b86fd2b39a868d7efc22151346e1a3ca4726586a6bed8"], ["809a20c67d64900ffb698c4c825f6d5f2310fb0451c869345b7319f645605721", "9e994980d9917e22b76b061927fa04143d096ccc54963e6a5ebfa5f3f8e286c1"], ["1b38903a43f7f114ed4500b4eac7083fdefece1cf29c63528d563446f972c180", "4036edc931a60ae889353f77fd53de4a2708b26b6f5da72ad3394119daf408f9"]]
+                }
+            }
+        }, {}],
+        13: [function (e, t, r) {
+            "use strict";
+            function d(e, t) {
+                if (Array.isArray(e))return e.slice();
+                if (!e)return [];
+                var r = [];
+                if ("string" != typeof e) {
+                    for (var d = 0; d < e.length; d++)r[d] = 0 | e[d];
+                    return r
+                }
+                if (t) {
+                    if ("hex" === t) {
+                        e = e.replace(/[^a-z0-9]+/gi, ""), e.length % 2 !== 0 && (e = "0" + e);
+                        for (var d = 0; d < e.length; d += 2)r.push(parseInt(e[d] + e[d + 1], 16))
+                    }
+                } else for (var d = 0; d < e.length; d++) {
+                    var i = e.charCodeAt(d), f = i >> 8, n = 255 & i;
+                    f ? r.push(f, n) : r.push(n)
+                }
+                return r
+            }
+
+            function i(e) {
+                return 1 === e.length ? "0" + e : e
+            }
+
+            function f(e) {
+                for (var t = "", r = 0; r < e.length; r++)t += i(e[r].toString(16));
+                return t
+            }
+
+            function n(e, t) {
+                for (var r = [], d = 1 << t + 1, i = e.clone(); i.cmpn(1) >= 0;) {
+                    var f;
+                    if (i.isOdd()) {
+                        var n = i.andln(d - 1);
+                        f = n > (d >> 1) - 1 ? (d >> 1) - n : n, i.isubn(f)
+                    } else f = 0;
+                    r.push(f);
+                    for (var a = 0 !== i.cmpn(0) && 0 === i.andln(d - 1) ? t + 1 : 1, s = 1; a > s; s++)r.push(0);
+                    i.ishrn(a)
+                }
+                return r
+            }
+
+            function a(e, t) {
+                var r = [[], []];
+                e = e.clone(), t = t.clone();
+                for (var d = 0, i = 0; e.cmpn(-d) > 0 || t.cmpn(-i) > 0;) {
+                    var f = e.andln(3) + d & 3, n = t.andln(3) + i & 3;
+                    3 === f && (f = -1), 3 === n && (n = -1);
+                    var a;
+                    if (0 === (1 & f))a = 0; else {
+                        var s = e.andln(7) + d & 7;
+                        a = 3 !== s && 5 !== s || 2 !== n ? f : -f
+                    }
+                    r[0].push(a);
+                    var c;
+                    if (0 === (1 & n))c = 0; else {
+                        var s = t.andln(7) + i & 7;
+                        c = 3 !== s && 5 !== s || 2 !== f ? n : -n
+                    }
+                    r[1].push(c), 2 * d === a + 1 && (d = 1 - d), 2 * i === c + 1 && (i = 1 - i), e.ishrn(1), t.ishrn(1)
+                }
+                return r
+            }
+
+            var s = r;
+            s.assert = function (e, t) {
+                if (!e)throw new Error(t || "Assertion failed")
+            }, s.toArray = d, s.zero2 = i, s.toHex = f, s.encode = function (e, t) {
+                return "hex" === t ? f(e) : e
+            }, s.getNAF = n, s.getJSF = a
+        }, {}],
+        14: [function (e, t) {
+            !function (e, t) {
+                "use strict";
+                function r(e, t) {
+                    if (!e)throw new Error(t || "Assertion failed")
+                }
+
+                function d(e, t) {
+                    e.super_ = t;
+                    var r = function () {
+                    };
+                    r.prototype = t.prototype, e.prototype = new r, e.prototype.constructor = e
+                }
+
+                function i(e, t, r) {
+                    return null !== e && "object" == typeof e && Array.isArray(e.words) ? e : (this.sign = !1, this.words = null, this.length = 0, this.red = null, ("le" === t || "be" === t) && (r = t, t = 10), void(null !== e && this._init(e || 0, t || 10, r || "be")))
+                }
+
+                function f(e, t, r) {
+                    for (var d = 0, i = Math.min(e.length, r), f = t; i > f; f++) {
+                        var n = e.charCodeAt(f) - 48;
+                        d <<= 4, d |= n >= 49 && 54 >= n ? n - 49 + 10 : n >= 17 && 22 >= n ? n - 17 + 10 : 15 & n
+                    }
+                    return d
+                }
+
+                function n(e, t, r, d) {
+                    for (var i = 0, f = Math.min(e.length, r), n = t; f > n; n++) {
+                        var a = e.charCodeAt(n) - 48;
+                        i *= d, i += a >= 49 ? a - 49 + 10 : a >= 17 ? a - 17 + 10 : a
+                    }
+                    return i
+                }
+
+                function a(e, t) {
+                    this.name = e, this.p = new i(t, 16), this.n = this.p.bitLength(), this.k = new i(1).ishln(this.n).isub(this.p), this.tmp = this._tmp()
+                }
+
+                function s() {
+                    a.call(this, "k256", "ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff fffffffe fffffc2f")
+                }
+
+                function c() {
+                    a.call(this, "p224", "ffffffff ffffffff ffffffff ffffffff 00000000 00000000 00000001")
+                }
+
+                function h() {
+                    a.call(this, "p192", "ffffffff ffffffff ffffffff fffffffe ffffffff ffffffff")
+                }
+
+                function o() {
+                    a.call(this, "25519", "7fffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffed")
+                }
+
+                function b(e) {
+                    if ("string" == typeof e) {
+                        var t = i._prime(e);
+                        this.m = t.p, this.prime = t
+                    } else this.m = e, this.prime = null
+                }
+
+                function u(e) {
+                    b.call(this, e), this.shift = this.m.bitLength(), this.shift % 26 !== 0 && (this.shift += 26 - this.shift % 26), this.r = new i(1).ishln(this.shift), this.r2 = this.imod(this.r.sqr()), this.rinv = this.r._invmp(this.m), this.minv = this.rinv.mul(this.r).isubn(1).div(this.m), this.minv.sign = !0, this.minv = this.minv.mod(this.r)
+                }
+
+                "object" == typeof e ? e.exports = i : t.BN = i, i.BN = i, i.wordSize = 26, i.prototype._init = function (e, t, d) {
+                    if ("number" == typeof e)return 0 > e && (this.sign = !0, e = -e), void(67108864 > e ? (this.words = [67108863 & e], this.length = 1) : (this.words = [67108863 & e, e / 67108864 & 67108863], this.length = 2));
+                    if ("object" == typeof e)return this._initArray(e, t, d);
+                    "hex" === t && (t = 16), r(t === (0 | t) && t >= 2 && 36 >= t), e = e.toString().replace(/\s+/g, "");
+                    var i = 0;
+                    "-" === e[0] && i++, 16 === t ? this._parseHex(e, i) : this._parseBase(e, t, i), "-" === e[0] && (this.sign = !0), this.strip()
+                }, i.prototype._initArray = function (e, t, d) {
+                    r("number" == typeof e.length), this.length = Math.ceil(e.length / 3), this.words = new Array(this.length);
+                    for (var i = 0; i < this.length; i++)this.words[i] = 0;
+                    var f = 0;
+                    if ("be" === d)for (var i = e.length - 1, n = 0; i >= 0; i -= 3) {
+                        var a = e[i] | e[i - 1] << 8 | e[i - 2] << 16;
+                        this.words[n] |= a << f & 67108863, this.words[n + 1] = a >>> 26 - f & 67108863, f += 24, f >= 26 && (f -= 26, n++)
+                    } else if ("le" === d)for (var i = 0, n = 0; i < e.length; i += 3) {
+                        var a = e[i] | e[i + 1] << 8 | e[i + 2] << 16;
+                        this.words[n] |= a << f & 67108863, this.words[n + 1] = a >>> 26 - f & 67108863, f += 24, f >= 26 && (f -= 26, n++)
+                    }
+                    return this.strip()
+                }, i.prototype._parseHex = function (e, t) {
+                    this.length = Math.ceil((e.length - t) / 6), this.words = new Array(this.length);
+                    for (var r = 0; r < this.length; r++)this.words[r] = 0;
+                    for (var d = 0, r = e.length - 6, i = 0; r >= t; r -= 6) {
+                        var n = f(e, r, r + 6);
+                        this.words[i] |= n << d & 67108863, this.words[i + 1] |= n >>> 26 - d & 4194303, d += 24, d >= 26 && (d -= 26, i++)
+                    }
+                    if (r + 6 !== t) {
+                        var n = f(e, t, r + 6);
+                        this.words[i] |= n << d & 67108863, this.words[i + 1] |= n >>> 26 - d & 4194303
+                    }
+                    this.strip()
+                }, i.prototype._parseBase = function (e, t, r) {
+                    this.words = [0], this.length = 1;
+                    for (var d = 0, i = 1; 67108863 >= i; i *= t)d++;
+                    d--, i = i / t | 0;
+                    for (var f = e.length - r, a = f % d, s = Math.min(f, f - a) + r, c = 0, h = r; s > h; h += d)c = n(e, h, h + d, t), this.imuln(i), this.words[0] + c < 67108864 ? this.words[0] += c : this._iaddn(c);
+                    if (0 !== a) {
+                        for (var o = 1, c = n(e, h, e.length, t), h = 0; a > h; h++)o *= t;
+                        this.imuln(o), this.words[0] + c < 67108864 ? this.words[0] += c : this._iaddn(c)
+                    }
+                }, i.prototype.copy = function (e) {
+                    e.words = new Array(this.length);
+                    for (var t = 0; t < this.length; t++)e.words[t] = this.words[t];
+                    e.length = this.length, e.sign = this.sign, e.red = this.red
+                }, i.prototype.clone = function () {
+                    var e = new i(null);
+                    return this.copy(e), e
+                }, i.prototype.strip = function () {
+                    for (; this.length > 1 && 0 === this.words[this.length - 1];)this.length--;
+                    return this._normSign()
+                }, i.prototype._normSign = function () {
+                    return 1 === this.length && 0 === this.words[0] && (this.sign = !1), this
+                }, i.prototype.inspect = function () {
+                    return (this.red ? "<BN-R: " : "<BN: ") + this.toString(16) + ">"
+                };
+                var p = ["", "0", "00", "000", "0000", "00000", "000000", "0000000", "00000000", "000000000", "0000000000", "00000000000", "000000000000", "0000000000000", "00000000000000", "000000000000000", "0000000000000000", "00000000000000000", "000000000000000000", "0000000000000000000", "00000000000000000000", "000000000000000000000", "0000000000000000000000", "00000000000000000000000", "000000000000000000000000", "0000000000000000000000000"], l = [0, 0, 25, 16, 12, 11, 10, 9, 8, 8, 7, 7, 7, 7, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5], v = [0, 0, 33554432, 43046721, 16777216, 48828125, 60466176, 40353607, 16777216, 43046721, 1e7, 19487171, 35831808, 62748517, 7529536, 11390625, 16777216, 24137569, 34012224, 47045881, 64e6, 4084101, 5153632, 6436343, 7962624, 9765625, 11881376, 14348907, 17210368, 20511149, 243e5, 28629151, 33554432, 39135393, 45435424, 52521875, 60466176];
+                i.prototype.toString = function (e, t) {
+                    if (e = e || 10, 16 === e || "hex" === e) {
+                        for (var d = "", i = 0, t = 0 | t || 1, f = 0, n = 0; n < this.length; n++) {
+                            var a = this.words[n], s = (16777215 & (a << i | f)).toString(16);
+                            f = a >>> 24 - i & 16777215, d = 0 !== f || n !== this.length - 1 ? p[6 - s.length] + s + d : s + d, i += 2, i >= 26 && (i -= 26, n--)
+                        }
+                        for (0 !== f && (d = f.toString(16) + d); d.length % t !== 0;)d = "0" + d;
+                        return this.sign && (d = "-" + d), d
+                    }
+                    if (e === (0 | e) && e >= 2 && 36 >= e) {
+                        var c = l[e], h = v[e], d = "", o = this.clone();
+                        for (o.sign = !1; 0 !== o.cmpn(0);) {
+                            var b = o.modn(h).toString(e);
+                            o = o.idivn(h), d = 0 !== o.cmpn(0) ? p[c - b.length] + b + d : b + d
+                        }
+                        return 0 === this.cmpn(0) && (d = "0" + d), this.sign && (d = "-" + d), d
+                    }
+                    r(!1, "Base should be between 2 and 36")
+                }, i.prototype.toJSON = function () {
+                    return this.toString(16)
+                }, i.prototype.toArray = function () {
+                    this.strip();
+                    var e = new Array(this.byteLength());
+                    e[0] = 0;
+                    for (var t = this.clone(), r = 0; 0 !== t.cmpn(0); r++) {
+                        var d = t.andln(255);
+                        t.ishrn(8), e[e.length - r - 1] = d
+                    }
+                    return e
+                }, i.prototype._countBits = Math.clz32 ? function (e) {
+                    return 32 - Math.clz32(e)
+                } : function (e) {
+                    var t = e, r = 0;
+                    return t >= 4096 && (r += 13, t >>>= 13), t >= 64 && (r += 7, t >>>= 7), t >= 8 && (r += 4, t >>>= 4), t >= 2 && (r += 2, t >>>= 2), r + t
+                }, i.prototype._zeroBits = function (e) {
+                    if (0 === e)return 26;
+                    var t = e, r = 0;
+                    return 0 === (8191 & t) && (r += 13, t >>>= 13), 0 === (127 & t) && (r += 7, t >>>= 7), 0 === (15 & t) && (r += 4, t >>>= 4), 0 === (3 & t) && (r += 2, t >>>= 2), 0 === (1 & t) && r++, r
+                }, i.prototype.bitLength = function () {
+                    var e = 0, t = this.words[this.length - 1], e = this._countBits(t);
+                    return 26 * (this.length - 1) + e
+                }, i.prototype.zeroBits = function () {
+                    if (0 === this.cmpn(0))return 0;
+                    for (var e = 0, t = 0; t < this.length; t++) {
+                        var r = this._zeroBits(this.words[t]);
+                        if (e += r, 26 !== r)break
+                    }
+                    return e
+                }, i.prototype.byteLength = function () {
+                    return Math.ceil(this.bitLength() / 8)
+                }, i.prototype.neg = function () {
+                    if (0 === this.cmpn(0))return this.clone();
+                    var e = this.clone();
+                    return e.sign = !this.sign, e
+                }, i.prototype.ior = function (e) {
+                    for (this.sign = this.sign || e.sign; this.length < e.length;)this.words[this.length++] = 0;
+                    for (var t = 0; t < e.length; t++)this.words[t] = this.words[t] | e.words[t];
+                    return this.strip()
+                }, i.prototype.or = function (e) {
+                    return this.length > e.length ? this.clone().ior(e) : e.clone().ior(this)
+                }, i.prototype.iand = function (e) {
+                    this.sign = this.sign && e.sign;
+                    var t;
+                    t = this.length > e.length ? e : this;
+                    for (var r = 0; r < t.length; r++)this.words[r] = this.words[r] & e.words[r];
+                    return this.length = t.length, this.strip()
+                }, i.prototype.and = function (e) {
+                    return this.length > e.length ? this.clone().iand(e) : e.clone().iand(this)
+                }, i.prototype.ixor = function (e) {
+                    this.sign = this.sign || e.sign;
+                    var t, r;
+                    this.length > e.length ? (t = this, r = e) : (t = e, r = this);
+                    for (var d = 0; d < r.length; d++)this.words[d] = t.words[d] ^ r.words[d];
+                    if (this !== t)for (; d < t.length; d++)this.words[d] = t.words[d];
+                    return this.length = t.length, this.strip()
+                }, i.prototype.xor = function (e) {
+                    return this.length > e.length ? this.clone().ixor(e) : e.clone().ixor(this)
+                }, i.prototype.setn = function (e, t) {
+                    r("number" == typeof e && e >= 0);
+                    for (var d = e / 26 | 0, i = e % 26; this.length <= d;)this.words[this.length++] = 0;
+                    return this.words[d] = t ? this.words[d] | 1 << i : this.words[d] & ~(1 << i), this.strip()
+                }, i.prototype.iadd = function (e) {
+                    if (this.sign && !e.sign) {
+                        this.sign = !1;
+                        var t = this.isub(e);
+                        return this.sign = !this.sign, this._normSign()
+                    }
+                    if (!this.sign && e.sign) {
+                        e.sign = !1;
+                        var t = this.isub(e);
+                        return e.sign = !0, t._normSign()
+                    }
+                    var r, d;
+                    this.length > e.length ? (r = this, d = e) : (r = e, d = this);
+                    for (var i = 0, f = 0; f < d.length; f++) {
+                        var t = r.words[f] + d.words[f] + i;
+                        this.words[f] = 67108863 & t, i = t >>> 26
+                    }
+                    for (; 0 !== i && f < r.length; f++) {
+                        var t = r.words[f] + i;
+                        this.words[f] = 67108863 & t, i = t >>> 26
+                    }
+                    if (this.length = r.length, 0 !== i)this.words[this.length] = i, this.length++; else if (r !== this)for (; f < r.length; f++)this.words[f] = r.words[f];
+                    return this
+                }, i.prototype.add = function (e) {
+                    if (e.sign && !this.sign) {
+                        e.sign = !1;
+                        var t = this.sub(e);
+                        return e.sign = !0, t
+                    }
+                    if (!e.sign && this.sign) {
+                        this.sign = !1;
+                        var t = e.sub(this);
+                        return this.sign = !0, t
+                    }
+                    return this.length > e.length ? this.clone().iadd(e) : e.clone().iadd(this)
+                }, i.prototype.isub = function (e) {
+                    if (e.sign) {
+                        e.sign = !1;
+                        var t = this.iadd(e);
+                        return e.sign = !0, t._normSign()
+                    }
+                    if (this.sign)return this.sign = !1, this.iadd(e), this.sign = !0, this._normSign();
+                    var r = this.cmp(e);
+                    if (0 === r)return this.sign = !1, this.length = 1, this.words[0] = 0, this;
+                    var d, i;
+                    r > 0 ? (d = this, i = e) : (d = e, i = this);
+                    for (var f = 0, n = 0; n < i.length; n++) {
+                        var t = d.words[n] - i.words[n] + f;
+                        f = t >> 26, this.words[n] = 67108863 & t
+                    }
+                    for (; 0 !== f && n < d.length; n++) {
+                        var t = d.words[n] + f;
+                        f = t >> 26, this.words[n] = 67108863 & t
+                    }
+                    if (0 === f && n < d.length && d !== this)for (; n < d.length; n++)this.words[n] = d.words[n];
+                    return this.length = Math.max(this.length, n), d !== this && (this.sign = !0), this.strip()
+                }, i.prototype.sub = function (e) {
+                    return this.clone().isub(e)
+                }, i.prototype._smallMulTo = function (e, t) {
+                    t.sign = e.sign !== this.sign, t.length = this.length + e.length;
+                    for (var r = 0, d = 0; d < t.length - 1; d++) {
+                        for (var i = r >>> 26, f = 67108863 & r, n = Math.min(d, e.length - 1), a = Math.max(0, d - this.length + 1); n >= a; a++) {
+                            var s = d - a, c = 0 | this.words[s], h = 0 | e.words[a], o = c * h, b = 67108863 & o;
+                            i = i + (o / 67108864 | 0) | 0, b = b + f | 0, f = 67108863 & b, i = i + (b >>> 26) | 0
+                        }
+                        t.words[d] = f, r = i
+                    }
+                    return 0 !== r ? t.words[d] = r : t.length--, t.strip()
+                }, i.prototype._bigMulTo = function (e, t) {
+                    t.sign = e.sign !== this.sign, t.length = this.length + e.length;
+                    for (var r = 0, d = 0, i = 0; i < t.length - 1; i++) {
+                        var f = d;
+                        d = 0;
+                        for (var n = 67108863 & r, a = Math.min(i, e.length - 1), s = Math.max(0, i - this.length + 1); a >= s; s++) {
+                            var c = i - s, h = 0 | this.words[c], o = 0 | e.words[s], b = h * o, u = 67108863 & b;
+                            f = f + (b / 67108864 | 0) | 0, u = u + n | 0, n = 67108863 & u, f = f + (u >>> 26) | 0, d += f >>> 26, f &= 67108863
+                        }
+                        t.words[i] = n, r = f, f = d
+                    }
+                    return 0 !== r ? t.words[i] = r : t.length--, t.strip()
+                }, i.prototype.mulTo = function (e, t) {
+                    var r;
+                    return r = this.length + e.length < 63 ? this._smallMulTo(e, t) : this._bigMulTo(e, t)
+                }, i.prototype.mul = function (e) {
+                    var t = new i(null);
+                    return t.words = new Array(this.length + e.length), this.mulTo(e, t)
+                }, i.prototype.imul = function (e) {
+                    if (0 === this.cmpn(0) || 0 === e.cmpn(0))return this.words[0] = 0, this.length = 1, this;
+                    var t = this.length, r = e.length;
+                    this.sign = e.sign !== this.sign, this.length = this.length + e.length, this.words[this.length - 1] = 0;
+                    for (var d = this.length - 2; d >= 0; d--) {
+                        for (var i = 0, f = 0, n = Math.min(d, r - 1), a = Math.max(0, d - t + 1); n >= a; a++) {
+                            var s = d - a, c = this.words[s], h = e.words[a], o = c * h, b = 67108863 & o;
+                            i += o / 67108864 | 0, b += f, f = 67108863 & b, i += b >>> 26
+                        }
+                        this.words[d] = f, this.words[d + 1] += i, i = 0
+                    }
+                    for (var i = 0, s = 1; s < this.length; s++) {
+                        var u = this.words[s] + i;
+                        this.words[s] = 67108863 & u, i = u >>> 26
+                    }
+                    return this.strip()
+                }, i.prototype.imuln = function (e) {
+                    r("number" == typeof e);
+                    for (var t = 0, d = 0; d < this.length; d++) {
+                        var i = this.words[d] * e, f = (67108863 & i) + (67108863 & t);
+                        t >>= 26, t += i / 67108864 | 0, t += f >>> 26, this.words[d] = 67108863 & f
+                    }
+                    return 0 !== t && (this.words[d] = t, this.length++), this
+                }, i.prototype.sqr = function () {
+                    return this.mul(this)
+                }, i.prototype.isqr = function () {
+                    return this.mul(this)
+                }, i.prototype.ishln = function (e) {
+                    r("number" == typeof e && e >= 0);
+                    var t = e % 26, d = (e - t) / 26, i = 67108863 >>> 26 - t << 26 - t;
+                    if (0 !== t) {
+                        for (var f = 0, n = 0; n < this.length; n++) {
+                            var a = this.words[n] & i, s = this.words[n] - a << t;
+                            this.words[n] = s | f, f = a >>> 26 - t
+                        }
+                        f && (this.words[n] = f, this.length++)
+                    }
+                    if (0 !== d) {
+                        for (var n = this.length - 1; n >= 0; n--)this.words[n + d] = this.words[n];
+                        for (var n = 0; d > n; n++)this.words[n] = 0;
+                        this.length += d
+                    }
+                    return this.strip()
+                }, i.prototype.ishrn = function (e, t, d) {
+                    r("number" == typeof e && e >= 0);
+                    var i;
+                    i = t ? (t - t % 26) / 26 : 0;
+                    var f = e % 26, n = Math.min((e - f) / 26, this.length), a = 67108863 ^ 67108863 >>> f << f, s = d;
+                    if (i -= n, i = Math.max(0, i), s) {
+                        for (var c = 0; n > c; c++)s.words[c] = this.words[c];
+                        s.length = n
+                    }
+                    if (0 === n); else if (this.length > n) {
+                        this.length -= n;
+                        for (var c = 0; c < this.length; c++)this.words[c] = this.words[c + n]
+                    } else this.words[0] = 0, this.length = 1;
+                    for (var h = 0, c = this.length - 1; c >= 0 && (0 !== h || c >= i); c--) {
+                        var o = this.words[c];
+                        this.words[c] = h << 26 - f | o >>> f, h = o & a
+                    }
+                    return s && 0 !== h && (s.words[s.length++] = h), 0 === this.length && (this.words[0] = 0, this.length = 1), this.strip(), this
+                }, i.prototype.shln = function (e) {
+                    return this.clone().ishln(e)
+                }, i.prototype.shrn = function (e) {
+                    return this.clone().ishrn(e)
+                }, i.prototype.testn = function (e) {
+                    r("number" == typeof e && e >= 0);
+                    var t = e % 26, d = (e - t) / 26, i = 1 << t;
+                    if (this.length <= d)return !1;
+                    var f = this.words[d];
+                    return !!(f & i)
+                }, i.prototype.imaskn = function (e) {
+                    r("number" == typeof e && e >= 0);
+                    var t = e % 26, d = (e - t) / 26;
+                    if (r(!this.sign, "imaskn works only with positive numbers"), 0 !== t && d++, this.length = Math.min(d, this.length), 0 !== t) {
+                        var i = 67108863 ^ 67108863 >>> t << t;
+                        this.words[this.length - 1] &= i
+                    }
+                    return this.strip()
+                }, i.prototype.maskn = function (e) {
+                    return this.clone().imaskn(e)
+                }, i.prototype.iaddn = function (e) {
+                    return r("number" == typeof e), 0 > e ? this.isubn(-e) : this.sign ? 1 === this.length && this.words[0] < e ? (this.words[0] = e - this.words[0], this.sign = !1, this) : (this.sign = !1, this.isubn(e), this.sign = !0, this) : this._iaddn(e)
+                }, i.prototype._iaddn = function (e) {
+                    this.words[0] += e;
+                    for (var t = 0; t < this.length && this.words[t] >= 67108864; t++)this.words[t] -= 67108864, t === this.length - 1 ? this.words[t + 1] = 1 : this.words[t + 1]++;
+                    return this.length = Math.max(this.length, t + 1), this
+                }, i.prototype.isubn = function (e) {
+                    if (r("number" == typeof e), 0 > e)return this.iaddn(-e);
+                    if (this.sign)return this.sign = !1, this.iaddn(e), this.sign = !0, this;
+                    this.words[0] -= e;
+                    for (var t = 0; t < this.length && this.words[t] < 0; t++)this.words[t] += 67108864, this.words[t + 1] -= 1;
+                    return this.strip()
+                }, i.prototype.addn = function (e) {
+                    return this.clone().iaddn(e)
+                }, i.prototype.subn = function (e) {
+                    return this.clone().isubn(e)
+                }, i.prototype.iabs = function () {
+                    return this.sign = !1, this
+                }, i.prototype.abs = function () {
+                    return this.clone().iabs()
+                }, i.prototype._ishlnsubmul = function (e, t, d) {
+                    var i, f = e.length + d;
+                    if (this.words.length < f) {
+                        for (var n = new Array(f), i = 0; i < this.length; i++)n[i] = this.words[i];
+                        this.words = n
+                    } else i = this.length;
+                    for (this.length = Math.max(this.length, f); i < this.length; i++)this.words[i] = 0;
+                    for (var a = 0, i = 0; i < e.length; i++) {
+                        var s = this.words[i + d] + a, c = e.words[i] * t;
+                        s -= 67108863 & c, a = (s >> 26) - (c / 67108864 | 0), this.words[i + d] = 67108863 & s
+                    }
+                    for (; i < this.length - d; i++) {
+                        var s = this.words[i + d] + a;
+                        a = s >> 26, this.words[i + d] = 67108863 & s
+                    }
+                    if (0 === a)return this.strip();
+                    r(-1 === a), a = 0;
+                    for (var i = 0; i < this.length; i++) {
+                        var s = -this.words[i] + a;
+                        a = s >> 26, this.words[i] = 67108863 & s
+                    }
+                    return this.sign = !0, this.strip()
+                }, i.prototype._wordDiv = function (e, t) {
+                    var r = this.length - e.length, d = this.clone(), f = e, n = f.words[f.length - 1], a = this._countBits(n);
+                    r = 26 - a, 0 !== r && (f = f.shln(r), d.ishln(r), n = f.words[f.length - 1]);
+                    var s, c = d.length - f.length;
+                    if ("mod" !== t) {
+                        s = new i(null), s.length = c + 1, s.words = new Array(s.length);
+                        for (var h = 0; h < s.length; h++)s.words[h] = 0
+                    }
+                    var o = d.clone()._ishlnsubmul(f, 1, c);
+                    o.sign || (d = o, s && (s.words[c] = 1));
+                    for (var b = c - 1; b >= 0; b--) {
+                        var u = 67108864 * d.words[f.length + b] + d.words[f.length + b - 1];
+                        for (u = Math.min(u / n | 0, 67108863), d._ishlnsubmul(f, u, b); d.sign;)u--, d.sign = !1, d._ishlnsubmul(f, 1, b), d.sign = !d.sign;
+                        s && (s.words[b] = u)
+                    }
+                    return s && s.strip(), d.strip(), "div" !== t && 0 !== r && d.ishrn(r), {div: s ? s : null, mod: d}
+                }, i.prototype.divmod = function (e, t) {
+                    if (r(0 !== e.cmpn(0)), this.sign && !e.sign) {
+                        var d, f, n = this.neg().divmod(e, t);
+                        return "mod" !== t && (d = n.div.neg()), "div" !== t && (f = 0 === n.mod.cmpn(0) ? n.mod : e.sub(n.mod)), {
+                            div: d,
+                            mod: f
+                        }
+                    }
+                    if (!this.sign && e.sign) {
+                        var d, n = this.divmod(e.neg(), t);
+                        return "mod" !== t && (d = n.div.neg()), {div: d, mod: n.mod}
+                    }
+                    return this.sign && e.sign ? this.neg().divmod(e.neg(), t) : e.length > this.length || this.cmp(e) < 0 ? {
+                        div: new i(0),
+                        mod: this
+                    } : 1 === e.length ? "div" === t ? {
+                        div: this.divn(e.words[0]),
+                        mod: null
+                    } : "mod" === t ? {div: null, mod: new i(this.modn(e.words[0]))} : {
+                        div: this.divn(e.words[0]),
+                        mod: new i(this.modn(e.words[0]))
+                    } : this._wordDiv(e, t)
+                }, i.prototype.div = function (e) {
+                    return this.divmod(e, "div").div
+                }, i.prototype.mod = function (e) {
+                    return this.divmod(e, "mod").mod
+                }, i.prototype.divRound = function (e) {
+                    var t = this.divmod(e);
+                    if (0 === t.mod.cmpn(0))return t.div;
+                    var r = t.div.sign ? t.mod.isub(e) : t.mod, d = e.shrn(1), i = e.andln(1), f = r.cmp(d);
+                    return 0 > f || 1 === i && 0 === f ? t.div : t.div.sign ? t.div.isubn(1) : t.div.iaddn(1)
+                }, i.prototype.modn = function (e) {
+                    r(67108863 >= e);
+                    for (var t = (1 << 26) % e, d = 0, i = this.length - 1; i >= 0; i--)d = (t * d + this.words[i]) % e;
+                    return d
+                }, i.prototype.idivn = function (e) {
+                    r(67108863 >= e);
+                    for (var t = 0, d = this.length - 1; d >= 0; d--) {
+                        var i = this.words[d] + 67108864 * t;
+                        this.words[d] = i / e | 0, t = i % e
+                    }
+                    return this.strip()
+                }, i.prototype.divn = function (e) {
+                    return this.clone().idivn(e)
+                }, i.prototype.egcd = function (e) {
+                    r(!e.sign), r(0 !== e.cmpn(0));
+                    var t = this, d = e.clone();
+                    t = t.sign ? t.mod(e) : t.clone();
+                    for (var f = new i(1), n = new i(0), a = new i(0), s = new i(1), c = 0; t.isEven() && d.isEven();)t.ishrn(1), d.ishrn(1), ++c;
+                    for (var h = d.clone(), o = t.clone(); 0 !== t.cmpn(0);) {
+                        for (; t.isEven();)t.ishrn(1), f.isEven() && n.isEven() ? (f.ishrn(1), n.ishrn(1)) : (f.iadd(h).ishrn(1), n.isub(o).ishrn(1));
+                        for (; d.isEven();)d.ishrn(1), a.isEven() && s.isEven() ? (a.ishrn(1), s.ishrn(1)) : (a.iadd(h).ishrn(1), s.isub(o).ishrn(1));
+                        t.cmp(d) >= 0 ? (t.isub(d), f.isub(a), n.isub(s)) : (d.isub(t), a.isub(f), s.isub(n))
+                    }
+                    return {a: a, b: s, gcd: d.ishln(c)}
+                }, i.prototype._invmp = function (e) {
+                    r(!e.sign), r(0 !== e.cmpn(0));
+                    var t = this, d = e.clone();
+                    t = t.sign ? t.mod(e) : t.clone();
+                    for (var f = new i(1), n = new i(0), a = d.clone(); t.cmpn(1) > 0 && d.cmpn(1) > 0;) {
+                        for (; t.isEven();)t.ishrn(1), f.isEven() ? f.ishrn(1) : f.iadd(a).ishrn(1);
+                        for (; d.isEven();)d.ishrn(1), n.isEven() ? n.ishrn(1) : n.iadd(a).ishrn(1);
+                        t.cmp(d) >= 0 ? (t.isub(d), f.isub(n)) : (d.isub(t), n.isub(f))
+                    }
+                    return 0 === t.cmpn(1) ? f : n
+                }, i.prototype.gcd = function (e) {
+                    if (0 === this.cmpn(0))return e.clone();
+                    if (0 === e.cmpn(0))return this.clone();
+                    var t = this.clone(), r = e.clone();
+                    t.sign = !1, r.sign = !1;
+                    for (var d = 0; t.isEven() && r.isEven(); d++)t.ishrn(1), r.ishrn(1);
+                    for (; ;) {
+                        for (; t.isEven();)t.ishrn(1);
+                        for (; r.isEven();)r.ishrn(1);
+                        var i = t.cmp(r);
+                        if (0 > i) {
+                            var f = t;
+                            t = r, r = f
+                        } else if (0 === i || 0 === r.cmpn(1))break;
+                        t.isub(r)
+                    }
+                    return r.ishln(d)
+                }, i.prototype.invm = function (e) {
+                    return this.egcd(e).a.mod(e)
+                }, i.prototype.isEven = function () {
+                    return 0 === (1 & this.words[0])
+                }, i.prototype.isOdd = function () {
+                    return 1 === (1 & this.words[0])
+                }, i.prototype.andln = function (e) {
+                    return this.words[0] & e
+                }, i.prototype.bincn = function (e) {
+                    r("number" == typeof e);
+                    var t = e % 26, d = (e - t) / 26, i = 1 << t;
+                    if (this.length <= d) {
+                        for (var f = this.length; d + 1 > f; f++)this.words[f] = 0;
+                        return this.words[d] |= i, this.length = d + 1, this
+                    }
+                    for (var n = i, f = d; 0 !== n && f < this.length; f++) {
+                        var a = this.words[f];
+                        a += n, n = a >>> 26, a &= 67108863, this.words[f] = a
+                    }
+                    return 0 !== n && (this.words[f] = n, this.length++), this
+                }, i.prototype.cmpn = function (e) {
+                    var t = 0 > e;
+                    if (t && (e = -e), this.sign && !t)return -1;
+                    if (!this.sign && t)return 1;
+                    e &= 67108863, this.strip();
+                    var r;
+                    if (this.length > 1)r = 1; else {
+                        var d = this.words[0];
+                        r = d === e ? 0 : e > d ? -1 : 1
+                    }
+                    return this.sign && (r = -r), r
+                }, i.prototype.cmp = function (e) {
+                    if (this.sign && !e.sign)return -1;
+                    if (!this.sign && e.sign)return 1;
+                    var t = this.ucmp(e);
+                    return this.sign ? -t : t
+                }, i.prototype.ucmp = function (e) {
+                    if (this.length > e.length)return 1;
+                    if (this.length < e.length)return -1;
+                    for (var t = 0, r = this.length - 1; r >= 0; r--) {
+                        var d = this.words[r], i = e.words[r];
+                        if (d !== i) {
+                            i > d ? t = -1 : d > i && (t = 1);
+                            break
+                        }
+                    }
+                    return t
+                }, i.red = function (e) {
+                    return new b(e)
+                }, i.prototype.toRed = function (e) {
+                    return r(!this.red, "Already a number in reduction context"), r(!this.sign, "red works only with positives"), e.convertTo(this)._forceRed(e)
+                }, i.prototype.fromRed = function () {
+                    return r(this.red, "fromRed works only with numbers in reduction context"), this.red.convertFrom(this)
+                }, i.prototype._forceRed = function (e) {
+                    return this.red = e, this
+                }, i.prototype.forceRed = function (e) {
+                    return r(!this.red, "Already a number in reduction context"), this._forceRed(e)
+                }, i.prototype.redAdd = function (e) {
+                    return r(this.red, "redAdd works only with red numbers"), this.red.add(this, e)
+                }, i.prototype.redIAdd = function (e) {
+                    return r(this.red, "redIAdd works only with red numbers"), this.red.iadd(this, e)
+                }, i.prototype.redSub = function (e) {
+                    return r(this.red, "redSub works only with red numbers"), this.red.sub(this, e)
+                }, i.prototype.redISub = function (e) {
+                    return r(this.red, "redISub works only with red numbers"), this.red.isub(this, e)
+                }, i.prototype.redShl = function (e) {
+                    return r(this.red, "redShl works only with red numbers"), this.red.shl(this, e)
+                }, i.prototype.redMul = function (e) {
+                    return r(this.red, "redMul works only with red numbers"), this.red._verify2(this, e), this.red.mul(this, e)
+                }, i.prototype.redIMul = function (e) {
+                    return r(this.red, "redMul works only with red numbers"), this.red._verify2(this, e), this.red.imul(this, e)
+                }, i.prototype.redSqr = function () {
+                    return r(this.red, "redSqr works only with red numbers"), this.red._verify1(this), this.red.sqr(this)
+                }, i.prototype.redISqr = function () {
+                    return r(this.red, "redISqr works only with red numbers"), this.red._verify1(this), this.red.isqr(this)
+                }, i.prototype.redSqrt = function () {
+                    return r(this.red, "redSqrt works only with red numbers"), this.red._verify1(this), this.red.sqrt(this)
+                }, i.prototype.redInvm = function () {
+                    return r(this.red, "redInvm works only with red numbers"), this.red._verify1(this), this.red.invm(this)
+                }, i.prototype.redNeg = function () {
+                    return r(this.red, "redNeg works only with red numbers"), this.red._verify1(this), this.red.neg(this)
+                }, i.prototype.redPow = function (e) {
+                    return r(this.red && !e.red, "redPow(normalNum)"), this.red._verify1(this), this.red.pow(this, e)
+                };
+                var g = {k256: null, p224: null, p192: null, p25519: null};
+                a.prototype._tmp = function () {
+                    var e = new i(null);
+                    return e.words = new Array(Math.ceil(this.n / 13)), e
+                }, a.prototype.ireduce = function (e) {
+                    var t, r = e;
+                    do this.split(r, this.tmp), r = this.imulK(r), r = r.iadd(this.tmp), t = r.bitLength(); while (t > this.n);
+                    var d = t < this.n ? -1 : r.ucmp(this.p);
+                    return 0 === d ? (r.words[0] = 0, r.length = 1) : d > 0 ? r.isub(this.p) : r.strip(), r
+                }, a.prototype.split = function (e, t) {
+                    e.ishrn(this.n, 0, t)
+                }, a.prototype.imulK = function (e) {
+                    return e.imul(this.k)
+                }, d(s, a), s.prototype.split = function (e, t) {
+                    for (var r = 4194303, d = Math.min(e.length, 9), i = 0; d > i; i++)t.words[i] = e.words[i];
+                    if (t.length = d, e.length <= 9)return e.words[0] = 0, void(e.length = 1);
+                    var f = e.words[9];
+                    t.words[t.length++] = f & r;
+                    for (var i = 10; i < e.length; i++) {
+                        var n = e.words[i];
+                        e.words[i - 10] = (n & r) << 4 | f >>> 22, f = n
+                    }
+                    e.words[i - 10] = f >>> 22, e.length -= 9
+                }, s.prototype.imulK = function (e) {
+                    e.words[e.length] = 0, e.words[e.length + 1] = 0, e.length += 2;
+                    for (var t, r = 0, d = 0; d < e.length; d++) {
+                        var i = e.words[d];
+                        t = 64 * i, r += 977 * i, t += r / 67108864 | 0, r &= 67108863, e.words[d] = r, r = t
+                    }
+                    return 0 === e.words[e.length - 1] && (e.length--, 0 === e.words[e.length - 1] && e.length--), e
+                }, d(c, a), d(h, a), d(o, a), o.prototype.imulK = function (e) {
+                    for (var t = 0, r = 0; r < e.length; r++) {
+                        var d = 19 * e.words[r] + t, i = 67108863 & d;
+                        d >>>= 26, e.words[r] = i, t = d
+                    }
+                    return 0 !== t && (e.words[e.length++] = t), e
+                }, i._prime = function m(e) {
+                    if (g[e])return g[e];
+                    var m;
+                    if ("k256" === e)m = new s; else if ("p224" === e)m = new c; else if ("p192" === e)m = new h; else {
+                        if ("p25519" !== e)throw new Error("Unknown prime " + e);
+                        m = new o
+                    }
+                    return g[e] = m, m
+                }, b.prototype._verify1 = function (e) {
+                    r(!e.sign, "red works only with positives"), r(e.red, "red works only with red numbers")
+                }, b.prototype._verify2 = function (e, t) {
+                    r(!e.sign && !t.sign, "red works only with positives"), r(e.red && e.red === t.red, "red works only with red numbers")
+                }, b.prototype.imod = function (e) {
+                    return this.prime ? this.prime.ireduce(e)._forceRed(this) : e.mod(this.m)._forceRed(this)
+                }, b.prototype.neg = function (e) {
+                    var t = e.clone();
+                    return t.sign = !t.sign, t.iadd(this.m)._forceRed(this)
+                }, b.prototype.add = function (e, t) {
+                    this._verify2(e, t);
+                    var r = e.add(t);
+                    return r.cmp(this.m) >= 0 && r.isub(this.m), r._forceRed(this)
+                }, b.prototype.iadd = function (e, t) {
+                    this._verify2(e, t);
+                    var r = e.iadd(t);
+                    return r.cmp(this.m) >= 0 && r.isub(this.m), r
+                }, b.prototype.sub = function (e, t) {
+                    this._verify2(e, t);
+                    var r = e.sub(t);
+                    return r.cmpn(0) < 0 && r.iadd(this.m), r._forceRed(this)
+                }, b.prototype.isub = function (e, t) {
+                    this._verify2(e, t);
+                    var r = e.isub(t);
+                    return r.cmpn(0) < 0 && r.iadd(this.m), r
+                }, b.prototype.shl = function (e, t) {
+                    return this._verify1(e), this.imod(e.shln(t))
+                }, b.prototype.imul = function (e, t) {
+                    return this._verify2(e, t), this.imod(e.imul(t))
+                }, b.prototype.mul = function (e, t) {
+                    return this._verify2(e, t), this.imod(e.mul(t))
+                }, b.prototype.isqr = function (e) {
+                    return this.imul(e, e)
+                }, b.prototype.sqr = function (e) {
+                    return this.mul(e, e)
+                }, b.prototype.sqrt = function (e) {
+                    if (0 === e.cmpn(0))return e.clone();
+                    var t = this.m.andln(3);
+                    if (r(t % 2 === 1), 3 === t) {
+                        var d = this.m.add(new i(1)).ishrn(2), f = this.pow(e, d);
+                        return f
+                    }
+                    for (var n = this.m.subn(1), a = 0; 0 !== n.cmpn(0) && 0 === n.andln(1);)a++, n.ishrn(1);
+                    r(0 !== n.cmpn(0));
+                    var s = new i(1).toRed(this), c = s.redNeg(), h = this.m.subn(1).ishrn(1), o = this.m.bitLength();
+                    for (o = new i(2 * o * o).toRed(this); 0 !== this.pow(o, h).cmp(c);)o.redIAdd(c);
+                    for (var b = this.pow(o, n), f = this.pow(e, n.addn(1).ishrn(1)), u = this.pow(e, n), p = a; 0 !== u.cmp(s);) {
+                        for (var l = u, v = 0; 0 !== l.cmp(s); v++)l = l.redSqr();
+                        r(p > v);
+                        var g = this.pow(b, new i(1).ishln(p - v - 1));
+                        f = f.redMul(g), b = g.redSqr(), u = u.redMul(b), p = v
+                    }
+                    return f
+                }, b.prototype.invm = function (e) {
+                    var t = e._invmp(this.m);
+                    return t.sign ? (t.sign = !1, this.imod(t).redNeg()) : this.imod(t)
+                }, b.prototype.pow = function (e, t) {
+                    for (var r = [], d = t.clone(); 0 !== d.cmpn(0);)r.push(d.andln(1)), d.ishrn(1);
+                    for (var i = e, f = 0; f < r.length && 0 === r[f]; f++, i = this.sqr(i));
+                    if (++f < r.length)for (var d = this.sqr(i); f < r.length; f++, d = this.sqr(d))0 !== r[f] && (i = this.mul(i, d));
+                    return i
+                }, b.prototype.convertTo = function (e) {
+                    return e.clone()
+                }, b.prototype.convertFrom = function (e) {
+                    var t = e.clone();
+                    return t.red = null, t
+                }, i.mont = function (e) {
+                    return new u(e)
+                }, d(u, b), u.prototype.convertTo = function (e) {
+                    return this.imod(e.shln(this.shift))
+                }, u.prototype.convertFrom = function (e) {
+                    var t = this.imod(e.mul(this.rinv));
+                    return t.red = null, t
+                }, u.prototype.imul = function (e, t) {
+                    if (0 === e.cmpn(0) || 0 === t.cmpn(0))return e.words[0] = 0, e.length = 1, e;
+                    var r = e.imul(t), d = r.maskn(this.shift).mul(this.minv).imaskn(this.shift).mul(this.m), i = r.isub(d).ishrn(this.shift), f = i;
+                    return i.cmp(this.m) >= 0 ? f = i.isub(this.m) : i.cmpn(0) < 0 && (f = i.iadd(this.m)), f._forceRed(this)
+                }, u.prototype.mul = function (e, t) {
+                    if (0 === e.cmpn(0) || 0 === t.cmpn(0))return new i(0)._forceRed(this);
+                    var r = e.mul(t), d = r.maskn(this.shift).mul(this.minv).imaskn(this.shift).mul(this.m), f = r.isub(d).ishrn(this.shift), n = f;
+                    return f.cmp(this.m) >= 0 ? n = f.isub(this.m) : f.cmpn(0) < 0 && (n = f.iadd(this.m)), n._forceRed(this)
+                }, u.prototype.invm = function (e) {
+                    var t = this.imod(e._invmp(this.m).mul(this.r2));
+                    return t._forceRed(this)
+                }
+            }("undefined" == typeof t || t, this)
+        }, {}],
+        15: [function (e, t) {
+            function r(e) {
+                this.rand = e
+            }
+
+            var d;
+            if (t.exports = function (e) {
+                    return d || (d = new r(null)), d.generate(e)
+                }, t.exports.Rand = r, r.prototype.generate = function (e) {
+                    return this._rand(e)
+                }, "object" == typeof window)r.prototype._rand = window.crypto && window.crypto.getRandomValues ? function (e) {
+                var t = new Uint8Array(e);
+                return window.crypto.getRandomValues(t), t
+            } : window.msCrypto && window.msCrypto.getRandomValues ? function (e) {
+                var t = new Uint8Array(e);
+                return window.msCrypto.getRandomValues(t), t
+            } : function () {
+                throw new Error("Not implemented yet")
+            }; else try {
+                var i = e("crypto");
+                r.prototype._rand = function (e) {
+                    return i.randomBytes(e)
+                }
+            } catch (f) {
+                r.prototype._rand = function (e) {
+                    for (var t = new Uint8Array(e), r = 0; r < t.length; r++)t[r] = this.rand.getByte();
+                    return t
+                }
+            }
+        }, {}],
+        16: [function (e, t, r) {
+            var d = r;
+            d.utils = e("./hash/utils"), d.common = e("./hash/common"), d.sha = e("./hash/sha"), d.ripemd = e("./hash/ripemd"), d.hmac = e("./hash/hmac"), d.sha1 = d.sha.sha1, d.sha256 = d.sha.sha256, d.sha224 = d.sha.sha224, d.sha384 = d.sha.sha384, d.sha512 = d.sha.sha512, d.ripemd160 = d.ripemd.ripemd160
+        }, {"./hash/common": 17, "./hash/hmac": 18, "./hash/ripemd": 19, "./hash/sha": 20, "./hash/utils": 21}],
+        17: [function (e, t, r) {
+            function d() {
+                this.pending = null, this.pendingTotal = 0, this.blockSize = this.constructor.blockSize, this.outSize = this.constructor.outSize, this.hmacStrength = this.constructor.hmacStrength, this.padLength = this.constructor.padLength / 8, this.endian = "big", this._delta8 = this.blockSize / 8, this._delta32 = this.blockSize / 32
+            }
+
+            var i = e("../hash"), f = i.utils, n = f.assert;
+            r.BlockHash = d, d.prototype.update = function (e, t) {
+                if (e = f.toArray(e, t), this.pending = this.pending ? this.pending.concat(e) : e, this.pendingTotal += e.length, this.pending.length >= this._delta8) {
+                    e = this.pending;
+                    var r = e.length % this._delta8;
+                    this.pending = e.slice(e.length - r, e.length), 0 === this.pending.length && (this.pending = null), e = f.join32(e, 0, e.length - r, this.endian);
+                    for (var d = 0; d < e.length; d += this._delta32)this._update(e, d, d + this._delta32)
+                }
+                return this
+            }, d.prototype.digest = function (e) {
+                return this.update(this._pad()), n(null === this.pending), this._digest(e)
+            }, d.prototype._pad = function () {
+                var e = this.pendingTotal, t = this._delta8, r = t - (e + this.padLength) % t, d = new Array(r + this.padLength);
+                d[0] = 128;
+                for (var i = 1; r > i; i++)d[i] = 0;
+                if (e <<= 3, "big" === this.endian) {
+                    for (var f = 8; f < this.padLength; f++)d[i++] = 0;
+                    d[i++] = 0, d[i++] = 0, d[i++] = 0, d[i++] = 0, d[i++] = e >>> 24 & 255, d[i++] = e >>> 16 & 255, d[i++] = e >>> 8 & 255, d[i++] = 255 & e
+                } else {
+                    d[i++] = 255 & e, d[i++] = e >>> 8 & 255, d[i++] = e >>> 16 & 255, d[i++] = e >>> 24 & 255, d[i++] = 0, d[i++] = 0, d[i++] = 0, d[i++] = 0;
+                    for (var f = 8; f < this.padLength; f++)d[i++] = 0
+                }
+                return d
+            }
+        }, {"../hash": 16}],
+        18: [function (e, t, r) {
+            function d(e, t, r) {
+                return this instanceof d ? (this.Hash = e, this.blockSize = e.blockSize / 8, this.outSize = e.outSize / 8, this.inner = null, this.outer = null, void this._init(f.toArray(t, r))) : new d(e, t, r)
+            }
+
+            var i = e("../hash"), f = i.utils, n = f.assert;
+            t.exports = d, d.prototype._init = function (e) {
+                e.length > this.blockSize && (e = (new this.Hash).update(e).digest()), n(e.length <= this.blockSize);
+                for (var t = e.length; t < this.blockSize; t++)e.push(0);
+                for (var t = 0; t < e.length; t++)e[t] ^= 54;
+                this.inner = (new this.Hash).update(e);
+                for (var t = 0; t < e.length; t++)e[t] ^= 106;
+                this.outer = (new this.Hash).update(e)
+            }, d.prototype.update = function (e, t) {
+                return this.inner.update(e, t), this
+            }, d.prototype.digest = function (e) {
+                return this.outer.update(this.inner.digest()), this.outer.digest(e)
+            }
+        }, {"../hash": 16}],
+        19: [function (e, t, r) {
+            function d() {
+                return this instanceof d ? (u.call(this), this.h = [1732584193, 4023233417, 2562383102, 271733878, 3285377520], void(this.endian = "little")) : new d
+            }
+
+            function i(e, t, r, d) {
+                return 15 >= e ? t ^ r ^ d : 31 >= e ? t & r | ~t & d : 47 >= e ? (t | ~r) ^ d : 63 >= e ? t & d | r & ~d : t ^ (r | ~d)
+            }
+
+            function f(e) {
+                return 15 >= e ? 0 : 31 >= e ? 1518500249 : 47 >= e ? 1859775393 : 63 >= e ? 2400959708 : 2840853838
+            }
+
+            function n(e) {
+                return 15 >= e ? 1352829926 : 31 >= e ? 1548603684 : 47 >= e ? 1836072691 : 63 >= e ? 2053994217 : 0
+            }
+
+            var a = e("../hash"), s = a.utils, c = s.rotl32, h = s.sum32, o = s.sum32_3, b = s.sum32_4, u = a.common.BlockHash;
+            s.inherits(d, u), r.ripemd160 = d, d.blockSize = 512, d.outSize = 160, d.hmacStrength = 192, d.padLength = 64, d.prototype._update = function (e, t) {
+                for (var r = this.h[0], d = this.h[1], a = this.h[2], s = this.h[3], u = this.h[4], m = r, y = d, w = a, S = s, _ = u, A = 0; 80 > A; A++) {
+                    var x = h(c(b(r, i(A, d, a, s), e[p[A] + t], f(A)), v[A]), u);
+                    r = u, u = s, s = c(a, 10), a = d, d = x, x = h(c(b(m, i(79 - A, y, w, S), e[l[A] + t], n(A)), g[A]), _), m = _, _ = S, S = c(w, 10), w = y, y = x
+                }
+                x = o(this.h[1], a, S), this.h[1] = o(this.h[2], s, _), this.h[2] = o(this.h[3], u, m), this.h[3] = o(this.h[4], r, y), this.h[4] = o(this.h[0], d, w), this.h[0] = x
+            }, d.prototype._digest = function (e) {
+                return "hex" === e ? s.toHex32(this.h, "little") : s.split32(this.h, "little")
+            };
+            var p = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 7, 4, 13, 1, 10, 6, 15, 3, 12, 0, 9, 5, 2, 14, 11, 8, 3, 10, 14, 4, 9, 15, 8, 1, 2, 7, 0, 6, 13, 11, 5, 12, 1, 9, 11, 10, 0, 8, 12, 4, 13, 3, 7, 15, 14, 5, 6, 2, 4, 0, 5, 9, 7, 12, 2, 10, 14, 1, 3, 8, 11, 6, 15, 13], l = [5, 14, 7, 0, 9, 2, 11, 4, 13, 6, 15, 8, 1, 10, 3, 12, 6, 11, 3, 7, 0, 13, 5, 10, 14, 15, 8, 12, 4, 9, 1, 2, 15, 5, 1, 3, 7, 14, 6, 9, 11, 8, 12, 2, 10, 0, 4, 13, 8, 6, 4, 1, 3, 11, 15, 0, 5, 12, 2, 13, 9, 7, 10, 14, 12, 15, 10, 4, 1, 5, 8, 7, 6, 2, 13, 14, 0, 3, 9, 11], v = [11, 14, 15, 12, 5, 8, 7, 9, 11, 13, 14, 15, 6, 7, 9, 8, 7, 6, 8, 13, 11, 9, 7, 15, 7, 12, 15, 9, 11, 7, 13, 12, 11, 13, 6, 7, 14, 9, 13, 15, 14, 8, 13, 6, 5, 12, 7, 5, 11, 12, 14, 15, 14, 15, 9, 8, 9, 14, 5, 6, 8, 6, 5, 12, 9, 15, 5, 11, 6, 8, 13, 12, 5, 12, 13, 14, 11, 8, 5, 6], g = [8, 9, 9, 11, 13, 15, 15, 5, 7, 7, 8, 11, 14, 14, 12, 6, 9, 13, 15, 7, 12, 8, 9, 11, 7, 7, 12, 7, 6, 15, 13, 11, 9, 7, 15, 11, 8, 6, 6, 14, 12, 13, 5, 14, 13, 13, 7, 5, 15, 5, 8, 11, 14, 14, 6, 14, 6, 9, 12, 9, 12, 5, 15, 8, 8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11]
+        }, {"../hash": 16}],
+        20: [function (e, t, r) {
+            function d() {
+                return this instanceof d ? (X.call(this), this.h = [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225], this.k = U, void(this.W = new Array(64))) : new d
+            }
+
+            function i() {
+                return this instanceof i ? (d.call(this), void(this.h = [3238371032, 914150663, 812702999, 4144912697, 4290775857, 1750603025, 1694076839, 3204075428])) : new i
+            }
+
+            function f() {
+                return this instanceof f ? (X.call(this), this.h = [1779033703, 4089235720, 3144134277, 2227873595, 1013904242, 4271175723, 2773480762, 1595750129, 1359893119, 2917565137, 2600822924, 725511199, 528734635, 4215389547, 1541459225, 327033209], this.k = G, void(this.W = new Array(160))) : new f
+            }
+
+            function n() {
+                return this instanceof n ? (f.call(this), void(this.h = [3418070365, 3238371032, 1654270250, 914150663, 2438529370, 812702999, 355462360, 4144912697, 1731405415, 4290775857, 2394180231, 1750603025, 3675008525, 1694076839, 1203062813, 3204075428])) : new n
+            }
+
+            function a() {
+                return this instanceof a ? (X.call(this), this.h = [1732584193, 4023233417, 2562383102, 271733878, 3285377520], void(this.W = new Array(80))) : new a
+            }
+
+            function s(e, t, r) {
+                return e & t ^ ~e & r
+            }
+
+            function c(e, t, r) {
+                return e & t ^ e & r ^ t & r
+            }
+
+            function h(e, t, r) {
+                return e ^ t ^ r
+            }
+
+            function o(e) {
+                return j(e, 2) ^ j(e, 13) ^ j(e, 22)
+            }
+
+            function b(e) {
+                return j(e, 6) ^ j(e, 11) ^ j(e, 25)
+            }
+
+            function u(e) {
+                return j(e, 7) ^ j(e, 18) ^ e >>> 3
+            }
+
+            function p(e) {
+                return j(e, 17) ^ j(e, 19) ^ e >>> 10
+            }
+
+            function l(e, t, r, d) {
+                return 0 === e ? s(t, r, d) : 1 === e || 3 === e ? h(t, r, d) : 2 === e ? c(t, r, d) : void 0
+            }
+
+            function v(e, t, r, d, i) {
+                var f = e & r ^ ~e & i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function g(e, t, r, d, i, f) {
+                var n = t & d ^ ~t & f;
+                return 0 > n && (n += 4294967296), n
+            }
+
+            function m(e, t, r, d, i) {
+                var f = e & r ^ e & i ^ r & i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function y(e, t, r, d, i, f) {
+                var n = t & d ^ t & f ^ d & f;
+                return 0 > n && (n += 4294967296), n
+            }
+
+            function w(e, t) {
+                var r = O(e, t, 28), d = O(t, e, 2), i = O(t, e, 7), f = r ^ d ^ i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function S(e, t) {
+                var r = L(e, t, 28), d = L(t, e, 2), i = L(t, e, 7), f = r ^ d ^ i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function _(e, t) {
+                var r = O(e, t, 14), d = O(e, t, 18), i = O(t, e, 9), f = r ^ d ^ i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function A(e, t) {
+                var r = L(e, t, 14), d = L(e, t, 18), i = L(t, e, 9), f = r ^ d ^ i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function x(e, t) {
+                var r = O(e, t, 1), d = O(e, t, 8), i = T(e, t, 7), f = r ^ d ^ i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function M(e, t) {
+                var r = L(e, t, 1), d = L(e, t, 8), i = C(e, t, 7), f = r ^ d ^ i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function I(e, t) {
+                var r = O(e, t, 19), d = O(t, e, 29), i = T(e, t, 6), f = r ^ d ^ i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            function z(e, t) {
+                var r = L(e, t, 19), d = L(t, e, 29), i = C(e, t, 6), f = r ^ d ^ i;
+                return 0 > f && (f += 4294967296), f
+            }
+
+            var q = e("../hash"), k = q.utils, R = k.assert, j = k.rotr32, E = k.rotl32, P = k.sum32, N = k.sum32_4, B = k.sum32_5, O = k.rotr64_hi, L = k.rotr64_lo, T = k.shr64_hi, C = k.shr64_lo, F = k.sum64, J = k.sum64_hi, D = k.sum64_lo, H = k.sum64_4_hi, V = k.sum64_4_lo, W = k.sum64_5_hi, K = k.sum64_5_lo, X = q.common.BlockHash, U = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298], G = [1116352408, 3609767458, 1899447441, 602891725, 3049323471, 3964484399, 3921009573, 2173295548, 961987163, 4081628472, 1508970993, 3053834265, 2453635748, 2937671579, 2870763221, 3664609560, 3624381080, 2734883394, 310598401, 1164996542, 607225278, 1323610764, 1426881987, 3590304994, 1925078388, 4068182383, 2162078206, 991336113, 2614888103, 633803317, 3248222580, 3479774868, 3835390401, 2666613458, 4022224774, 944711139, 264347078, 2341262773, 604807628, 2007800933, 770255983, 1495990901, 1249150122, 1856431235, 1555081692, 3175218132, 1996064986, 2198950837, 2554220882, 3999719339, 2821834349, 766784016, 2952996808, 2566594879, 3210313671, 3203337956, 3336571891, 1034457026, 3584528711, 2466948901, 113926993, 3758326383, 338241895, 168717936, 666307205, 1188179964, 773529912, 1546045734, 1294757372, 1522805485, 1396182291, 2643833823, 1695183700, 2343527390, 1986661051, 1014477480, 2177026350, 1206759142, 2456956037, 344077627, 2730485921, 1290863460, 2820302411, 3158454273, 3259730800, 3505952657, 3345764771, 106217008, 3516065817, 3606008344, 3600352804, 1432725776, 4094571909, 1467031594, 275423344, 851169720, 430227734, 3100823752, 506948616, 1363258195, 659060556, 3750685593, 883997877, 3785050280, 958139571, 3318307427, 1322822218, 3812723403, 1537002063, 2003034995, 1747873779, 3602036899, 1955562222, 1575990012, 2024104815, 1125592928, 2227730452, 2716904306, 2361852424, 442776044, 2428436474, 593698344, 2756734187, 3733110249, 3204031479, 2999351573, 3329325298, 3815920427, 3391569614, 3928383900, 3515267271, 566280711, 3940187606, 3454069534, 4118630271, 4000239992, 116418474, 1914138554, 174292421, 2731055270, 289380356, 3203993006, 460393269, 320620315, 685471733, 587496836, 852142971, 1086792851, 1017036298, 365543100, 1126000580, 2618297676, 1288033470, 3409855158, 1501505948, 4234509866, 1607167915, 987167468, 1816402316, 1246189591], Y = [1518500249, 1859775393, 2400959708, 3395469782];
+            k.inherits(d, X), r.sha256 = d, d.blockSize = 512, d.outSize = 256, d.hmacStrength = 192, d.padLength = 64, d.prototype._update = function (e, t) {
+                for (var r = this.W, d = 0; 16 > d; d++)r[d] = e[t + d];
+                for (; d < r.length; d++)r[d] = N(p(r[d - 2]), r[d - 7], u(r[d - 15]), r[d - 16]);
+                var i = this.h[0], f = this.h[1], n = this.h[2], a = this.h[3], h = this.h[4], l = this.h[5], v = this.h[6], g = this.h[7];
+                R(this.k.length === r.length);
+                for (var d = 0; d < r.length; d++) {
+                    var m = B(g, b(h), s(h, l, v), this.k[d], r[d]), y = P(o(i), c(i, f, n));
+                    g = v, v = l, l = h, h = P(a, m), a = n, n = f, f = i, i = P(m, y)
+                }
+                this.h[0] = P(this.h[0], i), this.h[1] = P(this.h[1], f), this.h[2] = P(this.h[2], n), this.h[3] = P(this.h[3], a), this.h[4] = P(this.h[4], h), this.h[5] = P(this.h[5], l), this.h[6] = P(this.h[6], v), this.h[7] = P(this.h[7], g)
+            }, d.prototype._digest = function (e) {
+                return "hex" === e ? k.toHex32(this.h, "big") : k.split32(this.h, "big")
+            }, k.inherits(i, d), r.sha224 = i, i.blockSize = 512, i.outSize = 224, i.hmacStrength = 192, i.padLength = 64, i.prototype._digest = function (e) {
+                return "hex" === e ? k.toHex32(this.h.slice(0, 7), "big") : k.split32(this.h.slice(0, 7), "big")
+            }, k.inherits(f, X), r.sha512 = f, f.blockSize = 1024, f.outSize = 512, f.hmacStrength = 192, f.padLength = 128, f.prototype._prepareBlock = function (e, t) {
+                for (var r = this.W, d = 0; 32 > d; d++)r[d] = e[t + d];
+                for (; d < r.length; d += 2) {
+                    var i = I(r[d - 4], r[d - 3]), f = z(r[d - 4], r[d - 3]), n = r[d - 14], a = r[d - 13], s = x(r[d - 30], r[d - 29]), c = M(r[d - 30], r[d - 29]), h = r[d - 32], o = r[d - 31];
+                    r[d] = H(i, f, n, a, s, c, h, o), r[d + 1] = V(i, f, n, a, s, c, h, o)
+                }
+            }, f.prototype._update = function (e, t) {
+                this._prepareBlock(e, t);
+                var r = this.W, d = this.h[0], i = this.h[1], f = this.h[2], n = this.h[3], a = this.h[4], s = this.h[5], c = this.h[6], h = this.h[7], o = this.h[8], b = this.h[9], u = this.h[10], p = this.h[11], l = this.h[12], x = this.h[13], M = this.h[14], I = this.h[15];
+                R(this.k.length === r.length);
+                for (var z = 0; z < r.length; z += 2) {
+                    var q = M, k = I, j = _(o, b), E = A(o, b), P = v(o, b, u, p, l, x), N = g(o, b, u, p, l, x), B = this.k[z], O = this.k[z + 1], L = r[z], T = r[z + 1], C = W(q, k, j, E, P, N, B, O, L, T), H = K(q, k, j, E, P, N, B, O, L, T), q = w(d, i), k = S(d, i), j = m(d, i, f, n, a, s), E = y(d, i, f, n, a, s), V = J(q, k, j, E), X = D(q, k, j, E);
+                    M = l, I = x, l = u, x = p, u = o, p = b, o = J(c, h, C, H), b = D(h, h, C, H), c = a, h = s, a = f, s = n, f = d, n = i, d = J(C, H, V, X), i = D(C, H, V, X)
+                }
+                F(this.h, 0, d, i), F(this.h, 2, f, n), F(this.h, 4, a, s), F(this.h, 6, c, h), F(this.h, 8, o, b), F(this.h, 10, u, p), F(this.h, 12, l, x), F(this.h, 14, M, I)
+            }, f.prototype._digest = function (e) {
+                return "hex" === e ? k.toHex32(this.h, "big") : k.split32(this.h, "big")
+            }, k.inherits(n, f), r.sha384 = n, n.blockSize = 1024, n.outSize = 384, n.hmacStrength = 192, n.padLength = 128, n.prototype._digest = function (e) {
+                return "hex" === e ? k.toHex32(this.h.slice(0, 12), "big") : k.split32(this.h.slice(0, 12), "big")
+            }, k.inherits(a, X), r.sha1 = a, a.blockSize = 512, a.outSize = 160, a.hmacStrength = 80, a.padLength = 64, a.prototype._update = function (e, t) {
+                for (var r = this.W, d = 0; 16 > d; d++)r[d] = e[t + d];
+                for (; d < r.length; d++)r[d] = E(r[d - 3] ^ r[d - 8] ^ r[d - 14] ^ r[d - 16], 1);
+                for (var i = this.h[0], f = this.h[1], n = this.h[2], a = this.h[3], s = this.h[4], d = 0; d < r.length; d++) {
+                    var c = ~~(d / 20), h = B(E(i, 5), l(c, f, n, a), s, r[d], Y[c]);
+                    s = a, a = n, n = E(f, 30), f = i, i = h
+                }
+                this.h[0] = P(this.h[0], i), this.h[1] = P(this.h[1], f), this.h[2] = P(this.h[2], n), this.h[3] = P(this.h[3], a), this.h[4] = P(this.h[4], s)
+            }, a.prototype._digest = function (e) {
+                return "hex" === e ? k.toHex32(this.h, "big") : k.split32(this.h, "big")
+            }
+        }, {"../hash": 16}],
+        21: [function (e, t, r) {
+            function d(e, t) {
+                if (Array.isArray(e))return e.slice();
+                if (!e)return [];
+                var r = [];
+                if ("string" == typeof e)if (t) {
+                    if ("hex" === t) {
+                        e = e.replace(/[^a-z0-9]+/gi, ""), e.length % 2 !== 0 && (e = "0" + e);
+                        for (var d = 0; d < e.length; d += 2)r.push(parseInt(e[d] + e[d + 1], 16))
+                    }
+                } else for (var d = 0; d < e.length; d++) {
+                    var i = e.charCodeAt(d), f = i >> 8, n = 255 & i;
+                    f ? r.push(f, n) : r.push(n)
+                } else for (var d = 0; d < e.length; d++)r[d] = 0 | e[d];
+                return r
+            }
+
+            function i(e) {
+                for (var t = "", r = 0; r < e.length; r++)t += a(e[r].toString(16));
+                return t
+            }
+
+            function f(e) {
+                var t = e >>> 24 | e >>> 8 & 65280 | e << 8 & 16711680 | (255 & e) << 24;
+                return t >>> 0
+            }
+
+            function n(e, t) {
+                for (var r = "", d = 0; d < e.length; d++) {
+                    var i = e[d];
+                    "little" === t && (i = f(i)), r += s(i.toString(16))
+                }
+                return r
+            }
+
+            function a(e) {
+                return 1 === e.length ? "0" + e : e
+            }
+
+            function s(e) {
+                return 7 === e.length ? "0" + e : 6 === e.length ? "00" + e : 5 === e.length ? "000" + e : 4 === e.length ? "0000" + e : 3 === e.length ? "00000" + e : 2 === e.length ? "000000" + e : 1 === e.length ? "0000000" + e : e
+            }
+
+            function c(e, t, r, d) {
+                var i = r - t;
+                g(i % 4 === 0);
+                for (var f = new Array(i / 4), n = 0, a = t; n < f.length; n++, a += 4) {
+                    var s;
+                    s = "big" === d ? e[a] << 24 | e[a + 1] << 16 | e[a + 2] << 8 | e[a + 3] : e[a + 3] << 24 | e[a + 2] << 16 | e[a + 1] << 8 | e[a], f[n] = s >>> 0
+                }
+                return f
+            }
+
+            function h(e, t) {
+                for (var r = new Array(4 * e.length), d = 0, i = 0; d < e.length; d++, i += 4) {
+                    var f = e[d];
+                    "big" === t ? (r[i] = f >>> 24, r[i + 1] = f >>> 16 & 255, r[i + 2] = f >>> 8 & 255, r[i + 3] = 255 & f) : (r[i + 3] = f >>> 24, r[i + 2] = f >>> 16 & 255, r[i + 1] = f >>> 8 & 255, r[i] = 255 & f)
+                }
+                return r
+            }
+
+            function o(e, t) {
+                return e >>> t | e << 32 - t
+            }
+
+            function b(e, t) {
+                return e << t | e >>> 32 - t
+            }
+
+            function u(e, t) {
+                return e + t >>> 0
+            }
+
+            function p(e, t, r) {
+                return e + t + r >>> 0
+            }
+
+            function l(e, t, r, d) {
+                return e + t + r + d >>> 0
+            }
+
+            function v(e, t, r, d, i) {
+                return e + t + r + d + i >>> 0
+            }
+
+            function g(e, t) {
+                if (!e)throw new Error(t || "Assertion failed")
+            }
+
+            function m(e, t, r, d) {
+                var i = e[t], f = e[t + 1], n = d + f >>> 0, a = (d > n ? 1 : 0) + r + i;
+                e[t] = a >>> 0, e[t + 1] = n
+            }
+
+            function y(e, t, r, d) {
+                var i = t + d >>> 0, f = (t > i ? 1 : 0) + e + r;
+                return f >>> 0
+            }
+
+            function w(e, t, r, d) {
+                var i = t + d;
+                return i >>> 0
+            }
+
+            function S(e, t, r, d, i, f, n, a) {
+                var s = 0, c = t;
+                c = c + d >>> 0, s += t > c ? 1 : 0, c = c + f >>> 0, s += f > c ? 1 : 0, c = c + a >>> 0, s += a > c ? 1 : 0;
+                var h = e + r + i + n + s;
+                return h >>> 0
+            }
+
+            function _(e, t, r, d, i, f, n, a) {
+                var s = t + d + f + a;
+                return s >>> 0
+            }
+
+            function A(e, t, r, d, i, f, n, a, s, c) {
+                var h = 0, o = t;
+                o = o + d >>> 0, h += t > o ? 1 : 0, o = o + f >>> 0, h += f > o ? 1 : 0, o = o + a >>> 0, h += a > o ? 1 : 0, o = o + c >>> 0, h += c > o ? 1 : 0;
+                var b = e + r + i + n + s + h;
+                return b >>> 0
+            }
+
+            function x(e, t, r, d, i, f, n, a, s, c) {
+                var h = t + d + f + a + c;
+                return h >>> 0
+            }
+
+            function M(e, t, r) {
+                var d = t << 32 - r | e >>> r;
+                return d >>> 0
+            }
+
+            function I(e, t, r) {
+                var d = e << 32 - r | t >>> r;
+                return d >>> 0
+            }
+
+            function z(e, t, r) {
+                return e >>> r
+            }
+
+            function q(e, t, r) {
+                var d = e << 32 - r | t >>> r;
+                return d >>> 0
+            }
+
+            var k = r, R = e("inherits");
+            k.toArray = d, k.toHex = i, k.htonl = f, k.toHex32 = n, k.zero2 = a, k.zero8 = s, k.join32 = c, k.split32 = h, k.rotr32 = o, k.rotl32 = b, k.sum32 = u, k.sum32_3 = p, k.sum32_4 = l, k.sum32_5 = v, k.assert = g, k.inherits = R, r.sum64 = m, r.sum64_hi = y, r.sum64_lo = w, r.sum64_4_hi = S, r.sum64_4_lo = _, r.sum64_5_hi = A, r.sum64_5_lo = x, r.rotr64_hi = M, r.rotr64_lo = I, r.shr64_hi = z, r.shr64_lo = q
+        }, {inherits: 22}],
+        22: [function (e, t) {
+            t.exports = "function" == typeof Object.create ? function (e, t) {
+                e.super_ = t, e.prototype = Object.create(t.prototype, {
+                    constructor: {
+                        value: e,
+                        enumerable: !1,
+                        writable: !0,
+                        configurable: !0
+                    }
+                })
+            } : function (e, t) {
+                e.super_ = t;
+                var r = function () {
+                };
+                r.prototype = t.prototype, e.prototype = new r, e.prototype.constructor = e
+            }
+        }, {}],
+        23: [function (e, t) {
+            t.exports = {
+                name: "elliptic",
+                version: "3.0.3",
+                description: "EC cryptography",
+                main: "lib/elliptic.js",
+                scripts: {test: "make lint && mocha --reporter=spec test/*-test.js"},
+                repository: {type: "git", url: "git@github.com:indutny/elliptic"},
+                keywords: ["EC", "Elliptic", "curve", "Cryptography"],
+                author: "Fedor Indutny <fedor@indutny.com>",
+                license: "MIT",
+                bugs: {url: "https://github.com/indutny/elliptic/issues"},
+                homepage: "https://github.com/indutny/elliptic",
+                devDependencies: {
+                    browserify: "^3.44.2",
+                    jscs: "^1.11.3",
+                    jshint: "^2.6.0",
+                    mocha: "^2.1.0",
+                    "uglify-js": "^2.4.13"
+                },
+                dependencies: {"bn.js": "^2.0.0", brorand: "^1.0.1", "hash.js": "^1.0.0", inherits: "^2.0.1"}
+            }
+        }, {}]
+    }, {}, [1])(1)
+});
 /*!
  * jQuery JavaScript Library v3.2.1
  * https://jquery.com/
@@ -10256,114 +13111,280 @@ if ( !noGlobal ) {
 return jQuery;
 } );
 
-"use strict";function p(a){throw a;}var r=void 0,v=!0,C=!1;var sjcl={cipher:{},hash:{},keyexchange:{},mode:{},misc:{},codec:{},exception:{corrupt:function(a){this.toString=function(){return"CORRUPT: "+this.message};this.message=a},invalid:function(a){this.toString=function(){return"INVALID: "+this.message};this.message=a},bug:function(a){this.toString=function(){return"BUG: "+this.message};this.message=a},notReady:function(a){this.toString=function(){return"NOT READY: "+this.message};this.message=a}}};
-"undefined"!==typeof module&&module.exports&&(module.exports=sjcl);"function"===typeof define&&define([],function(){return sjcl});
-sjcl.cipher.aes=function(a){this.A[0][0][0]||this.J();var b,c,d,e,f=this.A[0][4],g=this.A[1];b=a.length;var h=1;4!==b&&(6!==b&&8!==b)&&p(new sjcl.exception.invalid("invalid aes key size"));this.d=[d=a.slice(0),e=[]];for(a=b;a<4*b+28;a++){c=d[a-1];if(0===a%b||8===b&&4===a%b)c=f[c>>>24]<<24^f[c>>16&255]<<16^f[c>>8&255]<<8^f[c&255],0===a%b&&(c=c<<8^c>>>24^h<<24,h=h<<1^283*(h>>7));d[a]=d[a-b]^c}for(b=0;a;b++,a--)c=d[b&3?a:a-4],e[b]=4>=a||4>b?c:g[0][f[c>>>24]]^g[1][f[c>>16&255]]^g[2][f[c>>8&255]]^g[3][f[c&
-255]]};
-sjcl.cipher.aes.prototype={encrypt:function(a){return ba(this,a,0)},decrypt:function(a){return ba(this,a,1)},A:[[[],[],[],[],[]],[[],[],[],[],[]]],J:function(){var a=this.A[0],b=this.A[1],c=a[4],d=b[4],e,f,g,h=[],k=[],l,n,m,q;for(e=0;0x100>e;e++)k[(h[e]=e<<1^283*(e>>7))^e]=e;for(f=g=0;!c[f];f^=l||1,g=k[g]||1){m=g^g<<1^g<<2^g<<3^g<<4;m=m>>8^m&255^99;c[f]=m;d[m]=f;n=h[e=h[l=h[f]]];q=0x1010101*n^0x10001*e^0x101*l^0x1010100*f;n=0x101*h[m]^0x1010100*m;for(e=0;4>e;e++)a[e][f]=n=n<<24^n>>>8,b[e][m]=q=q<<24^q>>>8}for(e=
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       0;5>e;e++)a[e]=a[e].slice(0),b[e]=b[e].slice(0)}};
-function ba(a,b,c){4!==b.length&&p(new sjcl.exception.invalid("invalid aes block size"));var d=a.d[c],e=b[0]^d[0],f=b[c?3:1]^d[1],g=b[2]^d[2];b=b[c?1:3]^d[3];var h,k,l,n=d.length/4-2,m,q=4,t=[0,0,0,0];h=a.A[c];a=h[0];var s=h[1],E=h[2],G=h[3],F=h[4];for(m=0;m<n;m++)h=a[e>>>24]^s[f>>16&255]^E[g>>8&255]^G[b&255]^d[q],k=a[f>>>24]^s[g>>16&255]^E[b>>8&255]^G[e&255]^d[q+1],l=a[g>>>24]^s[b>>16&255]^E[e>>8&255]^G[f&255]^d[q+2],b=a[b>>>24]^s[e>>16&255]^E[f>>8&255]^G[g&255]^d[q+3],q+=4,e=h,f=k,g=l;for(m=0;4>
-m;m++)t[c?3&-m:m]=F[e>>>24]<<24^F[f>>16&255]<<16^F[g>>8&255]<<8^F[b&255]^d[q++],h=e,e=f,f=g,g=b,b=h;return t}
-sjcl.bitArray={bitSlice:function(a,b,c){a=sjcl.bitArray.ea(a.slice(b/32),32-(b&31)).slice(1);return c===r?a:sjcl.bitArray.clamp(a,c-b)},extract:function(a,b,c){var d=Math.floor(-b-c&31);return((b+c-1^b)&-32?a[b/32|0]<<32-d^a[b/32+1|0]>>>d:a[b/32|0]>>>d)&(1<<c)-1},concat:function(a,b){if(0===a.length||0===b.length)return a.concat(b);var c=a[a.length-1],d=sjcl.bitArray.getPartial(c);return 32===d?a.concat(b):sjcl.bitArray.ea(b,d,c|0,a.slice(0,a.length-1))},bitLength:function(a){var b=a.length;return 0===
-b?0:32*(b-1)+sjcl.bitArray.getPartial(a[b-1])},clamp:function(a,b){if(32*a.length<b)return a;a=a.slice(0,Math.ceil(b/32));var c=a.length;b&=31;0<c&&b&&(a[c-1]=sjcl.bitArray.partial(b,a[c-1]&2147483648>>b-1,1));return a},partial:function(a,b,c){return 32===a?b:(c?b|0:b<<32-a)+0x10000000000*a},getPartial:function(a){return Math.round(a/0x10000000000)||32},equal:function(a,b){if(sjcl.bitArray.bitLength(a)!==sjcl.bitArray.bitLength(b))return C;var c=0,d;for(d=0;d<a.length;d++)c|=a[d]^b[d];return 0===
-    c},ea:function(a,b,c,d){var e;e=0;for(d===r&&(d=[]);32<=b;b-=32)d.push(c),c=0;if(0===b)return d.concat(a);for(e=0;e<a.length;e++)d.push(c|a[e]>>>b),c=a[e]<<32-b;e=a.length?a[a.length-1]:0;a=sjcl.bitArray.getPartial(e);d.push(sjcl.bitArray.partial(b+a&31,32<b+a?c:d.pop(),1));return d},o:function(a,b){return[a[0]^b[0],a[1]^b[1],a[2]^b[2],a[3]^b[3]]},byteswapM:function(a){var b,c;for(b=0;b<a.length;++b)c=a[b],a[b]=c>>>24|c>>>8&0xff00|(c&0xff00)<<8|c<<24;return a}};
-sjcl.codec.utf8String={fromBits:function(a){var b="",c=sjcl.bitArray.bitLength(a),d,e;for(d=0;d<c/8;d++)0===(d&3)&&(e=a[d/4]),b+=String.fromCharCode(e>>>24),e<<=8;return decodeURIComponent(escape(b))},toBits:function(a){a=unescape(encodeURIComponent(a));var b=[],c,d=0;for(c=0;c<a.length;c++)d=d<<8|a.charCodeAt(c),3===(c&3)&&(b.push(d),d=0);c&3&&b.push(sjcl.bitArray.partial(8*(c&3),d));return b}};
-sjcl.codec.hex={fromBits:function(a){var b="",c;for(c=0;c<a.length;c++)b+=((a[c]|0)+0xf00000000000).toString(16).substr(4);return b.substr(0,sjcl.bitArray.bitLength(a)/4)},toBits:function(a){var b,c=[],d;a=a.replace(/\s|0x/g,"");d=a.length;a+="00000000";for(b=0;b<a.length;b+=8)c.push(parseInt(a.substr(b,8),16)^0);return sjcl.bitArray.clamp(c,4*d)}};
-sjcl.codec.base32={D:"0123456789abcdefghjkmnpqrstvwxyz",BITS:32,BASE:5,REMAINING:27,fromBits:function(a){var b=sjcl.codec.base32.BASE,c=sjcl.codec.base32.REMAINING,d="",e,f=0,g=sjcl.codec.base32.D,h=0,k=sjcl.bitArray.bitLength(a);for(e=0;d.length*b<=k;)d+=g.charAt((h^a[e]>>>f)>>>c),f<b?(h=a[e]<<b-f,f+=c,e++):(h<<=b,f-=b);return d},toBits:function(a){var b=sjcl.codec.base32.BITS,c=sjcl.codec.base32.BASE,d=sjcl.codec.base32.REMAINING,e=[],f,g=0,h=sjcl.codec.base32.D,k=0,l;for(f=0;f<a.length;f++)l=h.indexOf(a.charAt(f)),
-0>l&&p(new sjcl.exception.invalid("this isn't base32!")),g>d?(g-=d,e.push(k^l>>>g),k=l<<b-g):(g+=c,k^=l<<b-g);g&56&&e.push(sjcl.bitArray.partial(g&56,k,1));return e}};
-sjcl.codec.base64={D:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",fromBits:function(a,b,c){var d="",e=0,f=sjcl.codec.base64.D,g=0,h=sjcl.bitArray.bitLength(a);c&&(f=f.substr(0,62)+"-_");for(c=0;6*d.length<h;)d+=f.charAt((g^a[c]>>>e)>>>26),6>e?(g=a[c]<<6-e,e+=26,c++):(g<<=6,e-=6);for(;d.length&3&&!b;)d+="=";return d},toBits:function(a,b){a=a.replace(/\s|=/g,"");var c=[],d,e=0,f=sjcl.codec.base64.D,g=0,h;b&&(f=f.substr(0,62)+"-_");for(d=0;d<a.length;d++)h=f.indexOf(a.charAt(d)),
-0>h&&p(new sjcl.exception.invalid("this isn't base64!")),26<e?(e-=26,c.push(g^h>>>e),g=h<<32-e):(e+=6,g^=h<<32-e);e&56&&c.push(sjcl.bitArray.partial(e&56,g,1));return c}};sjcl.codec.base64url={fromBits:function(a){return sjcl.codec.base64.fromBits(a,1,1)},toBits:function(a){return sjcl.codec.base64.toBits(a,1)}};
-sjcl.codec.bytes={fromBits:function(a){var b=[],c=sjcl.bitArray.bitLength(a),d,e;for(d=0;d<c/8;d++)0===(d&3)&&(e=a[d/4]),b.push(e>>>24),e<<=8;return b},toBits:function(a){var b=[],c,d=0;for(c=0;c<a.length;c++)d=d<<8|a[c],3===(c&3)&&(b.push(d),d=0);c&3&&b.push(sjcl.bitArray.partial(8*(c&3),d));return b}};sjcl.hash.sha256=function(a){this.d[0]||this.J();a?(this.h=a.h.slice(0),this.e=a.e.slice(0),this.c=a.c):this.reset()};sjcl.hash.sha256.hash=function(a){return(new sjcl.hash.sha256).update(a).finalize()};
-sjcl.hash.sha256.prototype={blockSize:512,reset:function(){this.h=this.m.slice(0);this.e=[];this.c=0;return this},update:function(a){"string"===typeof a&&(a=sjcl.codec.utf8String.toBits(a));var b,c=this.e=sjcl.bitArray.concat(this.e,a);b=this.c;a=this.c=b+sjcl.bitArray.bitLength(a);for(b=512+b&-512;b<=a;b+=512)this.k(c.splice(0,16));return this},finalize:function(){var a,b=this.e,c=this.h,b=sjcl.bitArray.concat(b,[sjcl.bitArray.partial(1,1)]);for(a=b.length+2;a&15;a++)b.push(0);b.push(Math.floor(this.c/
-    4294967296));for(b.push(this.c|0);b.length;)this.k(b.splice(0,16));this.reset();return c},m:[],d:[],J:function(){function a(a){return 0x100000000*(a-Math.floor(a))|0}var b=0,c=2,d;a:for(;64>b;c++){for(d=2;d*d<=c;d++)if(0===c%d)continue a;8>b&&(this.m[b]=a(Math.pow(c,0.5)));this.d[b]=a(Math.pow(c,1/3));b++}},k:function(a){var b,c,d=a.slice(0),e=this.h,f=this.d,g=e[0],h=e[1],k=e[2],l=e[3],n=e[4],m=e[5],q=e[6],t=e[7];for(a=0;64>a;a++)16>a?b=d[a]:(b=d[a+1&15],c=d[a+14&15],b=d[a&15]=(b>>>7^b>>>18^b>>>3^
-    b<<25^b<<14)+(c>>>17^c>>>19^c>>>10^c<<15^c<<13)+d[a&15]+d[a+9&15]|0),b=b+t+(n>>>6^n>>>11^n>>>25^n<<26^n<<21^n<<7)+(q^n&(m^q))+f[a],t=q,q=m,m=n,n=l+b|0,l=k,k=h,h=g,g=b+(h&k^l&(h^k))+(h>>>2^h>>>13^h>>>22^h<<30^h<<19^h<<10)|0;e[0]=e[0]+g|0;e[1]=e[1]+h|0;e[2]=e[2]+k|0;e[3]=e[3]+l|0;e[4]=e[4]+n|0;e[5]=e[5]+m|0;e[6]=e[6]+q|0;e[7]=e[7]+t|0}};sjcl.hash.sha512=function(a){this.d[0]||this.J();a?(this.h=a.h.slice(0),this.e=a.e.slice(0),this.c=a.c):this.reset()};sjcl.hash.sha512.hash=function(a){return(new sjcl.hash.sha512).update(a).finalize()};
-sjcl.hash.sha512.prototype={blockSize:1024,reset:function(){this.h=this.m.slice(0);this.e=[];this.c=0;return this},update:function(a){"string"===typeof a&&(a=sjcl.codec.utf8String.toBits(a));var b,c=this.e=sjcl.bitArray.concat(this.e,a);b=this.c;a=this.c=b+sjcl.bitArray.bitLength(a);for(b=1024+b&-1024;b<=a;b+=1024)this.k(c.splice(0,32));return this},finalize:function(){var a,b=this.e,c=this.h,b=sjcl.bitArray.concat(b,[sjcl.bitArray.partial(1,1)]);for(a=b.length+4;a&31;a++)b.push(0);b.push(0);b.push(0);
-    b.push(Math.floor(this.c/0x100000000));for(b.push(this.c|0);b.length;)this.k(b.splice(0,32));this.reset();return c},m:[],ra:[12372232,13281083,9762859,1914609,15106769,4090911,4308331,8266105],d:[],ta:[2666018,15689165,5061423,9034684,4764984,380953,1658779,7176472,197186,7368638,14987916,16757986,8096111,1480369,13046325,6891156,15813330,5187043,9229749,11312229,2818677,10937475,4324308,1135541,6741931,11809296,16458047,15666916,11046850,698149,229999,945776,13774844,2541862,12856045,9810911,11494366,
-    7844520,15576806,8533307,15795044,4337665,16291729,5553712,15684120,6662416,7413802,12308920,13816008,4303699,9366425,10176680,13195875,4295371,6546291,11712675,15708924,1519456,15772530,6568428,6495784,8568297,13007125,7492395,2515356,12632583,14740254,7262584,1535930,13146278,16321966,1853211,294276,13051027,13221564,1051980,4080310,6651434,14088940,4675607],J:function(){function a(a){return 0x100000000*(a-Math.floor(a))|0}function b(a){return 0x10000000000*(a-Math.floor(a))&255}var c=0,d=2,e;a:for(;80>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               c;d++){for(e=2;e*e<=d;e++)if(0===d%e)continue a;8>c&&(this.m[2*c]=a(Math.pow(d,0.5)),this.m[2*c+1]=b(Math.pow(d,0.5))<<24|this.ra[c]);this.d[2*c]=a(Math.pow(d,1/3));this.d[2*c+1]=b(Math.pow(d,1/3))<<24|this.ta[c];c++}},k:function(a){var b,c,d=a.slice(0),e=this.h,f=this.d,g=e[0],h=e[1],k=e[2],l=e[3],n=e[4],m=e[5],q=e[6],t=e[7],s=e[8],E=e[9],G=e[10],F=e[11],ha=e[12],S=e[13],ia=e[14],T=e[15],y=g,w=h,J=k,H=l,K=n,I=m,Y=q,L=t,z=s,x=E,U=G,M=F,V=ha,N=S,Z=ia,O=T;for(a=0;80>a;a++){if(16>a)b=d[2*a],c=d[2*a+
-1];else{c=d[2*(a-15)];var u=d[2*(a-15)+1];b=(u<<31|c>>>1)^(u<<24|c>>>8)^c>>>7;var A=(c<<31|u>>>1)^(c<<24|u>>>8)^(c<<25|u>>>7);c=d[2*(a-2)];var B=d[2*(a-2)+1],u=(B<<13|c>>>19)^(c<<3|B>>>29)^c>>>6,B=(c<<13|B>>>19)^(B<<3|c>>>29)^(c<<26|B>>>6),$=d[2*(a-7)],aa=d[2*(a-16)],P=d[2*(a-16)+1];c=A+d[2*(a-7)+1];b=b+$+(c>>>0<A>>>0?1:0);c+=B;b+=u+(c>>>0<B>>>0?1:0);c+=P;b+=aa+(c>>>0<P>>>0?1:0)}d[2*a]=b|=0;d[2*a+1]=c|=0;var $=z&U^~z&V,ja=x&M^~x&N,B=y&J^y&K^J&K,na=w&H^w&I^H&I,aa=(w<<4|y>>>28)^(y<<30|w>>>2)^(y<<25|
-    w>>>7),P=(y<<4|w>>>28)^(w<<30|y>>>2)^(w<<25|y>>>7),oa=f[2*a],ka=f[2*a+1],u=O+((z<<18|x>>>14)^(z<<14|x>>>18)^(x<<23|z>>>9)),A=Z+((x<<18|z>>>14)^(x<<14|z>>>18)^(z<<23|x>>>9))+(u>>>0<O>>>0?1:0),u=u+ja,A=A+($+(u>>>0<ja>>>0?1:0)),u=u+ka,A=A+(oa+(u>>>0<ka>>>0?1:0)),u=u+c|0,A=A+(b+(u>>>0<c>>>0?1:0));c=P+na;b=aa+B+(c>>>0<P>>>0?1:0);Z=V;O=N;V=U;N=M;U=z;M=x;x=L+u|0;z=Y+A+(x>>>0<L>>>0?1:0)|0;Y=K;L=I;K=J;I=H;J=y;H=w;w=u+c|0;y=A+b+(w>>>0<u>>>0?1:0)|0}h=e[1]=h+w|0;e[0]=g+y+(h>>>0<w>>>0?1:0)|0;l=e[3]=l+H|0;e[2]=
-    k+J+(l>>>0<H>>>0?1:0)|0;m=e[5]=m+I|0;e[4]=n+K+(m>>>0<I>>>0?1:0)|0;t=e[7]=t+L|0;e[6]=q+Y+(t>>>0<L>>>0?1:0)|0;E=e[9]=E+x|0;e[8]=s+z+(E>>>0<x>>>0?1:0)|0;F=e[11]=F+M|0;e[10]=G+U+(F>>>0<M>>>0?1:0)|0;S=e[13]=S+N|0;e[12]=ha+V+(S>>>0<N>>>0?1:0)|0;T=e[15]=T+O|0;e[14]=ia+Z+(T>>>0<O>>>0?1:0)|0}};sjcl.hash.sha1=function(a){a?(this.h=a.h.slice(0),this.e=a.e.slice(0),this.c=a.c):this.reset()};sjcl.hash.sha1.hash=function(a){return(new sjcl.hash.sha1).update(a).finalize()};
-sjcl.hash.sha1.prototype={blockSize:512,reset:function(){this.h=this.m.slice(0);this.e=[];this.c=0;return this},update:function(a){"string"===typeof a&&(a=sjcl.codec.utf8String.toBits(a));var b,c=this.e=sjcl.bitArray.concat(this.e,a);b=this.c;a=this.c=b+sjcl.bitArray.bitLength(a);for(b=this.blockSize+b&-this.blockSize;b<=a;b+=this.blockSize)this.k(c.splice(0,16));return this},finalize:function(){var a,b=this.e,c=this.h,b=sjcl.bitArray.concat(b,[sjcl.bitArray.partial(1,1)]);for(a=b.length+2;a&15;a++)b.push(0);
-    b.push(Math.floor(this.c/0x100000000));for(b.push(this.c|0);b.length;)this.k(b.splice(0,16));this.reset();return c},m:[1732584193,4023233417,2562383102,271733878,3285377520],d:[1518500249,1859775393,2400959708,3395469782],k:function(a){var b,c,d,e,f,g,h=a.slice(0),k=this.h;c=k[0];d=k[1];e=k[2];f=k[3];g=k[4];for(a=0;79>=a;a++)16<=a&&(h[a]=(h[a-3]^h[a-8]^h[a-14]^h[a-16])<<1|(h[a-3]^h[a-8]^h[a-14]^h[a-16])>>>31),b=19>=a?d&e|~d&f:39>=a?d^e^f:59>=a?d&e|d&f|e&f:79>=a?d^e^f:r,b=(c<<5|c>>>27)+b+g+h[a]+this.d[Math.floor(a/
-        20)]|0,g=f,f=e,e=d<<30|d>>>2,d=c,c=b;k[0]=k[0]+c|0;k[1]=k[1]+d|0;k[2]=k[2]+e|0;k[3]=k[3]+f|0;k[4]=k[4]+g|0}};
-sjcl.mode.ccm={name:"ccm",encrypt:function(a,b,c,d,e){var f,g=b.slice(0),h=sjcl.bitArray,k=h.bitLength(c)/8,l=h.bitLength(g)/8;e=e||64;d=d||[];7>k&&p(new sjcl.exception.invalid("ccm: iv must be at least 7 bytes"));for(f=2;4>f&&l>>>8*f;f++);f<15-k&&(f=15-k);c=h.clamp(c,8*(15-f));b=sjcl.mode.ccm.Y(a,b,c,d,e,f);g=sjcl.mode.ccm.F(a,g,c,b,e,f);return h.concat(g.data,g.tag)},decrypt:function(a,b,c,d,e){e=e||64;d=d||[];var f=sjcl.bitArray,g=f.bitLength(c)/8,h=f.bitLength(b),k=f.clamp(b,h-e),l=f.bitSlice(b,
-    h-e),h=(h-e)/8;7>g&&p(new sjcl.exception.invalid("ccm: iv must be at least 7 bytes"));for(b=2;4>b&&h>>>8*b;b++);b<15-g&&(b=15-g);c=f.clamp(c,8*(15-b));k=sjcl.mode.ccm.F(a,k,c,l,e,b);a=sjcl.mode.ccm.Y(a,k.data,c,d,e,b);f.equal(k.tag,a)||p(new sjcl.exception.corrupt("ccm: tag doesn't match"));return k.data},Y:function(a,b,c,d,e,f){var g=[],h=sjcl.bitArray,k=h.o;e/=8;(e%2||4>e||16<e)&&p(new sjcl.exception.invalid("ccm: invalid tag length"));(0xffffffff<d.length||0xffffffff<b.length)&&p(new sjcl.exception.bug("ccm: can't deal with 4GiB or more data"));
-    f=[h.partial(8,(d.length?64:0)|e-2<<2|f-1)];f=h.concat(f,c);f[3]|=h.bitLength(b)/8;f=a.encrypt(f);if(d.length){c=h.bitLength(d)/8;65279>=c?g=[h.partial(16,c)]:0xffffffff>=c&&(g=h.concat([h.partial(16,65534)],[c]));g=h.concat(g,d);for(d=0;d<g.length;d+=4)f=a.encrypt(k(f,g.slice(d,d+4).concat([0,0,0])))}for(d=0;d<b.length;d+=4)f=a.encrypt(k(f,b.slice(d,d+4).concat([0,0,0])));return h.clamp(f,8*e)},F:function(a,b,c,d,e,f){var g,h=sjcl.bitArray;g=h.o;var k=b.length,l=h.bitLength(b);c=h.concat([h.partial(8,
-    f-1)],c).concat([0,0,0]).slice(0,4);d=h.bitSlice(g(d,a.encrypt(c)),0,e);if(!k)return{tag:d,data:[]};for(g=0;g<k;g+=4)c[3]++,e=a.encrypt(c),b[g]^=e[0],b[g+1]^=e[1],b[g+2]^=e[2],b[g+3]^=e[3];return{tag:d,data:h.clamp(b,l)}}};sjcl.beware===r&&(sjcl.beware={});
-sjcl.beware["CBC mode is dangerous because it doesn't protect message integrity."]=function(){sjcl.mode.cbc={name:"cbc",encrypt:function(a,b,c,d){d&&d.length&&p(new sjcl.exception.invalid("cbc can't authenticate data"));128!==sjcl.bitArray.bitLength(c)&&p(new sjcl.exception.invalid("cbc iv must be 128 bits"));var e=sjcl.bitArray,f=e.o,g=e.bitLength(b),h=0,k=[];g&7&&p(new sjcl.exception.invalid("pkcs#5 padding only works for multiples of a byte"));for(d=0;h+128<=g;d+=4,h+=128)c=a.encrypt(f(c,b.slice(d,
-    d+4))),k.splice(d,0,c[0],c[1],c[2],c[3]);g=0x1010101*(16-(g>>3&15));c=a.encrypt(f(c,e.concat(b,[g,g,g,g]).slice(d,d+4)));k.splice(d,0,c[0],c[1],c[2],c[3]);return k},decrypt:function(a,b,c,d){d&&d.length&&p(new sjcl.exception.invalid("cbc can't authenticate data"));128!==sjcl.bitArray.bitLength(c)&&p(new sjcl.exception.invalid("cbc iv must be 128 bits"));(sjcl.bitArray.bitLength(b)&127||!b.length)&&p(new sjcl.exception.corrupt("cbc ciphertext must be a positive multiple of the block size"));var e=sjcl.bitArray,
-    f=e.o,g,h=[];for(d=0;d<b.length;d+=4)g=b.slice(d,d+4),c=f(c,a.decrypt(g)),h.splice(d,0,c[0],c[1],c[2],c[3]),c=g;g=h[d-1]&255;(0===g||16<g)&&p(new sjcl.exception.corrupt("pkcs#5 padding corrupt"));c=0x1010101*g;e.equal(e.bitSlice([c,c,c,c],0,8*g),e.bitSlice(h,32*h.length-8*g,32*h.length))||p(new sjcl.exception.corrupt("pkcs#5 padding corrupt"));return e.bitSlice(h,0,32*h.length-8*g)}}};
-sjcl.mode.ocb2={name:"ocb2",encrypt:function(a,b,c,d,e,f){128!==sjcl.bitArray.bitLength(c)&&p(new sjcl.exception.invalid("ocb iv must be 128 bits"));var g,h=sjcl.mode.ocb2.V,k=sjcl.bitArray,l=k.o,n=[0,0,0,0];c=h(a.encrypt(c));var m,q=[];d=d||[];e=e||64;for(g=0;g+4<b.length;g+=4)m=b.slice(g,g+4),n=l(n,m),q=q.concat(l(c,a.encrypt(l(c,m)))),c=h(c);m=b.slice(g);b=k.bitLength(m);g=a.encrypt(l(c,[0,0,0,b]));m=k.clamp(l(m.concat([0,0,0]),g),b);n=l(n,l(m.concat([0,0,0]),g));n=a.encrypt(l(n,l(c,h(c))));d.length&&
-(n=l(n,f?d:sjcl.mode.ocb2.pmac(a,d)));return q.concat(k.concat(m,k.clamp(n,e)))},decrypt:function(a,b,c,d,e,f){128!==sjcl.bitArray.bitLength(c)&&p(new sjcl.exception.invalid("ocb iv must be 128 bits"));e=e||64;var g=sjcl.mode.ocb2.V,h=sjcl.bitArray,k=h.o,l=[0,0,0,0],n=g(a.encrypt(c)),m,q,t=sjcl.bitArray.bitLength(b)-e,s=[];d=d||[];for(c=0;c+4<t/32;c+=4)m=k(n,a.decrypt(k(n,b.slice(c,c+4)))),l=k(l,m),s=s.concat(m),n=g(n);q=t-32*c;m=a.encrypt(k(n,[0,0,0,q]));m=k(m,h.clamp(b.slice(c),q).concat([0,0,0]));
-    l=k(l,m);l=a.encrypt(k(l,k(n,g(n))));d.length&&(l=k(l,f?d:sjcl.mode.ocb2.pmac(a,d)));h.equal(h.clamp(l,e),h.bitSlice(b,t))||p(new sjcl.exception.corrupt("ocb: tag doesn't match"));return s.concat(h.clamp(m,q))},pmac:function(a,b){var c,d=sjcl.mode.ocb2.V,e=sjcl.bitArray,f=e.o,g=[0,0,0,0],h=a.encrypt([0,0,0,0]),h=f(h,d(d(h)));for(c=0;c+4<b.length;c+=4)h=d(h),g=f(g,a.encrypt(f(h,b.slice(c,c+4))));c=b.slice(c);128>e.bitLength(c)&&(h=f(h,d(h)),c=e.concat(c,[-2147483648,0,0,0]));g=f(g,c);return a.encrypt(f(d(f(h,
-    d(h))),g))},V:function(a){return[a[0]<<1^a[1]>>>31,a[1]<<1^a[2]>>>31,a[2]<<1^a[3]>>>31,a[3]<<1^135*(a[0]>>>31)]}};
-sjcl.mode.gcm={name:"gcm",encrypt:function(a,b,c,d,e){var f=b.slice(0);b=sjcl.bitArray;d=d||[];a=sjcl.mode.gcm.F(v,a,f,d,c,e||128);return b.concat(a.data,a.tag)},decrypt:function(a,b,c,d,e){var f=b.slice(0),g=sjcl.bitArray,h=g.bitLength(f);e=e||128;d=d||[];e<=h?(b=g.bitSlice(f,h-e),f=g.bitSlice(f,0,h-e)):(b=f,f=[]);a=sjcl.mode.gcm.F(C,a,f,d,c,e);g.equal(a.tag,b)||p(new sjcl.exception.corrupt("gcm: tag doesn't match"));return a.data},pa:function(a,b){var c,d,e,f,g,h=sjcl.bitArray.o;e=[0,0,0,0];f=b.slice(0);
-    for(c=0;128>c;c++){(d=0!==(a[Math.floor(c/32)]&1<<31-c%32))&&(e=h(e,f));g=0!==(f[3]&1);for(d=3;0<d;d--)f[d]=f[d]>>>1|(f[d-1]&1)<<31;f[0]>>>=1;g&&(f[0]^=-0x1f000000)}return e},t:function(a,b,c){var d,e=c.length;b=b.slice(0);for(d=0;d<e;d+=4)b[0]^=0xffffffff&c[d],b[1]^=0xffffffff&c[d+1],b[2]^=0xffffffff&c[d+2],b[3]^=0xffffffff&c[d+3],b=sjcl.mode.gcm.pa(b,a);return b},F:function(a,b,c,d,e,f){var g,h,k,l,n,m,q,t,s=sjcl.bitArray;m=c.length;q=s.bitLength(c);t=s.bitLength(d);h=s.bitLength(e);g=b.encrypt([0,
-    0,0,0]);96===h?(e=e.slice(0),e=s.concat(e,[1])):(e=sjcl.mode.gcm.t(g,[0,0,0,0],e),e=sjcl.mode.gcm.t(g,e,[0,0,Math.floor(h/0x100000000),h&0xffffffff]));h=sjcl.mode.gcm.t(g,[0,0,0,0],d);n=e.slice(0);d=h.slice(0);a||(d=sjcl.mode.gcm.t(g,h,c));for(l=0;l<m;l+=4)n[3]++,k=b.encrypt(n),c[l]^=k[0],c[l+1]^=k[1],c[l+2]^=k[2],c[l+3]^=k[3];c=s.clamp(c,q);a&&(d=sjcl.mode.gcm.t(g,h,c));a=[Math.floor(t/0x100000000),t&0xffffffff,Math.floor(q/0x100000000),q&0xffffffff];d=sjcl.mode.gcm.t(g,d,a);k=b.encrypt(e);d[0]^=k[0];
-    d[1]^=k[1];d[2]^=k[2];d[3]^=k[3];return{tag:s.bitSlice(d,0,f),data:c}}};sjcl.misc.hmac=function(a,b){this.$=b=b||sjcl.hash.sha256;var c=[[],[]],d,e=b.prototype.blockSize/32;this.C=[new b,new b];a.length>e&&(a=b.hash(a));for(d=0;d<e;d++)c[0][d]=a[d]^909522486,c[1][d]=a[d]^1549556828;this.C[0].update(c[0]);this.C[1].update(c[1]);this.U=new b(this.C[0])};
-sjcl.misc.hmac.prototype.encrypt=sjcl.misc.hmac.prototype.mac=function(a){this.ga&&p(new sjcl.exception.invalid("encrypt on already updated hmac called!"));this.update(a);return this.digest(a)};sjcl.misc.hmac.prototype.reset=function(){this.U=new this.$(this.C[0]);this.ga=C};sjcl.misc.hmac.prototype.update=function(a){this.ga=v;this.U.update(a)};sjcl.misc.hmac.prototype.digest=function(){var a=this.U.finalize(),a=(new this.$(this.C[1])).update(a).finalize();this.reset();return a};
-sjcl.misc.pbkdf2=function(a,b,c,d,e){c=c||1E3;(0>d||0>c)&&p(sjcl.exception.invalid("invalid params to pbkdf2"));"string"===typeof a&&(a=sjcl.codec.utf8String.toBits(a));"string"===typeof b&&(b=sjcl.codec.utf8String.toBits(b));e=e||sjcl.misc.hmac;a=new e(a);var f,g,h,k,l=[],n=sjcl.bitArray;for(k=1;32*l.length<(d||1);k++){e=f=a.encrypt(n.concat(b,[k]));for(g=1;g<c;g++){f=a.encrypt(f);for(h=0;h<f.length;h++)e[h]^=f[h]}l=l.concat(e)}d&&(l=n.clamp(l,d));return l};
-sjcl.prng=function(a){this.j=[new sjcl.hash.sha256];this.u=[0];this.T=0;this.L={};this.S=0;this.X={};this.da=this.n=this.w=this.ma=0;this.d=[0,0,0,0,0,0,0,0];this.q=[0,0,0,0];this.Q=r;this.R=a;this.K=C;this.P={progress:{},seeded:{}};this.B=this.la=0;this.M=1;this.O=2;this.ia=0x10000;this.W=[0,48,64,96,128,192,0x100,384,512,768,1024];this.ja=3E4;this.ha=80};
-sjcl.prng.prototype={randomWords:function(a,b){var c=[],d;d=this.isReady(b);var e;d===this.B&&p(new sjcl.exception.notReady("generator isn't seeded"));if(d&this.O){d=!(d&this.M);e=[];var f=0,g;this.da=e[0]=(new Date).valueOf()+this.ja;for(g=0;16>g;g++)e.push(0x100000000*Math.random()|0);for(g=0;g<this.j.length&&!(e=e.concat(this.j[g].finalize()),f+=this.u[g],this.u[g]=0,!d&&this.T&1<<g);g++);this.T>=1<<this.j.length&&(this.j.push(new sjcl.hash.sha256),this.u.push(0));this.n-=f;f>this.w&&(this.w=f);
-    this.T++;this.d=sjcl.hash.sha256.hash(this.d.concat(e));this.Q=new sjcl.cipher.aes(this.d);for(d=0;4>d&&!(this.q[d]=this.q[d]+1|0,this.q[d]);d++);}for(d=0;d<a;d+=4)0===(d+1)%this.ia&&ca(this),e=da(this),c.push(e[0],e[1],e[2],e[3]);ca(this);return c.slice(0,a)},setDefaultParanoia:function(a,b){0===a&&"Setting paranoia=0 will ruin your security; use it only for testing"!==b&&p("Setting paranoia=0 will ruin your security; use it only for testing");this.R=a},addEntropy:function(a,b,c){c=c||"user";var d,
-    e,f=(new Date).valueOf(),g=this.L[c],h=this.isReady(),k=0;d=this.X[c];d===r&&(d=this.X[c]=this.ma++);g===r&&(g=this.L[c]=0);this.L[c]=(this.L[c]+1)%this.j.length;switch(typeof a){case "number":b===r&&(b=1);this.j[g].update([d,this.S++,1,b,f,1,a|0]);break;case "object":c=Object.prototype.toString.call(a);if("[object Uint32Array]"===c){e=[];for(c=0;c<a.length;c++)e.push(a[c]);a=e}else{"[object Array]"!==c&&(k=1);for(c=0;c<a.length&&!k;c++)"number"!==typeof a[c]&&(k=1)}if(!k){if(b===r)for(c=b=0;c<a.length;c++)for(e=
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            a[c];0<e;)b++,e>>>=1;this.j[g].update([d,this.S++,2,b,f,a.length].concat(a))}break;case "string":b===r&&(b=a.length);this.j[g].update([d,this.S++,3,b,f,a.length]);this.j[g].update(a);break;default:k=1}k&&p(new sjcl.exception.bug("random: addEntropy only supports number, array of numbers or string"));this.u[g]+=b;this.n+=b;h===this.B&&(this.isReady()!==this.B&&ea("seeded",Math.max(this.w,this.n)),ea("progress",this.getProgress()))},isReady:function(a){a=this.W[a!==r?a:this.R];return this.w&&this.w>=
-a?this.u[0]>this.ha&&(new Date).valueOf()>this.da?this.O|this.M:this.M:this.n>=a?this.O|this.B:this.B},getProgress:function(a){a=this.W[a?a:this.R];return this.w>=a?1:this.n>a?1:this.n/a},startCollectors:function(){this.K||(this.f={loadTimeCollector:D(this,this.ua),mouseCollector:D(this,this.va),keyboardCollector:D(this,this.sa),accelerometerCollector:D(this,this.ka),touchCollector:D(this,this.xa)},window.addEventListener?(window.addEventListener("load",this.f.loadTimeCollector,C),window.addEventListener("mousemove",
-    this.f.mouseCollector,C),window.addEventListener("keypress",this.f.keyboardCollector,C),window.addEventListener("devicemotion",this.f.accelerometerCollector,C),window.addEventListener("touchmove",this.f.touchCollector,C)):document.attachEvent?(document.attachEvent("onload",this.f.loadTimeCollector),document.attachEvent("onmousemove",this.f.mouseCollector),document.attachEvent("keypress",this.f.keyboardCollector)):p(new sjcl.exception.bug("can't attach event")),this.K=v)},stopCollectors:function(){this.K&&
-(window.removeEventListener?(window.removeEventListener("load",this.f.loadTimeCollector,C),window.removeEventListener("mousemove",this.f.mouseCollector,C),window.removeEventListener("keypress",this.f.keyboardCollector,C),window.removeEventListener("devicemotion",this.f.accelerometerCollector,C),window.removeEventListener("touchmove",this.f.touchCollector,C)):document.detachEvent&&(document.detachEvent("onload",this.f.loadTimeCollector),document.detachEvent("onmousemove",this.f.mouseCollector),document.detachEvent("keypress",
-    this.f.keyboardCollector)),this.K=C)},addEventListener:function(a,b){this.P[a][this.la++]=b},removeEventListener:function(a,b){var c,d,e=this.P[a],f=[];for(d in e)e.hasOwnProperty(d)&&e[d]===b&&f.push(d);for(c=0;c<f.length;c++)d=f[c],delete e[d]},sa:function(){Q(1)},va:function(a){var b,c;try{b=a.x||a.clientX||a.offsetX||0,c=a.y||a.clientY||a.offsetY||0}catch(d){c=b=0}0!=b&&0!=c&&sjcl.random.addEntropy([b,c],2,"mouse");Q(0)},xa:function(a){a=a.touches[0]||a.changedTouches[0];sjcl.random.addEntropy([a.pageX||
-a.clientX,a.pageY||a.clientY],1,"touch");Q(0)},ua:function(){Q(2)},ka:function(a){a=a.accelerationIncludingGravity.x||a.accelerationIncludingGravity.y||a.accelerationIncludingGravity.z;if(window.orientation){var b=window.orientation;"number"===typeof b&&sjcl.random.addEntropy(b,1,"accelerometer")}a&&sjcl.random.addEntropy(a,2,"accelerometer");Q(0)}};function ea(a,b){var c,d=sjcl.random.P[a],e=[];for(c in d)d.hasOwnProperty(c)&&e.push(d[c]);for(c=0;c<e.length;c++)e[c](b)}
-function Q(a){"undefined"!==typeof window&&window.performance&&"function"===typeof window.performance.now?sjcl.random.addEntropy(window.performance.now(),a,"loadtime"):sjcl.random.addEntropy((new Date).valueOf(),a,"loadtime")}function ca(a){a.d=da(a).concat(da(a));a.Q=new sjcl.cipher.aes(a.d)}function da(a){for(var b=0;4>b&&!(a.q[b]=a.q[b]+1|0,a.q[b]);b++);return a.Q.encrypt(a.q)}function D(a,b){return function(){b.apply(a,arguments)}}sjcl.random=new sjcl.prng(6);
-a:try{var R,fa,W,ga;if(ga="undefined"!==typeof module){var la;if(la=module.exports){var ma;try{ma=require("crypto")}catch(pa){ma=null}la=(fa=ma)&&fa.randomBytes}ga=la}if(ga)R=fa.randomBytes(128),R=new Uint32Array((new Uint8Array(R)).buffer),sjcl.random.addEntropy(R,1024,"crypto['randomBytes']");else if("undefined"!==typeof window&&"undefined"!==typeof Uint32Array){W=new Uint32Array(32);if(window.crypto&&window.crypto.getRandomValues)window.crypto.getRandomValues(W);else if(window.msCrypto&&window.msCrypto.getRandomValues)window.msCrypto.getRandomValues(W);
-else break a;sjcl.random.addEntropy(W,1024,"crypto['getRandomValues']")}}catch(qa){"undefined"!==typeof window&&window.console&&(console.log("There was an error collecting entropy from the browser:"),console.log(qa))}
-sjcl.json={defaults:{v:1,iter:1E3,ks:128,ts:64,mode:"ccm",adata:"",cipher:"aes"},oa:function(a,b,c,d){c=c||{};d=d||{};var e=sjcl.json,f=e.p({iv:sjcl.random.randomWords(4,0)},e.defaults),g;e.p(f,c);c=f.adata;"string"===typeof f.salt&&(f.salt=sjcl.codec.base64.toBits(f.salt));"string"===typeof f.iv&&(f.iv=sjcl.codec.base64.toBits(f.iv));(!sjcl.mode[f.mode]||!sjcl.cipher[f.cipher]||"string"===typeof a&&100>=f.iter||64!==f.ts&&96!==f.ts&&128!==f.ts||128!==f.ks&&192!==f.ks&&0x100!==f.ks||2>f.iv.length||
-4<f.iv.length)&&p(new sjcl.exception.invalid("json encrypt: invalid parameters"));"string"===typeof a?(g=sjcl.misc.cachedPbkdf2(a,f),a=g.key.slice(0,f.ks/32),f.salt=g.salt):sjcl.ecc&&a instanceof sjcl.ecc.elGamal.publicKey&&(g=a.kem(),f.kemtag=g.tag,a=g.key.slice(0,f.ks/32));"string"===typeof b&&(b=sjcl.codec.utf8String.toBits(b));"string"===typeof c&&(c=sjcl.codec.utf8String.toBits(c));g=new sjcl.cipher[f.cipher](a);e.p(d,f);d.key=a;f.ct=sjcl.mode[f.mode].encrypt(g,b,f.iv,c,f.ts);return f},encrypt:function(a,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 b,c,d){var e=sjcl.json,f=e.oa.apply(e,arguments);return e.encode(f)},na:function(a,b,c,d){c=c||{};d=d||{};var e=sjcl.json;b=e.p(e.p(e.p({},e.defaults),b),c,v);var f,g;f=b.adata;"string"===typeof b.salt&&(b.salt=sjcl.codec.base64.toBits(b.salt));"string"===typeof b.iv&&(b.iv=sjcl.codec.base64.toBits(b.iv));(!sjcl.mode[b.mode]||!sjcl.cipher[b.cipher]||"string"===typeof a&&100>=b.iter||64!==b.ts&&96!==b.ts&&128!==b.ts||128!==b.ks&&192!==b.ks&&0x100!==b.ks||!b.iv||2>b.iv.length||4<b.iv.length)&&p(new sjcl.exception.invalid("json decrypt: invalid parameters"));
-    "string"===typeof a?(g=sjcl.misc.cachedPbkdf2(a,b),a=g.key.slice(0,b.ks/32),b.salt=g.salt):sjcl.ecc&&a instanceof sjcl.ecc.elGamal.secretKey&&(a=a.unkem(sjcl.codec.base64.toBits(b.kemtag)).slice(0,b.ks/32));"string"===typeof f&&(f=sjcl.codec.utf8String.toBits(f));g=new sjcl.cipher[b.cipher](a);f=sjcl.mode[b.mode].decrypt(g,b.ct,b.iv,f,b.ts);e.p(d,b);d.key=a;return 1===c.raw?f:sjcl.codec.utf8String.fromBits(f)},decrypt:function(a,b,c,d){var e=sjcl.json;return e.na(a,e.decode(b),c,d)},encode:function(a){var b,
-    c="{",d="";for(b in a)if(a.hasOwnProperty(b))switch(b.match(/^[a-z0-9]+$/i)||p(new sjcl.exception.invalid("json encode: invalid property name")),c+=d+'"'+b+'":',d=",",typeof a[b]){case "number":case "boolean":c+=a[b];break;case "string":c+='"'+escape(a[b])+'"';break;case "object":c+='"'+sjcl.codec.base64.fromBits(a[b],0)+'"';break;default:p(new sjcl.exception.bug("json encode: unsupported type"))}return c+"}"},decode:function(a){a=a.replace(/\s/g,"");a.match(/^\{.*\}$/)||p(new sjcl.exception.invalid("json decode: this isn't json!"));
-    a=a.replace(/^\{|\}$/g,"").split(/,/);var b={},c,d;for(c=0;c<a.length;c++)(d=a[c].match(/^\s*(?:(["']?)([a-z][a-z0-9]*)\1)\s*:\s*(?:(-?\d+)|"([a-z0-9+\/%*_.@=\-]*)"|(true|false))$/i))||p(new sjcl.exception.invalid("json decode: this isn't json!")),d[3]?b[d[2]]=parseInt(d[3],10):d[4]?b[d[2]]=d[2].match(/^(ct|salt|iv)$/)?sjcl.codec.base64.toBits(d[4]):unescape(d[4]):d[5]&&(b[d[2]]="true"===d[5]);return b},p:function(a,b,c){a===r&&(a={});if(b===r)return a;for(var d in b)b.hasOwnProperty(d)&&(c&&(a[d]!==
-r&&a[d]!==b[d])&&p(new sjcl.exception.invalid("required parameter overridden")),a[d]=b[d]);return a},za:function(a,b){var c={},d;for(d in a)a.hasOwnProperty(d)&&a[d]!==b[d]&&(c[d]=a[d]);return c},ya:function(a,b){var c={},d;for(d=0;d<b.length;d++)a[b[d]]!==r&&(c[b[d]]=a[b[d]]);return c}};sjcl.encrypt=sjcl.json.encrypt;sjcl.decrypt=sjcl.json.decrypt;sjcl.misc.wa={};
-sjcl.misc.cachedPbkdf2=function(a,b){var c=sjcl.misc.wa,d;b=b||{};d=b.iter||1E3;c=c[a]=c[a]||{};d=c[d]=c[d]||{firstSalt:b.salt&&b.salt.length?b.salt.slice(0):sjcl.random.randomWords(2,0)};c=b.salt===r?d.firstSalt:b.salt;d[c]=d[c]||sjcl.misc.pbkdf2(a,c,b.iter);return{key:d[c].slice(0),salt:c.slice(0)}};sjcl.bn=function(a){this.initWith(a)};
-sjcl.bn.prototype={radix:24,maxMul:8,i:sjcl.bn,copy:function(){return new this.i(this)},initWith:function(a){var b=0,c;switch(typeof a){case "object":this.limbs=a.limbs.slice(0);break;case "number":this.limbs=[a];this.normalize();break;case "string":a=a.replace(/^0x/,"");this.limbs=[];c=this.radix/4;for(b=0;b<a.length;b+=c)this.limbs.push(parseInt(a.substring(Math.max(a.length-b-c,0),a.length-b),16));break;default:this.limbs=[0]}return this},equals:function(a){"number"===typeof a&&(a=new this.i(a));
-    var b=0,c;this.fullReduce();a.fullReduce();for(c=0;c<this.limbs.length||c<a.limbs.length;c++)b|=this.getLimb(c)^a.getLimb(c);return 0===b},getLimb:function(a){return a>=this.limbs.length?0:this.limbs[a]},greaterEquals:function(a){"number"===typeof a&&(a=new this.i(a));var b=0,c=0,d,e,f;for(d=Math.max(this.limbs.length,a.limbs.length)-1;0<=d;d--)e=this.getLimb(d),f=a.getLimb(d),c|=f-e&~b,b|=e-f&~c;return(c|~b)>>>31},toString:function(){this.fullReduce();var a="",b,c,d=this.limbs;for(b=0;b<this.limbs.length;b++){for(c=
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                d[b].toString(16);b<this.limbs.length-1&&6>c.length;)c="0"+c;a=c+a}return"0x"+a},addM:function(a){"object"!==typeof a&&(a=new this.i(a));var b=this.limbs,c=a.limbs;for(a=b.length;a<c.length;a++)b[a]=0;for(a=0;a<c.length;a++)b[a]+=c[a];return this},doubleM:function(){var a,b=0,c,d=this.radix,e=this.radixMask,f=this.limbs;for(a=0;a<f.length;a++)c=f[a],c=c+c+b,f[a]=c&e,b=c>>d;b&&f.push(b);return this},halveM:function(){var a,b=0,c,d=this.radix,e=this.limbs;for(a=e.length-1;0<=a;a--)c=e[a],e[a]=c+b>>
-    1,b=(c&1)<<d;e[e.length-1]||e.pop();return this},subM:function(a){"object"!==typeof a&&(a=new this.i(a));var b=this.limbs,c=a.limbs;for(a=b.length;a<c.length;a++)b[a]=0;for(a=0;a<c.length;a++)b[a]-=c[a];return this},mod:function(a){var b=!this.greaterEquals(new sjcl.bn(0));a=(new sjcl.bn(a)).normalize();var c=(new sjcl.bn(this)).normalize(),d=0;for(b&&(c=(new sjcl.bn(0)).subM(c).normalize());c.greaterEquals(a);d++)a.doubleM();for(b&&(c=a.sub(c).normalize());0<d;d--)a.halveM(),c.greaterEquals(a)&&
-c.subM(a).normalize();return c.trim()},inverseMod:function(a){var b=new sjcl.bn(1),c=new sjcl.bn(0),d=new sjcl.bn(this),e=new sjcl.bn(a),f,g=1;a.limbs[0]&1||p(new sjcl.exception.invalid("inverseMod: p must be odd"));do{d.limbs[0]&1&&(d.greaterEquals(e)||(f=d,d=e,e=f,f=b,b=c,c=f),d.subM(e),d.normalize(),b.greaterEquals(c)||b.addM(a),b.subM(c));d.halveM();b.limbs[0]&1&&b.addM(a);b.normalize();b.halveM();for(f=g=0;f<d.limbs.length;f++)g|=d.limbs[f]}while(g);e.equals(1)||p(new sjcl.exception.invalid("inverseMod: p and x must be relatively prime"));
-    return c},add:function(a){return this.copy().addM(a)},sub:function(a){return this.copy().subM(a)},mul:function(a){"number"===typeof a&&(a=new this.i(a));var b,c=this.limbs,d=a.limbs,e=c.length,f=d.length,g=new this.i,h=g.limbs,k,l=this.maxMul;for(b=0;b<this.limbs.length+a.limbs.length+1;b++)h[b]=0;for(b=0;b<e;b++){k=c[b];for(a=0;a<f;a++)h[b+a]+=k*d[a];--l||(l=this.maxMul,g.cnormalize())}return g.cnormalize().reduce()},square:function(){return this.mul(this)},power:function(a){"number"===typeof a?
-    a=[a]:a.limbs!==r&&(a=a.normalize().limbs);var b,c,d=new this.i(1),e=this;for(b=0;b<a.length;b++)for(c=0;c<this.radix;c++)a[b]&1<<c&&(d=d.mul(e)),e=e.square();return d},mulmod:function(a,b){return this.mod(b).mul(a.mod(b)).mod(b)},powermod:function(a,b){for(var c=new sjcl.bn(1),d=new sjcl.bn(this),e=new sjcl.bn(a);;){e.limbs[0]&1&&(c=c.mulmod(d,b));e.halveM();if(e.equals(0))break;d=d.mulmod(d,b)}return c.normalize().reduce()},trim:function(){var a=this.limbs,b;do b=a.pop();while(a.length&&0===b);
-    a.push(b);return this},reduce:function(){return this},fullReduce:function(){return this.normalize()},normalize:function(){var a=0,b,c=this.placeVal,d=this.ipv,e,f=this.limbs,g=f.length,h=this.radixMask;for(b=0;b<g||0!==a&&-1!==a;b++)a=(f[b]||0)+a,e=f[b]=a&h,a=(a-e)*d;-1===a&&(f[b-1]-=c);return this},cnormalize:function(){var a=0,b,c=this.ipv,d,e=this.limbs,f=e.length,g=this.radixMask;for(b=0;b<f-1;b++)a=e[b]+a,d=e[b]=a&g,a=(a-d)*c;e[b]+=a;return this},toBits:function(a){this.fullReduce();a=a||this.exponent||
-    this.bitLength();var b=Math.floor((a-1)/24),c=sjcl.bitArray,d=[c.partial((a+7&-8)%this.radix||this.radix,this.getLimb(b))];for(b--;0<=b;b--)d=c.concat(d,[c.partial(Math.min(this.radix,a),this.getLimb(b))]),a-=this.radix;return d},bitLength:function(){this.fullReduce();for(var a=this.radix*(this.limbs.length-1),b=this.limbs[this.limbs.length-1];b;b>>>=1)a++;return a+7&-8}};
-sjcl.bn.fromBits=function(a){var b=new this,c=[],d=sjcl.bitArray,e=this.prototype,f=Math.min(this.bitLength||0x100000000,d.bitLength(a)),g=f%e.radix||e.radix;for(c[0]=d.extract(a,0,g);g<f;g+=e.radix)c.unshift(d.extract(a,g,e.radix));b.limbs=c;return b};sjcl.bn.prototype.ipv=1/(sjcl.bn.prototype.placeVal=Math.pow(2,sjcl.bn.prototype.radix));sjcl.bn.prototype.radixMask=(1<<sjcl.bn.prototype.radix)-1;
-sjcl.bn.pseudoMersennePrime=function(a,b){function c(a){this.initWith(a)}var d=c.prototype=new sjcl.bn,e,f;e=d.modOffset=Math.ceil(f=a/d.radix);d.exponent=a;d.offset=[];d.factor=[];d.minOffset=e;d.fullMask=0;d.fullOffset=[];d.fullFactor=[];d.modulus=c.modulus=new sjcl.bn(Math.pow(2,a));d.fullMask=0|-Math.pow(2,a%d.radix);for(e=0;e<b.length;e++)d.offset[e]=Math.floor(b[e][0]/d.radix-f),d.fullOffset[e]=Math.ceil(b[e][0]/d.radix-f),d.factor[e]=b[e][1]*Math.pow(0.5,a-b[e][0]+d.offset[e]*d.radix),d.fullFactor[e]=
-    b[e][1]*Math.pow(0.5,a-b[e][0]+d.fullOffset[e]*d.radix),d.modulus.addM(new sjcl.bn(Math.pow(2,b[e][0])*b[e][1])),d.minOffset=Math.min(d.minOffset,-d.offset[e]);d.i=c;d.modulus.cnormalize();d.reduce=function(){var a,b,c,d=this.modOffset,e=this.limbs,f=this.offset,q=this.offset.length,t=this.factor,s;for(a=this.minOffset;e.length>d;){c=e.pop();s=e.length;for(b=0;b<q;b++)e[s+f[b]]-=t[b]*c;a--;a||(e.push(0),this.cnormalize(),a=this.minOffset)}this.cnormalize();return this};d.fa=-1===d.fullMask?d.reduce:
-    function(){var a=this.limbs,b=a.length-1,c,d;this.reduce();if(b===this.modOffset-1){d=a[b]&this.fullMask;a[b]-=d;for(c=0;c<this.fullOffset.length;c++)a[b+this.fullOffset[c]]-=this.fullFactor[c]*d;this.normalize()}};d.fullReduce=function(){var a,b;this.fa();this.addM(this.modulus);this.addM(this.modulus);this.normalize();this.fa();for(b=this.limbs.length;b<this.modOffset;b++)this.limbs[b]=0;a=this.greaterEquals(this.modulus);for(b=0;b<this.limbs.length;b++)this.limbs[b]-=this.modulus.limbs[b]*a;this.cnormalize();
-    return this};d.inverse=function(){return this.power(this.modulus.sub(2))};c.fromBits=sjcl.bn.fromBits;return c};var X=sjcl.bn.pseudoMersennePrime;
-sjcl.bn.prime={p127:X(127,[[0,-1]]),p25519:X(255,[[0,-19]]),p192k:X(192,[[32,-1],[12,-1],[8,-1],[7,-1],[6,-1],[3,-1],[0,-1]]),p224k:X(224,[[32,-1],[12,-1],[11,-1],[9,-1],[7,-1],[4,-1],[1,-1],[0,-1]]),p256k:X(0x100,[[32,-1],[9,-1],[8,-1],[7,-1],[6,-1],[4,-1],[0,-1]]),p192:X(192,[[0,-1],[64,-1]]),p224:X(224,[[0,1],[96,-1]]),p256:X(0x100,[[0,-1],[96,1],[192,1],[224,-1]]),p384:X(384,[[0,-1],[32,1],[96,-1],[128,-1]]),p521:X(521,[[0,-1]])};
-sjcl.bn.random=function(a,b){"object"!==typeof a&&(a=new sjcl.bn(a));for(var c,d,e=a.limbs.length,f=a.limbs[e-1]+1,g=new sjcl.bn;;){do c=sjcl.random.randomWords(e,b),0>c[e-1]&&(c[e-1]+=0x100000000);while(Math.floor(c[e-1]/f)===Math.floor(0x100000000/f));c[e-1]%=f;for(d=0;d<e-1;d++)c[d]&=a.radixMask;g.limbs=c;if(!g.greaterEquals(a))return g}};sjcl.ecc={};
-sjcl.ecc.point=function(a,b,c){b===r?this.isIdentity=v:(b instanceof sjcl.bn&&(b=new a.field(b)),c instanceof sjcl.bn&&(c=new a.field(c)),this.x=b,this.y=c,this.isIdentity=C);this.curve=a};
-sjcl.ecc.point.prototype={toJac:function(){return new sjcl.ecc.pointJac(this.curve,this.x,this.y,new this.curve.field(1))},mult:function(a){return this.toJac().mult(a,this).toAffine()},mult2:function(a,b,c){return this.toJac().mult2(a,this,b,c).toAffine()},multiples:function(){var a,b,c;if(this.ca===r){c=this.toJac().doubl();a=this.ca=[new sjcl.ecc.point(this.curve),this,c.toAffine()];for(b=3;16>b;b++)c=c.add(this),a.push(c.toAffine())}return this.ca},isValid:function(){return this.y.square().equals(this.curve.b.add(this.x.mul(this.curve.a.add(this.x.square()))))},
-    toBits:function(){return sjcl.bitArray.concat(this.x.toBits(),this.y.toBits())}};sjcl.ecc.pointJac=function(a,b,c,d){b===r?this.isIdentity=v:(this.x=b,this.y=c,this.z=d,this.isIdentity=C);this.curve=a};
-sjcl.ecc.pointJac.prototype={add:function(a){var b,c,d,e;this.curve!==a.curve&&p("sjcl['ecc']['add'](): Points must be on the same curve to add them!");if(this.isIdentity)return a.toJac();if(a.isIdentity)return this;b=this.z.square();c=a.x.mul(b).subM(this.x);if(c.equals(0))return this.y.equals(a.y.mul(b.mul(this.z)))?this.doubl():new sjcl.ecc.pointJac(this.curve);b=a.y.mul(b.mul(this.z)).subM(this.y);d=c.square();a=b.square();e=c.square().mul(c).addM(this.x.add(this.x).mul(d));a=a.subM(e);b=this.x.mul(d).subM(a).mul(b);
-    d=this.y.mul(c.square().mul(c));b=b.subM(d);c=this.z.mul(c);return new sjcl.ecc.pointJac(this.curve,a,b,c)},doubl:function(){if(this.isIdentity)return this;var a=this.y.square(),b=a.mul(this.x.mul(4)),c=a.square().mul(8),a=this.z.square(),d=this.curve.a.toString()==(new sjcl.bn(-3)).toString()?this.x.sub(a).mul(3).mul(this.x.add(a)):this.x.square().mul(3).add(a.square().mul(this.curve.a)),a=d.square().subM(b).subM(b),b=b.sub(a).mul(d).subM(c),c=this.y.add(this.y).mul(this.z);return new sjcl.ecc.pointJac(this.curve,
-    a,b,c)},toAffine:function(){if(this.isIdentity||this.z.equals(0))return new sjcl.ecc.point(this.curve);var a=this.z.inverse(),b=a.square();return new sjcl.ecc.point(this.curve,this.x.mul(b).fullReduce(),this.y.mul(b.mul(a)).fullReduce())},mult:function(a,b){"number"===typeof a?a=[a]:a.limbs!==r&&(a=a.normalize().limbs);var c,d,e=(new sjcl.ecc.point(this.curve)).toJac(),f=b.multiples();for(c=a.length-1;0<=c;c--)for(d=sjcl.bn.prototype.radix-4;0<=d;d-=4)e=e.doubl().doubl().doubl().doubl().add(f[a[c]>>
-d&15]);return e},mult2:function(a,b,c,d){"number"===typeof a?a=[a]:a.limbs!==r&&(a=a.normalize().limbs);"number"===typeof c?c=[c]:c.limbs!==r&&(c=c.normalize().limbs);var e,f=(new sjcl.ecc.point(this.curve)).toJac();b=b.multiples();var g=d.multiples(),h,k;for(d=Math.max(a.length,c.length)-1;0<=d;d--){h=a[d]|0;k=c[d]|0;for(e=sjcl.bn.prototype.radix-4;0<=e;e-=4)f=f.doubl().doubl().doubl().doubl().add(b[h>>e&15]).add(g[k>>e&15])}return f},isValid:function(){var a=this.z.square(),b=a.square(),a=b.mul(a);
-    return this.y.square().equals(this.curve.b.mul(a).add(this.x.mul(this.curve.a.mul(b).add(this.x.square()))))}};sjcl.ecc.curve=function(a,b,c,d,e,f){this.field=a;this.r=new sjcl.bn(b);this.a=new a(c);this.b=new a(d);this.G=new sjcl.ecc.point(this,new a(e),new a(f))};
-sjcl.ecc.curve.prototype.fromBits=function(a){var b=sjcl.bitArray,c=this.field.prototype.exponent+7&-8;a=new sjcl.ecc.point(this,this.field.fromBits(b.bitSlice(a,0,c)),this.field.fromBits(b.bitSlice(a,c,2*c)));a.isValid()||p(new sjcl.exception.corrupt("not on the curve!"));return a};
-sjcl.ecc.curves={c192:new sjcl.ecc.curve(sjcl.bn.prime.p192,"0xffffffffffffffffffffffff99def836146bc9b1b4d22831",-3,"0x64210519e59c80e70fa7e9ab72243049feb8deecc146b9b1","0x188da80eb03090f67cbf20eb43a18800f4ff0afd82ff1012","0x07192b95ffc8da78631011ed6b24cdd573f977a11e794811"),c224:new sjcl.ecc.curve(sjcl.bn.prime.p224,"0xffffffffffffffffffffffffffff16a2e0b8f03e13dd29455c5c2a3d",-3,"0xb4050a850c04b3abf54132565044b0b7d7bfd8ba270b39432355ffb4","0xb70e0cbd6bb4bf7f321390b94a03c1d356c21122343280d6115c1d21",
-    "0xbd376388b5f723fb4c22dfe6cd4375a05a07476444d5819985007e34"),c256:new sjcl.ecc.curve(sjcl.bn.prime.p256,"0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",-3,"0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b","0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296","0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5"),c384:new sjcl.ecc.curve(sjcl.bn.prime.p384,"0xffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973",
-    -3,"0xb3312fa7e23ee7e4988e056be3f82d19181d9c6efe8141120314088f5013875ac656398d8a2ed19d2a85c8edd3ec2aef","0xaa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e082542a385502f25dbf55296c3a545e3872760ab7","0x3617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f"),k192:new sjcl.ecc.curve(sjcl.bn.prime.p192k,"0xfffffffffffffffffffffffe26f2fc170f69466a74defd8d",0,3,"0xdb4ff10ec057e9ae26b07d0280b7f4341da5d1b1eae06c7d","0x9b2f2f6d9c5628a7844163d015be86344082aa88d95e2f9d"),
-    k224:new sjcl.ecc.curve(sjcl.bn.prime.p224k,"0x010000000000000000000000000001dce8d2ec6184caf0a971769fb1f7",0,5,"0xa1455b334df099df30fc28a169a467e9e47075a90f7e650eb6b7a45c","0x7e089fed7fba344282cafbd6f7e319f7c0b0bd59e2ca4bdb556d61a5"),k256:new sjcl.ecc.curve(sjcl.bn.prime.p256k,"0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",0,7,"0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")};
-sjcl.ecc.basicKey={publicKey:function(a,b){this.l=a;this.s=a.r.bitLength();this.I=b instanceof Array?a.fromBits(b):b;this.get=function(){var a=this.I.toBits(),b=sjcl.bitArray.bitLength(a),e=sjcl.bitArray.bitSlice(a,0,b/2),a=sjcl.bitArray.bitSlice(a,b/2);return{x:e,y:a}}},secretKey:function(a,b){this.l=a;this.s=a.r.bitLength();this.H=b;this.get=function(){return this.H.toBits()}}};
-sjcl.ecc.basicKey.generateKeys=function(a){return function(b,c,d){b=b||0x100;"number"===typeof b&&(b=sjcl.ecc.curves["c"+b],b===r&&p(new sjcl.exception.invalid("no such curve")));d=d||sjcl.bn.random(b.r,c);c=b.G.mult(d);return{pub:new sjcl.ecc[a].publicKey(b,c),sec:new sjcl.ecc[a].secretKey(b,d)}}};
-sjcl.ecc.elGamal={generateKeys:sjcl.ecc.basicKey.generateKeys("elGamal"),publicKey:function(a,b){sjcl.ecc.basicKey.publicKey.apply(this,arguments)},secretKey:function(a,b){sjcl.ecc.basicKey.secretKey.apply(this,arguments)}};sjcl.ecc.elGamal.publicKey.prototype={kem:function(a){a=sjcl.bn.random(this.l.r,a);var b=this.l.G.mult(a).toBits();return{key:sjcl.hash.sha256.hash(this.I.mult(a).toBits()),tag:b}}};
-sjcl.ecc.elGamal.secretKey.prototype={unkem:function(a){return sjcl.hash.sha256.hash(this.l.fromBits(a).mult(this.H).toBits())},dh:function(a){return sjcl.hash.sha256.hash(a.I.mult(this.H).toBits())},dhJavaEc:function(a){return a.I.mult(this.H).x.toBits()}};sjcl.ecc.ecdsa={generateKeys:sjcl.ecc.basicKey.generateKeys("ecdsa")};sjcl.ecc.ecdsa.publicKey=function(a,b){sjcl.ecc.basicKey.publicKey.apply(this,arguments)};
-sjcl.ecc.ecdsa.publicKey.prototype={verify:function(a,b,c){sjcl.bitArray.bitLength(a)>this.s&&(a=sjcl.bitArray.clamp(a,this.s));var d=sjcl.bitArray,e=this.l.r,f=this.s,g=sjcl.bn.fromBits(d.bitSlice(b,0,f)),d=sjcl.bn.fromBits(d.bitSlice(b,f,2*f)),h=c?d:d.inverseMod(e),f=sjcl.bn.fromBits(a).mul(h).mod(e),h=g.mul(h).mod(e),f=this.l.G.mult2(f,h,this.I).x;if(g.equals(0)||d.equals(0)||g.greaterEquals(e)||d.greaterEquals(e)||!f.equals(g)){if(c===r)return this.verify(a,b,v);p(new sjcl.exception.corrupt("signature didn't check out"))}return v}};
-sjcl.ecc.ecdsa.secretKey=function(a,b){sjcl.ecc.basicKey.secretKey.apply(this,arguments)};sjcl.ecc.ecdsa.secretKey.prototype={sign:function(a,b,c,d){sjcl.bitArray.bitLength(a)>this.s&&(a=sjcl.bitArray.clamp(a,this.s));var e=this.l.r,f=e.bitLength();d=d||sjcl.bn.random(e.sub(1),b).add(1);b=this.l.G.mult(d).x.mod(e);a=sjcl.bn.fromBits(a).add(b.mul(this.H));c=c?a.inverseMod(e).mul(d).mod(e):a.mul(d.inverseMod(e)).mod(e);return sjcl.bitArray.concat(b.toBits(f),c.toBits(f))}};
-sjcl.keyexchange.srp={makeVerifier:function(a,b,c,d){a=sjcl.keyexchange.srp.makeX(a,b,c);a=sjcl.bn.fromBits(a);return d.g.powermod(a,d.N)},makeX:function(a,b,c){a=sjcl.hash.sha1.hash(a+":"+b);return sjcl.hash.sha1.hash(sjcl.bitArray.concat(c,a))},knownGroup:function(a){"string"!==typeof a&&(a=a.toString());sjcl.keyexchange.srp.Z||sjcl.keyexchange.srp.qa();return sjcl.keyexchange.srp.ba[a]},Z:C,qa:function(){var a,b;for(a=0;a<sjcl.keyexchange.srp.aa.length;a++)b=sjcl.keyexchange.srp.aa[a].toString(),
-    b=sjcl.keyexchange.srp.ba[b],b.N=new sjcl.bn(b.N),b.g=new sjcl.bn(b.g);sjcl.keyexchange.srp.Z=v},aa:[1024,1536,2048],ba:{1024:{N:"EEAF0AB9ADB38DD69C33F80AFA8FC5E86072618775FF3C0B9EA2314C9C256576D674DF7496EA81D3383B4813D692C6E0E0D5D8E250B98BE48E495C1D6089DAD15DC7D7B46154D6B6CE8EF4AD69B15D4982559B297BCF1885C529F566660E57EC68EDBC3C05726CC02FD4CBF4976EAA9AFD5138FE8376435B9FC61D2FC0EB06E3",g:2},1536:{N:"9DEF3CAFB939277AB1F12A8617A47BBBDBA51DF499AC4C80BEEEA9614B19CC4D5F4F5F556E27CBDE51C6A94BE4607A291558903BA0D0F84380B655BB9A22E8DCDF028A7CEC67F0D08134B1C8B97989149B609E0BE3BAB63D47548381DBC5B1FC764E3F4B53DD9DA1158BFD3E2B9C8CF56EDF019539349627DB2FD53D24B7C48665772E437D6C7F8CE442734AF7CCB7AE837C264AE3A9BEB87F8A2FE9B8B5292E5A021FFF5E91479E8CE7A28C2442C6F315180F93499A234DCF76E3FED135F9BB",
-    g:2},2048:{N:"AC6BDB41324A9A9BF166DE5E1389582FAF72B6651987EE07FC3192943DB56050A37329CBB4A099ED8193E0757767A13DD52312AB4B03310DCD7F48A9DA04FD50E8083969EDB767B0CF6095179A163AB3661A05FBD5FAAAE82918A9962F0B93B855F97993EC975EEAA80D740ADBF4FF747359D041D5C33EA71D281E446B14773BCA97B43A23FB801676BD207A436C6481F1D2B9078717461A5B9D32E688F87748544523B524B0D57D5EA77A2775D2ECFA032CFBDBF52FB3786160279004E57AE6AF874E7303CE53299CCC041C7BC308D82A5698F3A8D0C38271AE35F8E9DBFBB694B5C803D89F7AE435DE236D525F54759B65E372FCD68EF20FA7111F9E4AFF73",
-    g:2}}};
+/*
+ * JavaScript MD5 1.0.1
+ * https://github.com/blueimp/JavaScript-MD5
+ *
+ * Copyright 2011, Sebastian Tschan
+ * https://blueimp.net
+ *
+ * Licensed under the MIT license:
+ * http://www.opensource.org/licenses/MIT
+ *
+ * Based on
+ * A JavaScript implementation of the RSA Data Security, Inc. MD5 Message
+ * Digest Algorithm, as defined in RFC 1321.
+ * Version 2.2 Copyright (C) Paul Johnston 1999 - 2009
+ * Other contributors: Greg Holt, Andrew Kepert, Ydnar, Lostinet
+ * Distributed under the BSD License
+ * See http://pajhome.org.uk/crypt/md5 for more info.
+ */
+
+/*jslint bitwise: true */
+/*global unescape, define */
+
+(function ($) {
+    'use strict';
+
+    /*
+     * Add integers, wrapping at 2^32. This uses 16-bit operations internally
+     * to work around bugs in some JS interpreters.
+     */
+    function safe_add(x, y) {
+        var lsw = (x & 0xFFFF) + (y & 0xFFFF),
+            msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+        return (msw << 16) | (lsw & 0xFFFF);
+    }
+
+    /*
+     * Bitwise rotate a 32-bit number to the left.
+     */
+    function bit_rol(num, cnt) {
+        return (num << cnt) | (num >>> (32 - cnt));
+    }
+
+    /*
+     * These functions implement the four basic operations the algorithm uses.
+     */
+    function md5_cmn(q, a, b, x, s, t) {
+        return safe_add(bit_rol(safe_add(safe_add(a, q), safe_add(x, t)), s), b);
+    }
+    function md5_ff(a, b, c, d, x, s, t) {
+        return md5_cmn((b & c) | ((~b) & d), a, b, x, s, t);
+    }
+    function md5_gg(a, b, c, d, x, s, t) {
+        return md5_cmn((b & d) | (c & (~d)), a, b, x, s, t);
+    }
+    function md5_hh(a, b, c, d, x, s, t) {
+        return md5_cmn(b ^ c ^ d, a, b, x, s, t);
+    }
+    function md5_ii(a, b, c, d, x, s, t) {
+        return md5_cmn(c ^ (b | (~d)), a, b, x, s, t);
+    }
+
+    /*
+     * Calculate the MD5 of an array of little-endian words, and a bit length.
+     */
+    function binl_md5(x, len) {
+        /* append padding */
+        x[len >> 5] |= 0x80 << (len % 32);
+        x[(((len + 64) >>> 9) << 4) + 14] = len;
+
+        var i, olda, oldb, oldc, oldd,
+            a =  1732584193,
+            b = -271733879,
+            c = -1732584194,
+            d =  271733878;
+
+        for (i = 0; i < x.length; i += 16) {
+            olda = a;
+            oldb = b;
+            oldc = c;
+            oldd = d;
+
+            a = md5_ff(a, b, c, d, x[i],       7, -680876936);
+            d = md5_ff(d, a, b, c, x[i +  1], 12, -389564586);
+            c = md5_ff(c, d, a, b, x[i +  2], 17,  606105819);
+            b = md5_ff(b, c, d, a, x[i +  3], 22, -1044525330);
+            a = md5_ff(a, b, c, d, x[i +  4],  7, -176418897);
+            d = md5_ff(d, a, b, c, x[i +  5], 12,  1200080426);
+            c = md5_ff(c, d, a, b, x[i +  6], 17, -1473231341);
+            b = md5_ff(b, c, d, a, x[i +  7], 22, -45705983);
+            a = md5_ff(a, b, c, d, x[i +  8],  7,  1770035416);
+            d = md5_ff(d, a, b, c, x[i +  9], 12, -1958414417);
+            c = md5_ff(c, d, a, b, x[i + 10], 17, -42063);
+            b = md5_ff(b, c, d, a, x[i + 11], 22, -1990404162);
+            a = md5_ff(a, b, c, d, x[i + 12],  7,  1804603682);
+            d = md5_ff(d, a, b, c, x[i + 13], 12, -40341101);
+            c = md5_ff(c, d, a, b, x[i + 14], 17, -1502002290);
+            b = md5_ff(b, c, d, a, x[i + 15], 22,  1236535329);
+
+            a = md5_gg(a, b, c, d, x[i +  1],  5, -165796510);
+            d = md5_gg(d, a, b, c, x[i +  6],  9, -1069501632);
+            c = md5_gg(c, d, a, b, x[i + 11], 14,  643717713);
+            b = md5_gg(b, c, d, a, x[i],      20, -373897302);
+            a = md5_gg(a, b, c, d, x[i +  5],  5, -701558691);
+            d = md5_gg(d, a, b, c, x[i + 10],  9,  38016083);
+            c = md5_gg(c, d, a, b, x[i + 15], 14, -660478335);
+            b = md5_gg(b, c, d, a, x[i +  4], 20, -405537848);
+            a = md5_gg(a, b, c, d, x[i +  9],  5,  568446438);
+            d = md5_gg(d, a, b, c, x[i + 14],  9, -1019803690);
+            c = md5_gg(c, d, a, b, x[i +  3], 14, -187363961);
+            b = md5_gg(b, c, d, a, x[i +  8], 20,  1163531501);
+            a = md5_gg(a, b, c, d, x[i + 13],  5, -1444681467);
+            d = md5_gg(d, a, b, c, x[i +  2],  9, -51403784);
+            c = md5_gg(c, d, a, b, x[i +  7], 14,  1735328473);
+            b = md5_gg(b, c, d, a, x[i + 12], 20, -1926607734);
+
+            a = md5_hh(a, b, c, d, x[i +  5],  4, -378558);
+            d = md5_hh(d, a, b, c, x[i +  8], 11, -2022574463);
+            c = md5_hh(c, d, a, b, x[i + 11], 16,  1839030562);
+            b = md5_hh(b, c, d, a, x[i + 14], 23, -35309556);
+            a = md5_hh(a, b, c, d, x[i +  1],  4, -1530992060);
+            d = md5_hh(d, a, b, c, x[i +  4], 11,  1272893353);
+            c = md5_hh(c, d, a, b, x[i +  7], 16, -155497632);
+            b = md5_hh(b, c, d, a, x[i + 10], 23, -1094730640);
+            a = md5_hh(a, b, c, d, x[i + 13],  4,  681279174);
+            d = md5_hh(d, a, b, c, x[i],      11, -358537222);
+            c = md5_hh(c, d, a, b, x[i +  3], 16, -722521979);
+            b = md5_hh(b, c, d, a, x[i +  6], 23,  76029189);
+            a = md5_hh(a, b, c, d, x[i +  9],  4, -640364487);
+            d = md5_hh(d, a, b, c, x[i + 12], 11, -421815835);
+            c = md5_hh(c, d, a, b, x[i + 15], 16,  530742520);
+            b = md5_hh(b, c, d, a, x[i +  2], 23, -995338651);
+
+            a = md5_ii(a, b, c, d, x[i],       6, -198630844);
+            d = md5_ii(d, a, b, c, x[i +  7], 10,  1126891415);
+            c = md5_ii(c, d, a, b, x[i + 14], 15, -1416354905);
+            b = md5_ii(b, c, d, a, x[i +  5], 21, -57434055);
+            a = md5_ii(a, b, c, d, x[i + 12],  6,  1700485571);
+            d = md5_ii(d, a, b, c, x[i +  3], 10, -1894986606);
+            c = md5_ii(c, d, a, b, x[i + 10], 15, -1051523);
+            b = md5_ii(b, c, d, a, x[i +  1], 21, -2054922799);
+            a = md5_ii(a, b, c, d, x[i +  8],  6,  1873313359);
+            d = md5_ii(d, a, b, c, x[i + 15], 10, -30611744);
+            c = md5_ii(c, d, a, b, x[i +  6], 15, -1560198380);
+            b = md5_ii(b, c, d, a, x[i + 13], 21,  1309151649);
+            a = md5_ii(a, b, c, d, x[i +  4],  6, -145523070);
+            d = md5_ii(d, a, b, c, x[i + 11], 10, -1120210379);
+            c = md5_ii(c, d, a, b, x[i +  2], 15,  718787259);
+            b = md5_ii(b, c, d, a, x[i +  9], 21, -343485551);
+
+            a = safe_add(a, olda);
+            b = safe_add(b, oldb);
+            c = safe_add(c, oldc);
+            d = safe_add(d, oldd);
+        }
+        return [a, b, c, d];
+    }
+
+    /*
+     * Convert an array of little-endian words to a string
+     */
+    function binl2rstr(input) {
+        var i,
+            output = '';
+        for (i = 0; i < input.length * 32; i += 8) {
+            output += String.fromCharCode((input[i >> 5] >>> (i % 32)) & 0xFF);
+        }
+        return output;
+    }
+
+    /*
+     * Convert a raw string to an array of little-endian words
+     * Characters >255 have their high-byte silently ignored.
+     */
+    function rstr2binl(input) {
+        var i,
+            output = [];
+        output[(input.length >> 2) - 1] = undefined;
+        for (i = 0; i < output.length; i += 1) {
+            output[i] = 0;
+        }
+        for (i = 0; i < input.length * 8; i += 8) {
+            output[i >> 5] |= (input.charCodeAt(i / 8) & 0xFF) << (i % 32);
+        }
+        return output;
+    }
+
+    /*
+     * Calculate the MD5 of a raw string
+     */
+    function rstr_md5(s) {
+        return binl2rstr(binl_md5(rstr2binl(s), s.length * 8));
+    }
+
+    /*
+     * Calculate the HMAC-MD5, of a key and some data (raw strings)
+     */
+    function rstr_hmac_md5(key, data) {
+        var i,
+            bkey = rstr2binl(key),
+            ipad = [],
+            opad = [],
+            hash;
+        ipad[15] = opad[15] = undefined;
+        if (bkey.length > 16) {
+            bkey = binl_md5(bkey, key.length * 8);
+        }
+        for (i = 0; i < 16; i += 1) {
+            ipad[i] = bkey[i] ^ 0x36363636;
+            opad[i] = bkey[i] ^ 0x5C5C5C5C;
+        }
+        hash = binl_md5(ipad.concat(rstr2binl(data)), 512 + data.length * 8);
+        return binl2rstr(binl_md5(opad.concat(hash), 512 + 128));
+    }
+
+    /*
+     * Convert a raw string to a hex string
+     */
+    function rstr2hex(input) {
+        var hex_tab = '0123456789abcdef',
+            output = '',
+            x,
+            i;
+        for (i = 0; i < input.length; i += 1) {
+            x = input.charCodeAt(i);
+            output += hex_tab.charAt((x >>> 4) & 0x0F) +
+                hex_tab.charAt(x & 0x0F);
+        }
+        return output;
+    }
+
+    /*
+     * Encode a string as utf-8
+     */
+    function str2rstr_utf8(input) {
+        return unescape(encodeURIComponent(input));
+    }
+
+    /*
+     * Take string arguments and return either raw or hex encoded strings
+     */
+    function raw_md5(s) {
+        return rstr_md5(str2rstr_utf8(s));
+    }
+    function hex_md5(s) {
+        return rstr2hex(raw_md5(s));
+    }
+    function raw_hmac_md5(k, d) {
+        return rstr_hmac_md5(str2rstr_utf8(k), str2rstr_utf8(d));
+    }
+    function hex_hmac_md5(k, d) {
+        return rstr2hex(raw_hmac_md5(k, d));
+    }
+
+    function md5(string, key, raw) {
+        if (!key) {
+            if (!raw) {
+                return hex_md5(string);
+            }
+            return raw_md5(string);
+        }
+        if (!raw) {
+            return hex_hmac_md5(key, string);
+        }
+        return raw_hmac_md5(key, string);
+    }
+
+    if (typeof define === 'function' && define.amd) {
+        define(function () {
+            return md5;
+        });
+    } else {
+        $.md5 = md5;
+    }
+}(this));
 /*!
  * Vue.js v2.4.0
  * (c) 2014-2017 Evan You

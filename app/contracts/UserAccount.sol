@@ -3,9 +3,9 @@ pragma solidity ^0.4.0;
 
 //An instantiation of UserAccount which stands for a user.
 contract UserAccount {
-    bytes32 public MyName;
+    bytes32 public MyNickname;
 
-    bytes32 public MyPubKey;
+    bytes32[4] private MyPubKey;
 
     SocialAccount[] private SocialAccounts;//This is a dynamic arraylist of struct SocialAccount.
     mapping (bytes32 => mapping (bytes32 => Index)) private SocialAccountIndex;
@@ -26,7 +26,7 @@ contract UserAccount {
     struct Contact {
     address ConAddress;
     bytes32 ConName;
-    bytes32 ConPubKey;
+    bytes32[4] ConPubKey;
     }
 
     struct SocialAccount {
@@ -45,17 +45,30 @@ contract UserAccount {
 
 
     //constructor
-    function UserAccount(bytes32 Name, bytes32 PubKey) payable {
-        MyName = Name;
-        MyPubKey = PubKey;
+    function UserAccount(bytes32 Name, bytes32 PubKey_x1, bytes32 PubKey_x2, bytes32 PubKey_y1, bytes32 PubKey_y2) payable {
+        MyNickname = Name;
+        MyPubKey[0] = PubKey_x1;
+        MyPubKey[1] = PubKey_x2;
+        MyPubKey[2] = PubKey_y1;
+        MyPubKey[3] = PubKey_y2;
     }
 
     function setName(bytes32 newName) payable {
-        MyName = newName;
+        MyNickname = newName;
     }
 
-    function setPublicKey(bytes32 newPubKey) payable {
-        MyPubKey = newPubKey;
+    function setPublicKey(bytes32 PubKey_x1, bytes32 PubKey_x2, bytes32 PubKey_y1, bytes32 PubKey_y2) payable {
+        MyPubKey[0] = PubKey_x1;
+        MyPubKey[1] = PubKey_x2;
+        MyPubKey[2] = PubKey_y1;
+        MyPubKey[3] = PubKey_y2;
+    }
+
+    function getPublicKey() constant returns (bytes32 x1, bytes32 x2, bytes32 y1, bytes32 y2){
+        x1 = MyPubKey[0];
+        x2 = MyPubKey[1];
+        y1 = MyPubKey[2];
+        y2 = MyPubKey[3];
     }
 
     //Functions about SocialAccount.
@@ -113,8 +126,13 @@ contract UserAccount {
 
 
     //Functions about Contacts.
-    function AddContact(address newCAddress, bytes32 newCName, bytes32 newCPubkey) payable {
+    function AddContact(address newCAddress, bytes32 newCName, bytes32 PubKey_x1, bytes32 PubKey_x2, bytes32 PubKey_y1, bytes32 PubKey_y2) payable {
         if (!ContactIndex[newCAddress].initialized) {
+            bytes32[4] memory newCPubkey;
+            newCPubkey[0] = PubKey_x1;
+            newCPubkey[1] = PubKey_x2;
+            newCPubkey[2] = PubKey_y1;
+            newCPubkey[3] = PubKey_y2;
             Contacts.push(Contact(newCAddress, newCName, newCPubkey));
             ContactIndex[newCAddress].index = Contacts.length - 1;
             ContactIndex[newCAddress].initialized = true;
@@ -131,11 +149,11 @@ contract UserAccount {
             Log("Successfully modified the contact name.");}
     }
 
-    function AlterContactPubkey(address targetAddress, bytes32 altCPubkey) payable {
+    function AlterContactPubkey(address targetAddress, bytes32 PubKey_x1, bytes32 PubKey_x2, bytes32 PubKey_y1, bytes32 PubKey_y2) payable {
         if (!ContactIndex[targetAddress].initialized) {
             Log("Failed! There is no such record.");}
         else {
-            Contacts[ContactIndex[targetAddress].index].ConPubKey = altCPubkey;
+            Contacts[ContactIndex[targetAddress].index].ConPubKey = [PubKey_x1, PubKey_x2, PubKey_y1, PubKey_y2];
             Log("Successfully modified the contact public key.");}
     }
 
@@ -154,12 +172,16 @@ contract UserAccount {
             Log("Successfully deleted the contact.");}
     }
 
-    function getTargetContactPubKey(address targetAddress) constant returns (bytes32 resPubKey, bool isFound){
+    function getTargetContactPubKey(address targetAddress) constant returns (bytes32 PubKey_x1, bytes32 PubKey_x2, bytes32 PubKey_y1, bytes32 PubKey_y2, bool isFound){
         if (!ContactIndex[targetAddress].initialized) {//There is no existing record.
             isFound = false;}
         else {//There existing target record.
             uint targetIndex = ContactIndex[targetAddress].index;
-            resPubKey = Contacts[targetIndex].ConPubKey;
+            bytes32[4] resPubKey = Contacts[targetIndex].ConPubKey;
+            PubKey_x1 = resPubKey[0];
+            PubKey_x2 = resPubKey[1];
+            PubKey_y1 = resPubKey[2];
+            PubKey_y2 = resPubKey[3];
             isFound = true;}
     }
 

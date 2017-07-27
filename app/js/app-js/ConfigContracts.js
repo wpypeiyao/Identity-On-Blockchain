@@ -1,30 +1,11 @@
+//check the correct connection with web3
+if (typeof web3 !== 'undefined') {
+    web3 = new Web3(web3.currentProvider);}
+    else {
+    web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));};
+
 //link to contract;TokenFunctions
 var TokenFunctionsContract = web3.eth.contract([
-    {
-        "constant": false,
-        "inputs": [
-            {
-                "name": "Identity",
-                "type": "bytes32"
-            },
-            {
-                "name": "receiverAddress",
-                "type": "address"
-            },
-            {
-                "name": "targetApp",
-                "type": "bytes32"
-            },
-            {
-                "name": "targetUsername",
-                "type": "bytes32"
-            }
-        ],
-        "name": "AddSharedAccount",
-        "outputs": [],
-        "payable": false,
-        "type": "function"
-    },
     {
         "constant": false,
         "inputs": [
@@ -119,23 +100,6 @@ var TokenFunctionsContract = web3.eth.contract([
                 "type": "bytes32"
             },
             {
-                "name": "newPubKey",
-                "type": "bytes32"
-            }
-        ],
-        "name": "setMyPubKey",
-        "outputs": [],
-        "payable": false,
-        "type": "function"
-    },
-    {
-        "constant": false,
-        "inputs": [
-            {
-                "name": "Identity",
-                "type": "bytes32"
-            },
-            {
                 "name": "targetApp",
                 "type": "bytes32"
             },
@@ -157,15 +121,23 @@ var TokenFunctionsContract = web3.eth.contract([
                 "type": "bytes32"
             },
             {
-                "name": "Name",
+                "name": "receiverAddress",
+                "type": "address"
+            },
+            {
+                "name": "targetApp",
                 "type": "bytes32"
             },
             {
-                "name": "PubKey",
+                "name": "targetUsername",
+                "type": "bytes32"
+            },
+            {
+                "name": "targetPassword",
                 "type": "bytes32"
             }
         ],
-        "name": "newUserAccount",
+        "name": "AddSharedAccount",
         "outputs": [],
         "payable": false,
         "type": "function"
@@ -271,7 +243,19 @@ var TokenFunctionsContract = web3.eth.contract([
         "name": "getTargetContactPubKey",
         "outputs": [
             {
-                "name": "resPubKey",
+                "name": "PubKey_x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
                 "type": "bytes32"
             },
             {
@@ -301,6 +285,39 @@ var TokenFunctionsContract = web3.eth.contract([
         "type": "function"
     },
     {
+        "constant": false,
+        "inputs": [
+            {
+                "name": "Identity",
+                "type": "bytes32"
+            },
+            {
+                "name": "Name",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
+                "type": "bytes32"
+            }
+        ],
+        "name": "newUserAccount",
+        "outputs": [],
+        "payable": false,
+        "type": "function"
+    },
+    {
         "constant": true,
         "inputs": [
             {
@@ -311,7 +328,19 @@ var TokenFunctionsContract = web3.eth.contract([
         "name": "getMyPubKey",
         "outputs": [
             {
-                "name": "MyPubKey",
+                "name": "PubKey_x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
                 "type": "bytes32"
             }
         ],
@@ -425,6 +454,60 @@ var TokenFunctionsContract = web3.eth.contract([
         "type": "function"
     },
     {
+        "constant": true,
+        "inputs": [],
+        "name": "getManagerPubkey",
+        "outputs": [
+            {
+                "name": "x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "y2",
+                "type": "bytes32"
+            }
+        ],
+        "payable": false,
+        "type": "function"
+    },
+    {
+        "constant": false,
+        "inputs": [
+            {
+                "name": "Identity",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
+                "type": "bytes32"
+            }
+        ],
+        "name": "setMyPubKey",
+        "outputs": [],
+        "payable": false,
+        "type": "function"
+    },
+    {
         "constant": false,
         "inputs": [
             {
@@ -514,7 +597,19 @@ var UserAccountContract = web3.eth.contract([
         "constant": false,
         "inputs": [
             {
-                "name": "newPubKey",
+                "name": "PubKey_x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
                 "type": "bytes32"
             }
         ],
@@ -548,10 +643,22 @@ var UserAccountContract = web3.eth.contract([
     {
         "constant": true,
         "inputs": [],
-        "name": "MyName",
+        "name": "getPublicKey",
         "outputs": [
             {
-                "name": "",
+                "name": "x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "y2",
                 "type": "bytes32"
             }
         ],
@@ -673,7 +780,7 @@ var UserAccountContract = web3.eth.contract([
     {
         "constant": true,
         "inputs": [],
-        "name": "MyPubKey",
+        "name": "MyNickname",
         "outputs": [
             {
                 "name": "",
@@ -749,6 +856,39 @@ var UserAccountContract = web3.eth.contract([
         "type": "function"
     },
     {
+        "constant": false,
+        "inputs": [
+            {
+                "name": "newCAddress",
+                "type": "address"
+            },
+            {
+                "name": "newCName",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
+                "type": "bytes32"
+            }
+        ],
+        "name": "AddContact",
+        "outputs": [],
+        "payable": true,
+        "type": "function"
+    },
+    {
         "constant": true,
         "inputs": [
             {
@@ -781,7 +921,19 @@ var UserAccountContract = web3.eth.contract([
         "name": "getTargetContactPubKey",
         "outputs": [
             {
-                "name": "resPubKey",
+                "name": "PubKey_x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
                 "type": "bytes32"
             },
             {
@@ -790,23 +942,6 @@ var UserAccountContract = web3.eth.contract([
             }
         ],
         "payable": false,
-        "type": "function"
-    },
-    {
-        "constant": false,
-        "inputs": [
-            {
-                "name": "targetAddress",
-                "type": "address"
-            },
-            {
-                "name": "altCPubkey",
-                "type": "bytes32"
-            }
-        ],
-        "name": "AlterContactPubkey",
-        "outputs": [],
-        "payable": true,
         "type": "function"
     },
     {
@@ -834,19 +969,27 @@ var UserAccountContract = web3.eth.contract([
         "constant": false,
         "inputs": [
             {
-                "name": "newCAddress",
+                "name": "targetAddress",
                 "type": "address"
             },
             {
-                "name": "newCName",
+                "name": "PubKey_x1",
                 "type": "bytes32"
             },
             {
-                "name": "newCPubkey",
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
                 "type": "bytes32"
             }
         ],
-        "name": "AddContact",
+        "name": "AlterContactPubkey",
         "outputs": [],
         "payable": true,
         "type": "function"
@@ -921,7 +1064,19 @@ var UserAccountContract = web3.eth.contract([
                 "type": "bytes32"
             },
             {
-                "name": "PubKey",
+                "name": "PubKey_x1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_x2",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y1",
+                "type": "bytes32"
+            },
+            {
+                "name": "PubKey_y2",
                 "type": "bytes32"
             }
         ],
@@ -939,22 +1094,10 @@ var UserAccountContract = web3.eth.contract([
         ],
         "name": "Log",
         "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            {
-                "indexed": false,
-                "name": "PW",
-                "type": "bytes32"
-            }
-        ],
-        "name": "SharedAccountPW",
-        "type": "event"
     }
 ]);
 
-var Nettoken=TokenFunctionsContract.at("0x46c68b06e6b08cda17d7e8105157b857b5febca2");
+var Nettoken=TokenFunctionsContract.at("0x2645150df0afb30dbc37cc799156a46988e747b3");
 var eventLog = Nettoken.Log();
 var eventLogAddress = Nettoken.LogAddress();
 var eventSharedAccountPW = Nettoken.SharedAccountPW();
@@ -965,13 +1108,14 @@ eventLog.watch(function (error, result) {
     if (!error) {
         eventLogs = result.args.description;
         console.log(eventLogs);
+        alert(eventLogs);
     }
 });
 
 eventLogAddress.watch(function (error, result) {
     if (!error) {
         eventLogAddresses = result.args.outputAddress;
-        console.log(eventLogAddresses);
+        console.log("Address for new account is:"+eventLogAddresses);
     }
 });
 

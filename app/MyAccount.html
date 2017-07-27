@@ -2,28 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>MyAccount</title>
+    <title>Nettoken - User Page</title>
     <link rel="stylesheet" href="css/app.css">
     <script src="js/lib.js"></script>
     <script src="js/app.js"></script>
 </head>
 <body>
 <div class="container">
-    <!--Login section-->
-    <div id="Login" class="row">
-        <label>Login Identity:</label><input type="text" id="LoginID"/>
-        <button class="btn btn-success" onclick="Login()">Login</button>
-    </div>
+    <button class="btn btn-inverse" onclick="window.history.back(-1)">Back</button>
+    <button class="btn btn-inverse" onclick="window.location.reload()">Refresh</button>
 
     <!--section that interacts with account name and public key-->
-    <div id="NamePubkey" class="row">
-        Hello<span v-if="isVisible">{{MyName}}</span>!
+    <div id="Nickname" class="row">
+        Hello <span>{{MyName}}</span>!
         <button class="btn btn-success" onclick="setMyName()">Change Name</button>
-        <input type="text" id="setMyName" placeholder="Your new name"/>
-        <br>
-        Your Public Key is:<span v-if="isVisible">{{MyPubKey}}</span>
-        <button class="btn btn-success" onclick="setMyPubKey()">Change PublicKey</button>
-        <input type="text" id="setMyPubKey" placeholder="Your new public key"/>
+        <input type="text" id="setMyName" placeholder="Your new nickname"/>
     </div>
 
     <!--section that interacts with social accounts-->
@@ -38,7 +31,7 @@
         </div>
 
         <!--output all social accounts.-->
-        <div class="ShowData span9" id="SocialAccountOutput">
+        <div class="span9" id="SocialAccountOutput">
             <template v-for="item in JSONAllSocialAccounts">
                 <div class="tile">
                     <span>{{item.App}}</span>
@@ -54,10 +47,14 @@
                             v-on:click="AltSocialAccountPw(item.App, item.username,item.inputID)">Change
                     </button>
                     <br>
-                    <label>Share with:</label><input type="text" v-bind:id="item.inputAddressID"
-                                                       placeholder="Receiver address."/>
+                    <label>Share with:</label>
+                    <div class="span3">
+                        <select class="span3" name="share-address" v-bind:id="item.inputShareID">
+                            <option v-bind:value="contact.ContactAddress"  v-for="contact in JSONAllContacts">{{contact.ContactName}}</option>
+                        </select>
+                    </div>
                     <button class="btn btn-warning"
-                            v-on:click="ShareAccount(item.App, item.username,item.inputAddressID)">Share
+                            v-on:click="ShareAccount(item.App, item.username,item.inputShareID)">Share
                     </button>
                 </div>
             </template>
@@ -67,7 +64,7 @@
     <!--section that interacts with shared social accounts-->
     <div id="SharedAccounts" class="row">
         <h1 class="mbl pbl">My Shared Accounts From Contacts</h1>
-        <div class="ShowData span9" id="SharedAccountOutput">
+        <div class="span9" id="SharedAccountOutput">
             <template v-for="item in JSONAllSharedAccounts">
                 <div class="tile">
                     <span>From: {{item.fromAddress}}</span>
@@ -75,7 +72,8 @@
                     <span>{{item.SharedApp}}</span>
                     <span class="fui-twitter"></span>
                     <span>{{item.SharedUsername}}</span>
-                    <button class="btn btn-info" v-on:click="getSharedAccountPw(item.SharedApp,item.SharedUsername)">getPassword
+                    <button class="btn btn-info" v-on:click="getSharedAccountPw(item.SharedApp,item.SharedUsername)">
+                        getPassword
                     </button>
                     <br>
                     <span class="fui-time">Timestamp: {{item.timestamp}}</span>
@@ -94,7 +92,7 @@
         </div>
 
         <!--output all contacts.-->
-        <div class="span9 ShowData" id="ContactOutput">
+        <div class="span9" id="ContactOutput">
             <template v-for="item in JSONAllContacts">
                 <div class="tile">
                     <span class="fui-user"></span><span>{{item.ContactName}}</span>
@@ -105,7 +103,7 @@
                     </button>
                     <button class="btn btn-danger" v-on:click="deleteContact(item.ContactAddress)">Delete</button>
                     <label>New Nickname:</label><input type="text" v-bind:id="item.inputID"
-                                                          placeholder="New Nickname."/>
+                                                       placeholder="New Nickname."/>
                     <button class="btn btn-warning"
                             v-on:click="AlterContactName(item.ContactAddress,item.inputID)">Change
                     </button>
@@ -115,7 +113,7 @@
     </div>
 
 </div>
-<script src="js/inner.js"></script>
+<script src="js/MyAccount.js"></script>
 
 </body>
 </html>

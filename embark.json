@@ -2,9 +2,11 @@
   "contracts": ["app/contracts/**"],
   "app": {
     "css/app.css": ["app/css/**"],
-    "js/app.js": ["embark.js", "app/js/app-js/**"],
+    "data/user-data.json":["app/data/UserData.json"],
     "js/lib.js": ["app/js/lib-js/**"],
-    "js/inner.js": ["app/js/inner-js/**"],
+    "js/app.js": ["embark.js", "app/js/app-js/**"],
+    "js/index.js": ["app/js/inner-js/index.js"],
+    "js/MyAccount.js": ["app/js/inner-js/MyAccount.js"],
     "index.html": "app/index.html",
     "MyAccount.html": "app/MyAccount.html"
   },

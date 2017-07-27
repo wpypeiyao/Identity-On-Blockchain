@@ -449,6 +449,38 @@
       "0x8a85e1eaef518f966b643e5d6e048f7d84dc0523a48549d82e9d207c583850cb": {
         "name": "UserAccount",
         "address": "0xfa805f5a030dcb0e79ed2b023e8a4e0ec06b1436"
+      },
+      "0x1f5685d8ae0210b63ed72b75dca1bb1614d16ebe3cf57ceb1fcbd2e67d69322c": {
+        "name": "TokenFunctions",
+        "address": "0x8f8fc25295f12a3b01b2726777a62b5e11957b4c"
+      },
+      "0x2e2012237427a11592fb8ccbd06064b47230dba2f71ec3049a86224dde6154ae": {
+        "name": "UserAccount",
+        "address": "0x0b3bbac29e95d9a4d66891ede41aeec8235500f0"
+      },
+      "0x0767bd3faea7f2be1e65ade5dded7ca7d0ff31621f27f63052a768ade20a7396": {
+        "name": "TokenFunctions",
+        "address": "0x0e7c8f032f09cc6301182bcb38ba29414b14a02e"
+      },
+      "0xaa096e913591ef5602219fb959c75232516dbd223fe9d1b020e6c848977397ed": {
+        "name": "UserAccount",
+        "address": "0xa3a3151e83637de4bbf2f45eba104ceb5394efae"
+      },
+      "0xd5e7a5c900e228665aaa54e72e656e7a552f68c70f5aef9cd1afb305f6a199d1": {
+        "name": "TokenFunctions",
+        "address": "0x0d3ed57fda30dc9618a3d7a08757d2ef977ebd8e"
+      },
+      "0x2ae4048732e4eae2a6a442bc0cb8d0b78a9a992f1869c7e995534f9a249ff8b6": {
+        "name": "UserAccount",
+        "address": "0x281d1026d3a5d666acca4e1bd978a6672502bb1f"
+      },
+      "0x913175e6a4e65eed807bf0061356db33c35f12ea9a3947d4e92e0856751db61e": {
+        "name": "TokenFunctions",
+        "address": "0x2645150df0afb30dbc37cc799156a46988e747b3"
+      },
+      "0xe6f254596b2952dff2e4b4978125ea56b66b03646a2f9782ed75a575c2eaeef6": {
+        "name": "UserAccount",
+        "address": "0x4af1c554795b370cbab736df12097bd1c4ad3e9f"
       }
     },
     "name": "development"
