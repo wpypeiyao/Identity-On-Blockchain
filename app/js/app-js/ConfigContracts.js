@@ -1,8 +1,11 @@
 //check the correct connection with web3
 if (typeof web3 !== 'undefined') {
-    web3 = new Web3(web3.currentProvider);}
-    else {
-    web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));};
+    web3 = new Web3(web3.currentProvider);
+}
+else {
+    web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+}
+;
 
 //link to contract;TokenFunctions
 var TokenFunctionsContract = web3.eth.contract([
@@ -93,7 +96,7 @@ var TokenFunctionsContract = web3.eth.contract([
         "type": "function"
     },
     {
-        "constant": false,
+        "constant": true,
         "inputs": [
             {
                 "name": "Identity",
@@ -109,7 +112,16 @@ var TokenFunctionsContract = web3.eth.contract([
             }
         ],
         "name": "getSharedAccountPw",
-        "outputs": [],
+        "outputs": [
+            {
+                "name": "Password",
+                "type": "bytes32"
+            },
+            {
+                "name": "isFound",
+                "type": "bool"
+            }
+        ],
         "payable": false,
         "type": "function"
     },
@@ -389,6 +401,27 @@ var TokenFunctionsContract = web3.eth.contract([
                 "type": "bytes32"
             },
             {
+                "name": "targetApp",
+                "type": "bytes32"
+            },
+            {
+                "name": "targetUsername",
+                "type": "bytes32"
+            }
+        ],
+        "name": "deleteSharedAccount",
+        "outputs": [],
+        "payable": false,
+        "type": "function"
+    },
+    {
+        "constant": false,
+        "inputs": [
+            {
+                "name": "Identity",
+                "type": "bytes32"
+            },
+            {
                 "name": "newName",
                 "type": "bytes32"
             }
@@ -446,8 +479,12 @@ var TokenFunctionsContract = web3.eth.contract([
                 "type": "address[]"
             },
             {
-                "name": "times",
-                "type": "uint256[]"
+                "name": "Years",
+                "type": "uint16[]"
+            },
+            {
+                "name": "RestTimes",
+                "type": "uint8[5][]"
             }
         ],
         "payable": false,
@@ -552,18 +589,6 @@ var TokenFunctionsContract = web3.eth.contract([
         ],
         "name": "LogAddress",
         "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            {
-                "indexed": false,
-                "name": "PW",
-                "type": "bytes32"
-            }
-        ],
-        "name": "SharedAccountPW",
-        "type": "event"
     }
 ]);
 var UserAccountContract = web3.eth.contract([
@@ -591,6 +616,19 @@ var UserAccountContract = web3.eth.contract([
         "name": "deleteContact",
         "outputs": [],
         "payable": true,
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [],
+        "name": "getBalance",
+        "outputs": [
+            {
+                "name": "balance",
+                "type": "uint256"
+            }
+        ],
+        "payable": false,
         "type": "function"
     },
     {
@@ -1097,13 +1135,10 @@ var UserAccountContract = web3.eth.contract([
     }
 ]);
 
-var Nettoken=TokenFunctionsContract.at("0x2645150df0afb30dbc37cc799156a46988e747b3");
+var Nettoken = TokenFunctionsContract.at("0x122d327c3ae500d2fe1782c51d429e961a7831f3");
+
 var eventLog = Nettoken.Log();
-var eventLogAddress = Nettoken.LogAddress();
-var eventSharedAccountPW = Nettoken.SharedAccountPW();
-
-var eventLogs, eventLogAddresses, eventSharedAccountPWs;
-
+var eventLogs;
 eventLog.watch(function (error, result) {
     if (!error) {
         eventLogs = result.args.description;
@@ -1112,10 +1147,4 @@ eventLog.watch(function (error, result) {
     }
 });
 
-eventLogAddress.watch(function (error, result) {
-    if (!error) {
-        eventLogAddresses = result.args.outputAddress;
-        console.log("Address for new account is:"+eventLogAddresses);
-    }
-});
 

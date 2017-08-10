@@ -63,6 +63,20 @@ var ec = new ellipticjs.ec('secp256k1');
  json_data=JSON.stringify(json_data);
  console.log(json_data);*/
 
+/*Generate identity*/
+function generate_identity(manager_pub_x1, manager_pub_x2, manager_pub_y1, manager_pub_y2, pri_key, RegisterID) {
+    manager_pub_x1 = web3.toAscii(manager_pub_x1);
+    manager_pub_x2 = web3.toAscii(manager_pub_x2);
+    manager_pub_y1 = web3.toAscii(manager_pub_y1);
+    manager_pub_y2 = web3.toAscii(manager_pub_y2);
+    var manager_pubkey_recover = recoverPubkey(manager_pub_x1, manager_pub_x2, manager_pub_y1, manager_pub_y2);
+    var shared_key = getShared_key(pri_key, manager_pubkey_recover);
+    var identity = padding_for_id(RegisterID);
+    identity = aes_encrypt(shared_key, identity);
+    identity = md5(identity);
+    return identity;
+}
+
 /*Generate key pair (object): key should be stored physically*/
 function generate_ecdh_key() {
     var key_pair = ec.genKeyPair();
@@ -217,3 +231,122 @@ function unpadding(str_16bytes) {
     var padding_place = str_16bytes.indexOf("?");
     return str_16bytes.substring(0, padding_place);
 }
+
+/*formatting time*/
+function getReadableTime(years,times) {
+    var year = String(years);
+    var day = String(times[1]);
+    var hour = String(times[2]);
+    var minute = String(times[3]);
+    var second = String(times[4]);
+
+    var padding = "00";
+    day = padding.substring(day.length) + day;
+    hour = padding.substring(hour.length) + hour;
+    minute = padding.substring(minute.length) + minute;
+    second = padding.substring(second.length) + second;
+
+    /*month*/
+    var month = Number(times[0]);
+    switch (month) {
+        case 1:
+            month = "January";
+            break;
+        case 2:
+            month = "February";
+            break;
+        case 3:
+            month = "March";
+            break;
+        case 4:
+            month = "April";
+            break;
+        case 5:
+            month = "May";
+            break;
+        case 6:
+            month = "June";
+            break;
+        case 7:
+            month = "July";
+            break;
+        case 8:
+            month = "August";
+            break;
+        case 9:
+            month = "September";
+            break;
+        case 10:
+            month = "October";
+            break;
+        case 11:
+            month = "November";
+            break;
+        case 12:
+            month = "December";
+            break;
+        default:
+            throw "Format error!";
+    }
+
+    var output = hour + ":" + minute + ":" + second + " " + " " + day + " " + month + "," + year;
+    return output;
+}
+
+/*save QR-Code as file*/
+function exportCanvasAsPNG(canvas, fileName) {
+    var MIME_TYPE = "image/png";
+    var dlLink = document.createElement('a');
+    dlLink.download = fileName;
+    dlLink.href = canvas.toDataURL("image/png");
+    dlLink.dataset.downloadurl = [MIME_TYPE, dlLink.href].join(':');
+    document.body.appendChild(dlLink);
+    dlLink.click();
+    document.body.removeChild(dlLink);
+}
+
+/*generate qr code*/
+function create(container_id_string, data_json, myname) {
+    myname = myname + " QR-Code";
+    document.getElementById("QR-Code-name").innerHTML = myname;
+
+    document.getElementById("qrcode").innerHTML = "<img src='https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=" + encodeURIComponent(data_json) + "'/>";
+
+    html2canvas(document.getElementById(container_id_string)).then(function (canvas) {
+        exportCanvasAsPNG(canvas, "qrcode.png");
+    });
+}
+
+/*function createQRDiv(container_id_string) {
+ var my = document.createElement("qrcode");
+ document.getElementById(container_id_string).appendChild(my);
+ my.style.position = "relative";
+ my.style.padding = "3px";
+ my.id = "qrcode";
+ }
+
+ function deleteQRDiv() {
+ var my = document.getElementById("qrcode");
+ if (my != null)
+ my.parentNode.removeChild(my);
+ }
+
+ /!*generate qrcode for new user*!/
+ function generate_qrcode(container_id_string, data_json, myname) {
+ /!*delete last qrcode node*!/
+ deleteQRDiv();
+ /!*create div for qrcode*!/
+ myname = myname + " QR-Code";
+ document.getElementById("QR-Code-name").innerHTML = myname;
+ createQRDiv(container_id_string);
+
+ /!*generate qrcode and save as image*!/
+ var binaryString = pako.deflate(data_json, {to: 'string'});
+ $('#qrcode').qrcode(binaryString);
+ html2canvas(document.getElementById(container_id_string)).then(function (canvas) {
+ exportCanvasAsPNG(canvas, "qrcode.png");
+ });
+
+ //扫描出的结果经过以下表达式则会还原原来的字符串
+ //var restored = JSON.parse(pako.inflate(binaryString, {to: 'string'}));//字符串解压缩处理
+ }*/

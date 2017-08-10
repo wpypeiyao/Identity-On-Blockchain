@@ -7,6 +7,8 @@ contract UserAccount {
 
     bytes32[4] private MyPubKey;
 
+    bytes32 private identity_hash;
+
     SocialAccount[] private SocialAccounts;//This is a dynamic arraylist of struct SocialAccount.
     mapping (bytes32 => mapping (bytes32 => Index)) private SocialAccountIndex;
 
@@ -69,6 +71,10 @@ contract UserAccount {
         x2 = MyPubKey[1];
         y1 = MyPubKey[2];
         y2 = MyPubKey[3];
+    }
+
+    function getBalance() constant returns (uint256 balance){
+        balance = this.balance;
     }
 
     //Functions about SocialAccount.

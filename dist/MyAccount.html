@@ -14,7 +14,7 @@
 
     <!--section that interacts with account name and public key-->
     <div id="Nickname" class="row">
-        Hello <span>{{MyName}}</span>!
+        Hello <span id="MyName">{{MyName}}</span>!
         <button class="btn btn-success" onclick="setMyName()">Change Name</button>
         <input type="text" id="setMyName" placeholder="Your new nickname"/>
     </div>
@@ -24,7 +24,13 @@
         <h1 class="mbl pbl">My Social Accounts</h1>
         <!--add a social account-->
         <div class="row" id="AddSocialAccount">
-            <label>App:</label><input type="text" id="newApp" placeholder="Facebook, twitter or ..."/>
+
+
+            <label>App:</label>
+            <select class="span3" name="social-app" id="newApp">
+                <option value="Facebook">Facebook</option>
+                <option value="Twitter">Twitter</option>
+            </select>
             <label>Username:</label><input type="text" id="newUsername" placeholder="Your Username."/>
             <label>Password:</label><input type="password" id="newPassword" placeholder="Your Password."/>
             <button class="btn" onclick="AddSocialAccount()">Add</button>
@@ -36,10 +42,8 @@
                 <div class="tile">
                     <span>{{item.App}}</span>
                     <span class="fui-facebook"></span>
-                    <span>{{item.username}}</span>
+                    <a v-on:click="goSocial(item.App,item.username)">{{item.username}}</a>
                     <br>
-                    <button class="btn btn-info" v-on:click="getSocialAccountPW(item.App,item.username)">getPassword
-                    </button>
                     <button class="btn btn-danger" v-on:click="DelSocialAccount(item.App,item.username)">Delete</button>
                     <label>New Password:</label><input type="password" v-bind:id="item.inputID"
                                                        placeholder="Your new password."/>
@@ -48,11 +52,11 @@
                     </button>
                     <br>
                     <label>Share with:</label>
-                    <div class="span3">
-                        <select class="span3" name="share-address" v-bind:id="item.inputShareID">
-                            <option v-bind:value="contact.ContactAddress"  v-for="contact in JSONAllContacts">{{contact.ContactName}}</option>
-                        </select>
-                    </div>
+                    <select class="span3" name="share-address" v-bind:id="item.inputShareID">
+                        <option v-bind:value="contact.ContactAddress" v-for="contact in JSONAllContacts">
+                            {{contact.ContactName}}
+                        </option>
+                    </select>
                     <button class="btn btn-warning"
                             v-on:click="ShareAccount(item.App, item.username,item.inputShareID)">Share
                     </button>
@@ -61,19 +65,23 @@
         </div>
     </div>
 
+
     <!--section that interacts with shared social accounts-->
     <div id="SharedAccounts" class="row">
         <h1 class="mbl pbl">My Shared Accounts From Contacts</h1>
         <div class="span9" id="SharedAccountOutput">
             <template v-for="item in JSONAllSharedAccounts">
                 <div class="tile">
-                    <span>From: {{item.fromAddress}}</span>
+                    From: <span class="fui-user"></span><span>{{item.fromName}}</span>
+                    <br>
+                    <span>Address: {{item.fromAddress}}</span>
                     <br>
                     <span>{{item.SharedApp}}</span>
                     <span class="fui-twitter"></span>
                     <span>{{item.SharedUsername}}</span>
-                    <button class="btn btn-info" v-on:click="getSharedAccountPw(item.SharedApp,item.SharedUsername)">
-                        getPassword
+                    <button class="btn btn-info"
+                            v-on:click="goShared(item.SharedApp,item.SharedUsername,item.SharedKey)">
+                        GO
                     </button>
                     <br>
                     <span class="fui-time">Timestamp: {{item.timestamp}}</span>
@@ -81,6 +89,7 @@
             </template>
         </div>
     </div>
+
 
     <!--section that interacts with contacts-->
     <div id="Contacts" class="row">

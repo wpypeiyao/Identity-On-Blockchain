@@ -2,6 +2,7 @@ pragma solidity ^0.4.0;
 
 
 import "./UserAccount.sol";
+import "./DateTime.sol";
 
 
 contract TokenFunctions {
@@ -10,13 +11,14 @@ contract TokenFunctions {
 
     mapping (address => bool) private isAddressUsed;
 
+    bytes32[4] private ManagerPubkey;
+
+    address private DateTimeAddress="0xA47965a03542F82EcaB56C596D8754fF8D2114D3";
+
     event Log(string description);
 
     event LogAddress(address outputAddress);
 
-    event SharedAccountPW(bytes32 PW);
-
-    bytes32[4] private ManagerPubkey;
 
     uint public timeLimited;//This is for SharedAccounts. When the difference between timestamp of target and current time is larger than this "timeLimited", it should be deleted from record.
 
@@ -64,6 +66,7 @@ contract TokenFunctions {
             valid = true;
             AccountAddress = target;}
     }
+
 
     //Functions to interact with attributes of UserAccount:MyName,MyPubKey
     function getMyName(bytes32 Identity) constant returns (bytes32 MyName) {
@@ -191,43 +194,40 @@ contract TokenFunctions {
     //Hint:this function is for sender, not receiver(user).
     function AddSharedAccount(bytes32 Identity, address receiverAddress, bytes32 targetApp, bytes32 targetUsername, bytes32 targetPassword) {
         address sender = UserMappingList[sha256(Identity)];
-        if (isAddressUsed[sender]) {
-            if (isAddressUsed[receiverAddress]) {
-                UserAccount receiverAccount = UserAccount(receiverAddress);
-                receiverAccount.AddSharedAccount(targetApp, targetUsername, targetPassword, sender);
-                Log("Successfully added a record for receiver as a shared account.");}
-            else {
-                Log("Failed! There is no such account with receiverAddress.");}
-
-        }
+        if (isAddressUsed[receiverAddress]) {
+            UserAccount receiverAccount = UserAccount(receiverAddress);
+            receiverAccount.AddSharedAccount(targetApp, targetUsername, targetPassword, sender);
+            Log("Successfully added a record for receiver as a shared account.");}
         else {
-            Log("Failed! Identity is incorrect.");
-        }}
+            Log("Failed! There is no such account with receiverAddress.");}
 
-    function getSharedAccountPw(bytes32 Identity, bytes32 targetApp, bytes32 targetUsername){
+    }
+
+    function deleteSharedAccount(bytes32 Identity, bytes32 targetApp, bytes32 targetUsername){
         address target = UserMappingList[sha256(Identity)];
         UserAccount targetAccount = UserAccount(target);
         targetAccount.deleteSharedAccount(targetApp, targetUsername, timeLimited);
-        bytes32 Password;
-        bool isFound;
-        (Password, isFound) = targetAccount.getSharedAccountPw(targetApp, targetUsername);
-        if (isFound) {
-            SharedAccountPW(Password);
-            Log("Successfully get the shared account password.");}
-        else {
-            Log("Failed! There is no such account.");}
     }
 
-    function getAllSharedAccounts(bytes32 Identity) constant returns (bytes32[] SharedApps, bytes32[] SharedUsernames, address[] SenderAddresses, uint[] times){
+    function getSharedAccountPw(bytes32 Identity, bytes32 targetApp, bytes32 targetUsername) constant returns (bytes32 Password, bool isFound){
+        address target = UserMappingList[sha256(Identity)];
+        UserAccount targetAccount = UserAccount(target);
+        (Password, isFound) = targetAccount.getSharedAccountPw(targetApp, targetUsername);
+    }
+
+    function getAllSharedAccounts(bytes32 Identity) constant returns (bytes32[] SharedApps, bytes32[] SharedUsernames, address[] SenderAddresses, uint16[] Years, uint8[5][] RestTimes){
         address target = UserMappingList[sha256(Identity)];
         UserAccount targetAccount = UserAccount(target);
         uint length = targetAccount.getSharedAccountsLength();
         SharedApps = new bytes32[](length);
         SharedUsernames = new bytes32[](length);
         SenderAddresses =new address[](length);
-        times = new uint[](length);
-        for (uint i = 0; i < length; i++) {
-            (SharedApps[i], SharedUsernames[i], SenderAddresses[i], times[i]) = targetAccount.getSharedAccounByIndex(i);}
-    }
+        uint[] memory times = new uint[](length);
+        Years = new uint16[](length);
+        RestTimes = new uint8[5][](length);
 
-}
+        for (uint i = 0; i < length; i++) {
+            (SharedApps[i], SharedUsernames[i], SenderAddresses[i], times[i]) = targetAccount.getSharedAccounByIndex(i);
+            (Years[i], RestTimes[i]) = DateTime(DateTimeAddress).getReadableTime(times[i]);
+        }
+    }}

@@ -3,56 +3,27 @@
     "note1": "This is the simulator of token card.",
     "note2": "MainUser : the current user. Everytime you should copy current data here.",
     "note3": "TestUser* record data of several testing account information",
-    "note4": "Remember to record address for every new account."
+    "note4": "Remember to record address for every new account.",
+    "datetime address": "0x8f7dda5d67e9028786511238b4bde8d9c2c92cbe"
   },
-  "MainUser3": {
-    "identity": "53599d1cbdc1492ad168e03956ca435e",
-    "address": "0x87dc0b3d1626c694962faed7cabe4ea92796714f",
-    "Nickname": "PEIYAO WU",
-    "private": "b4b50ed2b55cf088591534f3c40001fec7c4d1bcaf46f2c67cace6b5d0064878",
-    "public_x1": "821938225e8eeae2a2894d7d513027e6",
-    "public_x2": "d10d3c7d2c16d267f6e94de9b16b7064",
-    "public_y1": "13756dff72abf851f20788648d6967a6",
-    "public_y2": "3a71a4f000511dc5e9b1f57ca02c2837"
-  },
-  "TestUser1": {
-    "identity": "52f9c5d6546f1b563273204a95dcff9d",
-    "address": "0x9d295d28602edf0175cde7b0a5174b522fb72703",
-    "Nickname": "IMerialComputing",
-    "private": "105111fb014a8ee7f842a12bb9cc6713f7afa31ca4bb51c74645f2412f06baaf",
-    "public_x1": "b2891cbcfc86c54ab18b67aa82f9791a",
-    "public_x2": "21c7fde56e4afb1c240028bb9a55577b",
-    "public_y1": "dee68318f7e521800f7d6690d545dbea",
-    "public_y2": "ece49e0f223d6fe2713ea6936acdcac0"
-  },
-  "TestUser2": {
-    "identity": "40242968d83d0c08bd1892db8b80112e",
-    "address": "0xed4d201000525c8b604e0b3b181aa0238005c170",
-    "Nickname": "Free Zhang",
-    "private": "e7654c70987e5b7d0d4d46d81c48f3fe9583f8470fb1f18ad66e2e65ac257be4",
-    "public_x1": "715c66dba20ba660ba1f8f03bc74021e",
-    "public_x2": "2a89b379c97c2539d6610bc87e03af0c",
-    "public_y1": "9182a3d5df76dd569a553a9ecc12dd14",
-    "public_y2": "940809b17b340ac3735bbb881f967772"
+  "MainUser1": {
+    "identity": "9007780320790066ecf6fd7f1ed720f1",
+    "address": "0x223236d6c5938e90c86bbf08ea577c14bef476c1",
+    "Nickname": "Peiyao Wu",
+    "private": "1f8f640b1f6252a9a8237828f7fa877c0cf88c9f6476623b3b360235cedd0c7b",
+    "public_x1": "eb0cdd2aed7dab76b38a4cabbea1844d",
+    "public_x2": "d11f346e8d9e34d85b7a8afeffc2e725",
+    "public_y1": "b8f16079e979600f91906d55563df5b9",
+    "public_y2": "9a7b24295e6b54749922c5f5b501ecb3"
   },
   "MainUser": {
-    "identity": "609f9a6d4e92d25571708d350d169e55",
-    "address": "0xfb8d7e3979aebbc4ed5cb63c1381d5ac9b835464",
-    "Nickname": "Britney Wang",
-    "private": "14735eeee963d9fdceba83fc73eea1093d4cbad30d5c22b7f0137ec4768f6c5b",
-    "public_x1": "f645d1e211ba9990b413133994017028",
-    "public_x2": "edf6d0fd6679d0965e5c183dbc15252d",
-    "public_y1": "7233420ac49e32e4b3347d77ca46040e",
-    "public_y2": "78aa2d8c4c8576205564d7516a500425"
-  },
-  "TestUser4": {
-    "identity": "2e27bbf3397b44aa808a2cfd11cfbd74",
-    "address": "0xb8394972f10936a088d97364afe07f79901b2d10",
-    "Nickname": "Meng Cai",
-    "private": "396cb4fc99c32be406f556ba60379a25e39acc13d903bb28d4d3230880a5c4d6",
-    "public_x1": "2d4f524944a37f8c5adacd59929f1330",
-    "public_x2": "ddf8b8ef76fe9067e4b55cd50850b69a",
-    "public_y1": "cb3e0622a540e823a2829e564f4448d2",
-    "public_y2": "06bec400440413dec50f2e6d05f57b4a"
+    "identity": "e465c65eb527afaeaf7347358d0e1226",
+    "address": "0x284018432517bf35cd2e845c832281004c63fc51",
+    "Nickname": "Freya Woo",
+    "private": "e2424cdf17458d37d675508ba50c71f6f0b0ecc5a0c83d7a5af06d892c9488bf",
+    "public_x1": "c056628d05a9885366db961424c0ddaf",
+    "public_x2": "3afb67e3b95ca7bc1e3bd8fe6b7e7250",
+    "public_y1": "59eef36edd073b79d4bc97062aa57cec",
+    "public_y2": "1944782db0682a1108b234a6a311065c"
   }
 }

@@ -13702,9 +13702,9 @@ div {
   border-radius: 10px;
 }
 
-.index-input{
+.index-input {
     position: absolute;
-    width:80%;
+    width: 80%;
     left: 20%;
 }
 
@@ -13717,7 +13717,46 @@ div {
     display: none;
 }
 
-#register-pane,#login-pane {
+#login-pane {
+    display: inline;
+}
+
+#register-pane, #login-pane {
     width: 640px;
+    position: absolute;
     left: 10%;
+}
+
+a:link, a:visited {
+    color: #7F8C8D;
+    text-decoration: none;
+}
+
+a:hover, a:active {
+    color: #95A5A6;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+#QR-Code-image {
+    display: none;
+    position: absolute;
+    left: 66%;
+    top: 30%;
+    text-align: center;
+    border: 2px;
+    border-color: #1b6d85;
+    border-radius: 6px;
+    background-color: #edeff1;
+}
+
+#QR-Code-decode {
+    position: absolute;
+    left: 66%;
+    top: 30%;
+    text-align: center;
+    border: 2px;
+    border-color: #1b6d85;
+    border-radius: 6px;
+    background-color: #edeff1;
 }

@@ -7,8 +7,10 @@
     "js/app.js": ["embark.js", "app/js/app-js/**"],
     "js/index.js": ["app/js/inner-js/index.js"],
     "js/MyAccount.js": ["app/js/inner-js/MyAccount.js"],
+    "js/qrdecoder.js":["app/js/inner-js/qrdecoder.js"],
     "index.html": "app/index.html",
-    "MyAccount.html": "app/MyAccount.html"
+    "MyAccount.html": "app/MyAccount.html",
+    "decoder.html":"app/decoder.html"
   },
   "buildDir": "dist/",
   "config": "config/",

@@ -3,13 +3,14 @@ var identity;
 var shared_key;
 var AccountName, AllSocialAccounts, AllSharedAccounts, AllContacts;
 var SocialAccountslength, SharedAccountslength, Contactslength;
-var Apps, Usernames, SharedApps, SharedUsernames, fromAddresses, timestamps, ContactAddresses, ContactNames;
+var Apps, Usernames, SharedApps, SharedUsernames, fromAddresses, timestamps_year, timestamps_times, ContactAddresses, ContactNames;
 
 var JSONAllSocialAccounts = [];
 var JSONAllSharedAccounts = [];
 var JSONAllContacts = [];
 var ROWSocialAccount, ROWSharedAccount, ROWContact;
 var AppAscii, UsernameAscii, SharedAppAscii, SharedUsernameAscii, ContactNameAscii;
+var senderPubKeyResult, senderPubKey, sender_pubkey_recover;
 
 /*Vue Objects that process data*/
 var VueName = new Vue({
@@ -88,24 +89,6 @@ $.getJSON(dataroot, function (data) {
                 JSONAllSocialAccounts.push(ROWSocialAccount);
             }
 
-            /*data processing:shared accounts*/
-            SharedApps = AllSharedAccounts[0]
-            SharedUsernames = AllSharedAccounts[1]
-            fromAddresses = AllSharedAccounts[2]
-            timestamps = AllSharedAccounts[3]
-            SharedAccountslength = SharedApps.length;
-
-            for (var j = 0; j < SharedAccountslength; j++) {
-                SharedAppAscii = web3.toAscii(SharedApps[j]);
-                SharedUsernameAscii = web3.toAscii(SharedUsernames[j]);
-                ROWSharedAccount = {};
-                ROWSharedAccount.SharedApp = SharedAppAscii;
-                ROWSharedAccount.SharedUsername = SharedUsernameAscii;
-                ROWSharedAccount.fromAddress = fromAddresses[j];
-                ROWSharedAccount.timestamp = timestamps[j];
-                JSONAllSharedAccounts.push(ROWSharedAccount);
-            }
-
             /*data processing:contacts*/
             ContactAddresses = AllContacts[0]
             ContactNames = AllContacts[1]
@@ -119,6 +102,56 @@ $.getJSON(dataroot, function (data) {
                 ROWContact.inputID = "NewContactName" + k;
                 JSONAllContacts.push(ROWContact);
             }
+
+
+            /*data processing:shared accounts*/
+            SharedApps = AllSharedAccounts[0];
+            SharedUsernames = AllSharedAccounts[1];
+            fromAddresses = AllSharedAccounts[2];
+            timestamps_year = AllSharedAccounts[3];
+            timestamps_times = AllSharedAccounts[4];
+
+            SharedAccountslength = SharedApps.length;
+
+            for (var j = 0; j < SharedAccountslength; j++) {
+                SharedAppAscii = web3.toAscii(SharedApps[j]);
+                SharedUsernameAscii = web3.toAscii(SharedUsernames[j]);
+                ROWSharedAccount = {};
+                ROWSharedAccount.SharedApp = SharedAppAscii;
+                ROWSharedAccount.fromAddress = fromAddresses[j];
+                ROWSharedAccount.fromName = "not current contact";
+
+                /*show sender name*/
+                for (var y in JSONAllContacts) {
+                    if (fromAddresses[j] == JSONAllContacts[y].ContactAddress)
+                        ROWSharedAccount.fromName = JSONAllContacts[y].ContactName;
+                }
+
+                /*get sender public key and calculate shared key*/
+                senderPubKeyResult;
+                senderPubKeyResult = Nettoken.getTargetContactPubKey.call(identity, fromAddresses[j]);
+                if (senderPubKeyResult[4] == true) {
+                    senderPubKey = {};
+                    senderPubKey.x1 = web3.toAscii(senderPubKeyResult[0]);
+                    senderPubKey.x2 = web3.toAscii(senderPubKeyResult[1]);
+                    senderPubKey.y1 = web3.toAscii(senderPubKeyResult[2]);
+                    senderPubKey.y2 = web3.toAscii(senderPubKeyResult[3]);
+                    sender_pubkey_recover = recoverPubkey(senderPubKey.x1, senderPubKey.x2, senderPubKey.y1, senderPubKey.y2);
+                    ROWSharedAccount.SharedKey = getShared_key(priv, sender_pubkey_recover);
+
+                    /*decrypt*/
+                    SharedUsernameAscii = aes_decrypt(ROWSharedAccount.SharedKey, SharedUsernameAscii);
+                    SharedUsernameAscii = unpadding(SharedUsernameAscii);
+                    ROWSharedAccount.SharedUsername = SharedUsernameAscii;
+                }
+                else
+                    console.log("The contact information has been deleted. Failed to decrypt.");
+
+                /*convert timestamp to readable type*/
+                ROWSharedAccount.timestamp = getReadableTime(timestamps_year[j], timestamps_times[j]);
+                JSONAllSharedAccounts.push(ROWSharedAccount);
+            }
+
 
             /*show data on page*/
             VueName.MyName = AccountName;
@@ -158,7 +191,9 @@ function setMyName() {
 /*Functions:SocialAccount*/
 /*Button: AddSocialAccount*/
 function AddSocialAccount() {
-    var newApp = String($("#AddSocialAccount input#newApp").val());
+    var sel_app = document.getElementById("newApp");
+    var app_index = sel_app.selectedIndex;
+    var newApp = sel_app.options[app_index].value;
     var newUsername = String($("#AddSocialAccount input#newUsername").val());
     var newPassword = String($("#AddSocialAccount input#newPassword").val());
     newUsername = padding_16bytes(newUsername);
@@ -319,18 +354,126 @@ function AlterContactName(targetAddress, Index) {
 
 /*Functions:SharedAccount*/
 /*Button: getSharedAccountPw*/
-function getSharedAccountPw(targetApp, targetUsername) {
-    Nettoken.getSharedAccountPw.sendTransaction(identity, targetApp, targetUsername, {
+function getSharedAccountPw(targetApp, targetUsername, shared_key) {
+    targetUsername = padding_16bytes(targetUsername);
+    targetUsername = aes_encrypt(shared_key, targetUsername);
+    Nettoken.deleteSharedAccount.sendTransaction(identity, targetApp, targetUsername, {
         from: web3.eth.accounts[0],
         gas: '500000'
+    }, function (error, result) {
+        if (!error) {
+            var getSharedAccountPWResult;
+            getSharedAccountPWResult = Nettoken.getSharedAccountPw.call(identity, targetApp, targetUsername);
+            if (getSharedAccountPWResult[1] == true) {
+                var result = web3.toAscii(getSharedAccountPWResult[0]);
+                result = aes_decrypt(shared_key, result);
+                result = unpadding(result);
+                console.log("The shared password is:" + result);
+                alert("The shared password is:" + result);
+            }
+            else
+                console.log("The record has been deleted. Failed to get the password.");
+        }
+        else
+            console.error(error);
     });
 };
 
-/*monitor the log for shared account password*/
-eventSharedAccountPW.watch(function (error, result) {
-    if (!error) {
-        eventSharedAccountPWs = result.args.PW;
-        var SharedAccountPWresult = web3.toAscii(eventSharedAccountPWs);
-        alert("The account password is:" + SharedAccountPWresult);
+/*Button: link to social media and autofill*/
+function goSocial(app, username) {
+    /*get password*/
+    var targetUsername = padding_16bytes(username);
+    targetUsername = aes_encrypt(shared_key, targetUsername);
+    var getSocialAccountPWResult;
+    getSocialAccountPWResult = Nettoken.getSocialAccountPw.call(identity, app, targetUsername);
+    if (getSocialAccountPWResult[1] == true) {
+        var targetPassword = web3.toAscii(getSocialAccountPWResult[0]);
+        targetPassword = aes_decrypt(shared_key, targetPassword);
+        targetPassword = unpadding(targetPassword);
     }
-});
+    else
+        console.log("The record has been deleted. Failed to get the password.");
+
+    /*build data structure*/
+    var result = {};
+    result.username = username;
+    result.password = targetPassword;
+    result = JSON.stringify(result);
+    /* console.log("Social account information:"+result);*/
+
+    /*open social media website*/
+    var Facebook = new RegExp("Facebook");
+    var Twitter = new RegExp("Twitter");
+    var domain;
+    if (Facebook.test(app)) {
+        domain = "https://www.facebook.com/";
+        var facebook_window = window.open(domain);
+        setTimeout(function () {
+            facebook_window.postMessage(result, domain)
+        }, 2000);
+    }
+    if (Twitter.test(app)) {
+        domain = "https://twitter.com/login";
+        var twitter_window = window.open(domain);
+        setTimeout(function () {
+            twitter_window.postMessage(result, domain)
+        }, 2000);
+    }
+}
+
+/*Button: link to shared account of social media and autofill*/
+function goShared(app, username, shared_key) {
+    /*get password*/
+    var targetUsername = padding_16bytes(username);
+    targetUsername = aes_encrypt(shared_key, targetUsername);
+    Nettoken.deleteSharedAccount.sendTransaction(identity, app, targetUsername, {
+        from: web3.eth.accounts[0],
+        gas: '500000'
+    }, function (error, result) {
+        if (!error) {
+            /*wait for checking*/
+            setTimeout(function () {
+                var getSharedAccountPWResult;
+                getSharedAccountPWResult = Nettoken.getSharedAccountPw.call(identity, app, targetUsername);
+                if (getSharedAccountPWResult[1] == true) {
+                    var target_password = web3.toAscii(getSharedAccountPWResult[0]);
+                    target_password = aes_decrypt(shared_key, target_password);
+                    target_password = unpadding(target_password);
+                    console.log("The shared password is:" + target_password);
+
+                    /*build data structure*/
+                    var result = {};
+                    result.username = username;
+                    result.password = target_password;
+                    result = JSON.stringify(result);
+                    console.log("Shared account information:" + result);
+
+                    /*open social media website*/
+                    var Facebook = new RegExp("Facebook");
+                    var Twitter = new RegExp("Twitter");
+                    var domain;
+                    if (Facebook.test(app)) {
+                        domain = "https://www.facebook.com/";
+                        var facebook_window = window.open(domain);
+                        setTimeout(function () {
+                            facebook_window.postMessage(result, domain)
+                        }, 2000);
+                    }
+                    if (Twitter.test(app)) {
+                        domain = "https://twitter.com/login";
+                        var twitter_window = window.open(domain);
+                        setTimeout(function () {
+                            twitter_window.postMessage(result, domain)
+                        }, 2000);
+                    }
+                }
+                else
+                    console.log("The record has been deleted. Failed to get the password.");
+            }, 3000);
+        }
+        else
+            console.error(error);
+    });
+
+}
+
