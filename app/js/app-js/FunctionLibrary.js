@@ -71,8 +71,7 @@ function generate_identity(manager_pub_x1, manager_pub_x2, manager_pub_y1, manag
     manager_pub_y2 = web3.toAscii(manager_pub_y2);
     var manager_pubkey_recover = recoverPubkey(manager_pub_x1, manager_pub_x2, manager_pub_y1, manager_pub_y2);
     var shared_key = getShared_key(pri_key, manager_pubkey_recover);
-    var identity = padding_for_id(RegisterID);
-    identity = aes_encrypt(shared_key, identity);
+    var identity = aes_encrypt(shared_key, RegisterID);
     identity = md5(identity);
     return identity;
 }
@@ -121,18 +120,6 @@ function getShared_key(prikey1, pubkey2) {
     return shared_key;
 }
 
-/*generate random hex string*/
-function randomString(len) {
-    len = len || 32;
-    var $chars = '0123456789abcdef';
-    var maxPos = $chars.length;
-    var pwd = '';
-    for (i = 0; i < len; i++) {
-        pwd += $chars.charAt(Math.floor(Math.random() * maxPos));
-    }
-    return pwd;
-}
-
 /*Convert hex string to byte array*/
 function StrToBytes(str) {
     var pos = 0;
@@ -152,26 +139,33 @@ function StrToBytes(str) {
 }
 
 /*encryption: return cipher hex string*/
-function aes_encrypt(key_hex, plaintext_16bytes) {
-    var aes_key = StrToBytes(key_hex);
-    var iv = StrToBytes(key_hex.substring(0, 32));
-    var textBytes = aesjs.utils.utf8.toBytes(plaintext_16bytes);
-    var aesCbc = new aesjs.ModeOfOperation.cbc(aes_key, iv);
-    var encryptedBytes = aesCbc.encrypt(textBytes);
+function aes_encrypt(key, plaintext) {
+    key = $.trim(key);
+    plaintext = $.trim(plaintext);
+    var aes_key = md5(key);
+    aes_key = StrToBytes(aes_key);
+    var textBytes = aesjs.utils.utf8.toBytes(plaintext);
+    var aesCtr = new aesjs.ModeOfOperation.ctr(aes_key, new aesjs.Counter(5));
+    var encryptedBytes = aesCtr.encrypt(textBytes);
     var encryptedHex = aesjs.utils.hex.fromBytes(encryptedBytes);
+    encryptedHex=$.trim(encryptedHex);
     return encryptedHex;
 }
 
 /*decryption:return plaintext string*/
-function aes_decrypt(key_hex, cipher_hex) {
-    var aes_key = StrToBytes(key_hex);
-    var iv = StrToBytes(key_hex.substring(0, 32));
+function aes_decrypt(key, cipher_hex) {
+    key = $.trim(key);
+    cipher_hex = $.trim(cipher_hex);
+    var aes_key = md5(key);
+    aes_key = StrToBytes(aes_key);
     var cipherBytes = aesjs.utils.hex.toBytes(cipher_hex);
-    var aesCbc = new aesjs.ModeOfOperation.cbc(aes_key, iv);
-    var decryptedBytes = aesCbc.decrypt(cipherBytes);
+    var aesCtr = new aesjs.ModeOfOperation.ctr(aes_key, new aesjs.Counter(5));
+    var decryptedBytes = aesCtr.decrypt(cipherBytes);
     var decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
+    decryptedText = $.trim(decryptedText);
     return decryptedText;
 }
+
 
 /*string padding(16bytes)： using "?"*/
 function padding_16bytes(str) {
@@ -195,45 +189,13 @@ function padding_16bytes(str) {
     }
 }
 
-/*string padding(16/32/48bytes)： using "?"*/
-function padding_for_id(str) {
-    var padding;
-    var result;
-    try {
-        if (0 <= str.length && str.length <= 16) {
-            padding = "????????????????";
-            result = str + padding.substring(str.length);
-        }
-        if (16 < str.length && str.length <= 32) {
-            padding = "????????????????????????????????";
-            result = str + padding.substring(str.length);
-        }
-        if (32 < str.length && str.length <= 48) {
-            padding = "????????????????????????????????????????????????";
-            result = str + padding.substring(str.length);
-        }
-        if (str.length > 48) {
-            throw 'Error!!!ID cannot be longer than 48 bytes.';
-        }
-    }
-    catch (e) {
-        console.log(e);
-        alert(e);
-    }
-    finally {
-        return result;
-    }
-
-}
-
-/*string unpadding: deleting "?"*/
 function unpadding(str_16bytes) {
     var padding_place = str_16bytes.indexOf("?");
     return str_16bytes.substring(0, padding_place);
 }
 
 /*formatting time*/
-function getReadableTime(years,times) {
+function getReadableTime(years, times) {
     var year = String(years);
     var day = String(times[1]);
     var hour = String(times[2]);
@@ -309,12 +271,14 @@ function exportCanvasAsPNG(canvas, fileName) {
 function create(container_id_string, data_json, myname) {
     myname = myname + " QR-Code";
     document.getElementById("QR-Code-name").innerHTML = myname;
-
     document.getElementById("qrcode").innerHTML = "<img src='https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=" + encodeURIComponent(data_json) + "'/>";
-
     html2canvas(document.getElementById(container_id_string)).then(function (canvas) {
         exportCanvasAsPNG(canvas, "qrcode.png");
     });
+}
+
+function normalize(value){
+
 }
 
 /*function createQRDiv(container_id_string) {
@@ -350,3 +314,39 @@ function create(container_id_string, data_json, myname) {
  //扫描出的结果经过以下表达式则会还原原来的字符串
  //var restored = JSON.parse(pako.inflate(binaryString, {to: 'string'}));//字符串解压缩处理
  }*/
+/*function aes_encrypt_token(password, plaintext, callback) {
+    generate_aes_key(password, function (aes_key) {
+        var textBytes = aesjs.utils.utf8.toBytes(plaintext);
+        var aesCtr = new aesjs.ModeOfOperation.ctr(aes_key, new aesjs.Counter(5));
+        var encryptedBytes = aesCtr.encrypt(textBytes);
+        var encryptedHex = aesjs.utils.hex.fromBytes(encryptedBytes);
+        callback(encryptedHex);
+    });
+}*/
+/*decryption:return plaintext string*/
+/*function aes_decrypt_token(password, cipher_hex, callback) {
+    generate_aes_key(password, function (aes_key) {
+        var cipherBytes = aesjs.utils.hex.toBytes(cipher_hex);
+        var aesCtr = new aesjs.ModeOfOperation.ctr(aes_key, new aesjs.Counter(5));
+        var decryptedBytes = aesCtr.decrypt(cipherBytes);
+        var decryptedText = aesjs.utils.utf8.fromBytes(decryptedBytes);
+        callback(decryptedText);
+    });
+}*/
+/*generation: key from password-salt*/
+/*
+function generate_aes_key(password_string, callback) {
+    var pw = new String(password_string);
+    var password = new buffer.SlowBuffer(pw.normalize('NFKC'));
+    var salt = new buffer.SlowBuffer("Nettoken".normalize('NFKC'));
+    var N = 1024, r = 8, p = 1;
+    var dkLen = 16;
+    scrypt(password, salt, N, r, p, dkLen, function (error, progress, key) {
+        if (error) {
+            console.error("Error: " + error);
+
+        } else if (key) {
+            callback(key);
+        }
+    });
+}*/

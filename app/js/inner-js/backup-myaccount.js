@@ -9,7 +9,7 @@ var JSONAllSharedAccounts = [];
 var JSONAllContacts = [];
 var ROWSocialAccount, ROWSharedAccount, ROWContact;
 var AppAscii, UsernameAscii, SharedAppAscii, SharedUsernameAscii, ContactNameAscii;
-var senderPubKeyResult, senderPubKey, sender_pubkey_recover, sender_contact_sharedkey;
+var senderPubKeyResult, senderPubKey, sender_pubkey_recover;
 
 /*Vue Objects that process data*/
 var VueName = new Vue({
@@ -43,8 +43,6 @@ var priv = sessionStorage.getItem("pri");
 identity = String(identity);
 priv = String(priv);
 
-/*initialization of page*/
-
 /*to interact with contract and store data locally*/
 AccountName = web3.toAscii(Nettoken.getMyName.call(identity));
 AllSocialAccounts = Nettoken.getAllSocialAccounts.call(identity);
@@ -64,7 +62,6 @@ Nettoken.getManagerPubkey.call(function (error, result) {
         manager_pub_y2 = web3.toAscii(manager_pub_y2);
         var manager_pubkey_recover = recoverPubkey(manager_pub_x1, manager_pub_x2, manager_pub_y1, manager_pub_y2);
         shared_key = getShared_key(priv, manager_pubkey_recover);
-
         /*data processing:social accounts*/
         Apps = AllSocialAccounts[0];
         Usernames = AllSocialAccounts[1];
@@ -131,13 +128,11 @@ Nettoken.getManagerPubkey.call(function (error, result) {
                 senderPubKey.y1 = web3.toAscii(senderPubKeyResult[2]);
                 senderPubKey.y2 = web3.toAscii(senderPubKeyResult[3]);
                 sender_pubkey_recover = recoverPubkey(senderPubKey.x1, senderPubKey.x2, senderPubKey.y1, senderPubKey.y2);
-                sender_contact_sharedkey = getShared_key(priv, sender_pubkey_recover);
-                sender_contact_sharedkey = String(sender_contact_sharedkey);
-                ROWSharedAccount.SharedKey = sender_contact_sharedkey;
-                /*decrypt*/
-                SharedUsernameAscii = aes_decrypt(sender_contact_sharedkey, SharedUsernameAscii);
-                SharedUsernameAscii = unpadding(SharedUsernameAscii);
+                ROWSharedAccount.SharedKey = getShared_key(priv, sender_pubkey_recover);
 
+                /*decrypt*/
+                SharedUsernameAscii = aes_decrypt(ROWSharedAccount.SharedKey, SharedUsernameAscii);
+                SharedUsernameAscii = unpadding(SharedUsernameAscii);
                 ROWSharedAccount.SharedUsername = SharedUsernameAscii;
             }
             else
@@ -173,7 +168,6 @@ Nettoken.getManagerPubkey.call(function (error, result) {
         console.error(error);
 });
 
-
 /*Button: setMyName*/
 function setMyName() {
     var newMyName = String($("#Nickname input#setMyName").val());
@@ -181,7 +175,6 @@ function setMyName() {
         if (!error) {
             AccountName = web3.toAscii(Nettoken.getMyName.call(identity));
             VueName.MyName = AccountName;
-            window.location.reload();
         }
     });
 };
@@ -201,12 +194,6 @@ function AddSocialAccount() {
     Nettoken.AddSocialAccount.sendTransaction(identity, newApp, newUsername, newPassword, {
         from: web3.eth.accounts[0],
         gas: '400000'
-    }, function (error, result) {
-        if (error)
-            console.error(error);
-        else {
-            window.location.reload();
-        }
     });
 };
 
@@ -217,12 +204,6 @@ function DelSocialAccount(delApp, delUsername) {
     Nettoken.DelSocialAccount.sendTransaction(identity, delApp, delUsername, {
         from: web3.eth.accounts[0],
         gas: '200000'
-    }, function (error, result) {
-        if (error)
-            console.error(error);
-        else {
-            window.location.reload();
-        }
     });
 };
 
@@ -248,8 +229,8 @@ function AltSocialAccountPw(targetApp, targetUsername, Index) {
     var inputID = String("#SocialAccountOutput input#" + Index);
     var NewSocialAccountPW = String($(inputID).val());
     NewSocialAccountPW = padding_16bytes(NewSocialAccountPW);
-    NewSocialAccountPW = aes_encrypt(shared_key, NewSocialAccountPW);
     targetUsername = padding_16bytes(targetUsername);
+    NewSocialAccountPW = aes_encrypt(shared_key, NewSocialAccountPW);
     targetUsername = aes_encrypt(shared_key, targetUsername);
     Nettoken.AltSocialAccountPw.sendTransaction(identity, targetApp, targetUsername, NewSocialAccountPW, {
         from: web3.eth.accounts[0],
@@ -276,7 +257,6 @@ function ShareAccount(targetApp, targetUsername, id) {
             var targetPassword = web3.toAscii(getSocialAccountPWResult[0]);
             targetPassword = aes_decrypt(shared_key, targetPassword);
             targetPassword = unpadding(targetPassword);
-
             /*get target public key and calculate shared key*/
             var TargetPubKeyResult;
             TargetPubKeyResult = Nettoken.getTargetContactPubKey.call(identity, ShareAccountAddress);
@@ -288,11 +268,16 @@ function ShareAccount(targetApp, targetUsername, id) {
                 ContactPubKey.y2 = web3.toAscii(TargetPubKeyResult[3]);
                 var target_pubkey_recover = recoverPubkey(ContactPubKey.x1, ContactPubKey.x2, ContactPubKey.y1, ContactPubKey.y2);
                 var target_shared_key = getShared_key(priv, target_pubkey_recover);
+
+                console.log("4 shared key:" + shared_key);
+                console.log("4 contact_sharedkey:" + target_shared_key);
+
                 /*encrypt*/
                 targetUsername = padding_16bytes(targetUsername);
                 targetPassword = padding_16bytes(targetPassword);
                 targetUsername = aes_encrypt(target_shared_key, targetUsername);
                 targetPassword = aes_encrypt(target_shared_key, targetPassword);
+
 
                 /*share*/
                 Nettoken.AddSharedAccount.sendTransaction(identity, ShareAccountAddress, targetApp, targetUsername, targetPassword, {
@@ -319,12 +304,6 @@ function AddContact() {
         Nettoken.AddContact.sendTransaction(identity, result[0], {
             from: web3.eth.accounts[0],
             gas: '550000'
-        }, function (error, result) {
-            if (error)
-                console.error(error);
-            else {
-                window.location.reload();
-            }
         });
     }
     else
@@ -367,12 +346,6 @@ function AlterContactName(targetAddress, Index) {
     Nettoken.AlterContactName.sendTransaction(identity, targetAddress, NewContactName, {
         from: web3.eth.accounts[0],
         gas: '53000'
-    }, function (error, result) {
-        if (error)
-            console.error(error);
-        else {
-            window.location.reload();
-        }
     });
 }
 
@@ -463,7 +436,6 @@ function goShared(app, username, shared_key) {
                     var target_password = web3.toAscii(getSharedAccountPWResult[0]);
                     target_password = aes_decrypt(shared_key, target_password);
                     target_password = unpadding(target_password);
-
                     console.log("The shared password is:" + target_password);
 
                     /*build data structure*/

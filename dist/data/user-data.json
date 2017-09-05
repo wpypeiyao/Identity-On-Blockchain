@@ -6,16 +6,6 @@
     "note4": "Remember to record address for every new account.",
     "datetime address": "0x8f7dda5d67e9028786511238b4bde8d9c2c92cbe"
   },
-  "MainUser1": {
-    "identity": "9007780320790066ecf6fd7f1ed720f1",
-    "address": "0x223236d6c5938e90c86bbf08ea577c14bef476c1",
-    "Nickname": "Peiyao Wu",
-    "private": "1f8f640b1f6252a9a8237828f7fa877c0cf88c9f6476623b3b360235cedd0c7b",
-    "public_x1": "eb0cdd2aed7dab76b38a4cabbea1844d",
-    "public_x2": "d11f346e8d9e34d85b7a8afeffc2e725",
-    "public_y1": "b8f16079e979600f91906d55563df5b9",
-    "public_y2": "9a7b24295e6b54749922c5f5b501ecb3"
-  },
   "MainUser": {
     "identity": "e465c65eb527afaeaf7347358d0e1226",
     "address": "0x284018432517bf35cd2e845c832281004c63fc51",

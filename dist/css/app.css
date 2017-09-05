@@ -13652,60 +13652,49 @@ footer p {
         background: #bdc3c7 !important
     }
 }
-
-div {
-  margin: 15px;
+#login-dp {
+    margin: 0 auto;
+    width: 640px;
+    padding: 14px 14px 0;
+    overflow: hidden;
+    background-color: rgba(255, 255, 255, .8);
+    border-radius: 5px;
 }
 
-.logs {
-  background-color: black;
-  font-size: 14px;
-  color: white;
-  font-weight: bold;
-  padding: 10px;
-  border-radius: 8px;
+#login-dp .help-block {
+    font-size: 12px
 }
 
-.tab-content {
-  border-left: 1px solid #ddd;
-  border-right: 1px solid #ddd;
-  border-bottom: 1px solid #ddd;
-  padding: 10px;
-  margin: 0px;
+#login-dp .bottom {
+    background-color: rgba(255, 255, 255, .8);
+    border-top: 1px solid #ddd;
+    clear: both;
+    padding: 14px;
 }
 
-.nav-tabs {
-  margin-bottom: 0;
+#login-dp .form-group {
+    margin-bottom: 10px;
 }
 
-.status-offline {
-  vertical-align: middle;
-  margin-left: 5px;
-  margin-top: 4px;
-  width: 12px;
-  height: 12px;
-  background: red;
-  -moz-border-radius: 10px;
-  -webkit-border-radius: 10px;
-  border-radius: 10px;
+@media (max-width: 768px) {
+    #login-dp {
+        background-color: inherit;
+        color: #fff;
+    }
+
+    #login-dp .bottom {
+        background-color: inherit;
+        border-top: 0 none;
+    }
 }
 
-.status-online {
-  vertical-align: middle;
-  margin-left: 5px;
-  margin-top: 4px;
-  width: 12px;
-  height: 12px;
-  background: mediumseagreen;
-  -moz-border-radius: 10px;
-  -webkit-border-radius: 10px;
-  border-radius: 10px;
+#register-pane {
+    display: none;
+    height: 500px;
 }
 
-.index-input {
-    position: absolute;
-    width: 80%;
-    left: 20%;
+#login-pane {
+    display: inline;
 }
 
 .index-label {
@@ -13713,18 +13702,93 @@ div {
     color: #5d6d7e;
 }
 
-#register-pane {
-    display: none;
+#register-form-td {
+    width: 280px;
 }
 
-#login-pane {
-    display: inline;
+#register-qrcode-td {
+    height: 300px;
 }
 
-#register-pane, #login-pane {
-    width: 640px;
+#login-qrcode-td{
+    width: 370px;
+}
+
+#login-scan-td{
+    width:50%;
+}
+
+td {
+    padding: 4px;
+    margin: 0 auto;
+
+}
+table {
+    margin: 0 auto;
+}
+#QR-Code-image {
+    text-align: center;
+    border: 2px;
+    border-color: #1b6d85;
+    border-radius: 6px;
+}
+
+#QR-Code-decode {
     position: absolute;
-    left: 10%;
+    left: 66%;
+    top: 30%;
+    text-align: center;
+    border: 2px;
+    border-color: #1b6d85;
+    border-radius: 6px;
+    background-color: #edeff1;
+}
+
+#time-panel {
+    position: relative;
+    top: 10px;
+    left: 10px;
+}
+
+#qr-canvas{
+    display:none;
+}
+#qrfile{
+    width:320px;
+    height:240px;
+}
+#mp1{
+    text-align:center;
+    font-size:35px;
+}
+
+
+#imghelp{
+    position:relative;
+    left:0px;
+    top:-160px;
+    z-index:100;
+    font:18px arial,sans-serif;
+    background:#f0f0f0;
+    margin-left:35px;
+    margin-right:35px;
+    padding-top:10px;
+    padding-bottom:10px;
+    border-radius:20px;
+}
+#outdiv
+{
+    width:320px;
+    height:240px;
+    border: solid;
+    border-radius: 2px;
+    border-color: #3399CC;
+    border-width: 0.5px;
+    margin: 0 auto;
+}
+#v{
+    width:320px;
+    height:240px;
 }
 
 a:link, a:visited {
@@ -13738,25 +13802,18 @@ a:hover, a:active {
     cursor: pointer;
 }
 
-#QR-Code-image {
-    display: none;
-    position: absolute;
-    left: 66%;
-    top: 30%;
-    text-align: center;
-    border: 2px;
-    border-color: #1b6d85;
-    border-radius: 6px;
-    background-color: #edeff1;
+#userpage-container{
+    padding-top: 26px;
 }
 
-#QR-Code-decode {
+#button-back{
     position: absolute;
-    left: 66%;
-    top: 30%;
-    text-align: center;
-    border: 2px;
-    border-color: #1b6d85;
-    border-radius: 6px;
-    background-color: #edeff1;
+    left: 870px;
+    width: 80px;
+}
+
+#button-refresh{
+    position: absolute;
+    left: 1000px;
+    width: 80px;
 }

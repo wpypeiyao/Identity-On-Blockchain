@@ -1,0 +1,26 @@
+a:link, a:visited {
+    color: #7F8C8D;
+    text-decoration: none;
+}
+
+a:hover, a:active {
+    color: #95A5A6;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+#userpage-container{
+    padding-top: 26px;
+}
+
+#button-back{
+    position: absolute;
+    left: 870px;
+    width: 80px;
+}
+
+#button-refresh{
+    position: absolute;
+    left: 1000px;
+    width: 80px;
+}

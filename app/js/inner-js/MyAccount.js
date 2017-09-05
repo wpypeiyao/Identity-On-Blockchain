@@ -1,5 +1,4 @@
 /*declaration of global variables*/
-var identity;
 var shared_key;
 var AccountName, AllSocialAccounts, AllSharedAccounts, AllContacts;
 var SocialAccountslength, SharedAccountslength, Contactslength;
@@ -10,7 +9,7 @@ var JSONAllSharedAccounts = [];
 var JSONAllContacts = [];
 var ROWSocialAccount, ROWSharedAccount, ROWContact;
 var AppAscii, UsernameAscii, SharedAppAscii, SharedUsernameAscii, ContactNameAscii;
-var senderPubKeyResult, senderPubKey, sender_pubkey_recover;
+var senderPubKeyResult, senderPubKey, sender_pubkey_recover, sender_contact_sharedkey;
 
 /*Vue Objects that process data*/
 var VueName = new Vue({
@@ -39,143 +38,141 @@ var VueContact = new Vue({
     }
 });
 
-/*get the data from token card(here json file)*/
-var dataroot = "data/user-data.json";
-var user_data;
-var priv;
+var identity = sessionStorage.getItem("id");
+var priv = sessionStorage.getItem("pri");
+identity = String(identity);
+priv = String(priv);
 
 /*initialization of page*/
-$.getJSON(dataroot, function (data) {
-    user_data = data.MainUser;
-    priv = user_data.private;
-    identity = (location.search).substring(4);
-    identity = aes_decrypt(priv, identity);
 
-    /*to interact with contract and store data locally*/
-    AccountName = web3.toAscii(Nettoken.getMyName.call(identity));
-    AllSocialAccounts = Nettoken.getAllSocialAccounts.call(identity);
-    AllSharedAccounts = Nettoken.getAllSharedAccounts.call(identity);
-    AllContacts = Nettoken.getAllContact.call(identity);
+/*to interact with contract and store data locally*/
+AccountName = web3.toAscii(Nettoken.getMyName.call(identity));
+AllSocialAccounts = Nettoken.getAllSocialAccounts.call(identity);
+AllSharedAccounts = Nettoken.getAllSharedAccounts.call(identity);
+AllContacts = Nettoken.getAllContact.call(identity);
 
-    Nettoken.getManagerPubkey.call(function (error, result) {
-        if (!error) {
-            /*calculate shared key*/
-            var manager_pub_x1 = result[0];
-            var manager_pub_x2 = result[1];
-            var manager_pub_y1 = result[2];
-            var manager_pub_y2 = result[3];
-            manager_pub_x1 = web3.toAscii(manager_pub_x1);
-            manager_pub_x2 = web3.toAscii(manager_pub_x2);
-            manager_pub_y1 = web3.toAscii(manager_pub_y1);
-            manager_pub_y2 = web3.toAscii(manager_pub_y2);
-            var manager_pubkey_recover = recoverPubkey(manager_pub_x1, manager_pub_x2, manager_pub_y1, manager_pub_y2);
-            shared_key = getShared_key(priv, manager_pubkey_recover);
+Nettoken.getManagerPubkey.call(function (error, result) {
+    if (!error) {
+        /*calculate shared key*/
+        var manager_pub_x1 = result[0];
+        var manager_pub_x2 = result[1];
+        var manager_pub_y1 = result[2];
+        var manager_pub_y2 = result[3];
+        manager_pub_x1 = web3.toAscii(manager_pub_x1);
+        manager_pub_x2 = web3.toAscii(manager_pub_x2);
+        manager_pub_y1 = web3.toAscii(manager_pub_y1);
+        manager_pub_y2 = web3.toAscii(manager_pub_y2);
+        var manager_pubkey_recover = recoverPubkey(manager_pub_x1, manager_pub_x2, manager_pub_y1, manager_pub_y2);
+        shared_key = getShared_key(priv, manager_pubkey_recover);
 
-            /*data processing:social accounts*/
-            Apps = AllSocialAccounts[0];
-            Usernames = AllSocialAccounts[1];
-            SocialAccountslength = Apps.length;
+        /*data processing:social accounts*/
+        Apps = AllSocialAccounts[0];
+        Usernames = AllSocialAccounts[1];
+        SocialAccountslength = Apps.length;
 
-            for (var i = 0; i < SocialAccountslength; i++) {
-                AppAscii = web3.toAscii(Apps[i]);
-                UsernameAscii = web3.toAscii(Usernames[i]);
-                UsernameAscii = aes_decrypt(shared_key, UsernameAscii);
-                UsernameAscii = unpadding(UsernameAscii);
-                ROWSocialAccount = {};
-                ROWSocialAccount.App = AppAscii;
-                ROWSocialAccount.username = UsernameAscii;
-                ROWSocialAccount.inputID = "NewPW" + i;
-                ROWSocialAccount.inputShareID = "SharedAddress" + i;
-                JSONAllSocialAccounts.push(ROWSocialAccount);
-            }
-
-            /*data processing:contacts*/
-            ContactAddresses = AllContacts[0]
-            ContactNames = AllContacts[1]
-            Contactslength = ContactAddresses.length;
-
-            for (var k = 0; k < Contactslength; k++) {
-                ContactNameAscii = web3.toAscii(ContactNames[k]);
-                ROWContact = {};
-                ROWContact.ContactAddress = ContactAddresses[k];
-                ROWContact.ContactName = ContactNameAscii;
-                ROWContact.inputID = "NewContactName" + k;
-                JSONAllContacts.push(ROWContact);
-            }
-
-
-            /*data processing:shared accounts*/
-            SharedApps = AllSharedAccounts[0];
-            SharedUsernames = AllSharedAccounts[1];
-            fromAddresses = AllSharedAccounts[2];
-            timestamps_year = AllSharedAccounts[3];
-            timestamps_times = AllSharedAccounts[4];
-
-            SharedAccountslength = SharedApps.length;
-
-            for (var j = 0; j < SharedAccountslength; j++) {
-                SharedAppAscii = web3.toAscii(SharedApps[j]);
-                SharedUsernameAscii = web3.toAscii(SharedUsernames[j]);
-                ROWSharedAccount = {};
-                ROWSharedAccount.SharedApp = SharedAppAscii;
-                ROWSharedAccount.fromAddress = fromAddresses[j];
-                ROWSharedAccount.fromName = "not current contact";
-
-                /*show sender name*/
-                for (var y in JSONAllContacts) {
-                    if (fromAddresses[j] == JSONAllContacts[y].ContactAddress)
-                        ROWSharedAccount.fromName = JSONAllContacts[y].ContactName;
-                }
-
-                /*get sender public key and calculate shared key*/
-                senderPubKeyResult;
-                senderPubKeyResult = Nettoken.getTargetContactPubKey.call(identity, fromAddresses[j]);
-                if (senderPubKeyResult[4] == true) {
-                    senderPubKey = {};
-                    senderPubKey.x1 = web3.toAscii(senderPubKeyResult[0]);
-                    senderPubKey.x2 = web3.toAscii(senderPubKeyResult[1]);
-                    senderPubKey.y1 = web3.toAscii(senderPubKeyResult[2]);
-                    senderPubKey.y2 = web3.toAscii(senderPubKeyResult[3]);
-                    sender_pubkey_recover = recoverPubkey(senderPubKey.x1, senderPubKey.x2, senderPubKey.y1, senderPubKey.y2);
-                    ROWSharedAccount.SharedKey = getShared_key(priv, sender_pubkey_recover);
-
-                    /*decrypt*/
-                    SharedUsernameAscii = aes_decrypt(ROWSharedAccount.SharedKey, SharedUsernameAscii);
-                    SharedUsernameAscii = unpadding(SharedUsernameAscii);
-                    ROWSharedAccount.SharedUsername = SharedUsernameAscii;
-                }
-                else
-                    console.log("The contact information has been deleted. Failed to decrypt.");
-
-                /*convert timestamp to readable type*/
-                ROWSharedAccount.timestamp = getReadableTime(timestamps_year[j], timestamps_times[j]);
-                JSONAllSharedAccounts.push(ROWSharedAccount);
-            }
-
-
-            /*show data on page*/
-            VueName.MyName = AccountName;
-            VueSocialAccount.JSONAllSocialAccounts = JSONAllSocialAccounts;
-            VueSocialAccount.JSONAllContacts = JSONAllContacts;
-            VueSharedAccount.JSONAllSharedAccounts = JSONAllSharedAccounts;
-            VueContact.JSONAllContacts = JSONAllContacts;
-
-            /*monitor useraccount*/
-            var ThisAccount = UserAccountContract.at(user_data.address);
-            var ThisAccounteventLog = ThisAccount.Log();
-            var ThisAccounteventLogs;
-            ThisAccounteventLog.watch(function (error, result) {
-                if (!error) {
-                    ThisAccounteventLogs = result.args.description;
-                    console.log(ThisAccounteventLogs);
-                    alert(ThisAccounteventLogs);
-                }
-            });
+        for (var i = 0; i < SocialAccountslength; i++) {
+            AppAscii = web3.toAscii(Apps[i]);
+            UsernameAscii = web3.toAscii(Usernames[i]);
+            UsernameAscii = aes_decrypt(shared_key, UsernameAscii);
+            UsernameAscii = unpadding(UsernameAscii);
+            ROWSocialAccount = {};
+            ROWSocialAccount.App = AppAscii;
+            ROWSocialAccount.username = UsernameAscii;
+            ROWSocialAccount.inputID = "NewPW" + i;
+            ROWSocialAccount.inputShareID = "SharedAddress" + i;
+            JSONAllSocialAccounts.push(ROWSocialAccount);
         }
-        else
-            console.error(error);
-    });
+
+        /*data processing:contacts*/
+        ContactAddresses = AllContacts[0]
+        ContactNames = AllContacts[1]
+        Contactslength = ContactAddresses.length;
+
+        for (var k = 0; k < Contactslength; k++) {
+            ContactNameAscii = web3.toAscii(ContactNames[k]);
+            ROWContact = {};
+            ROWContact.ContactAddress = ContactAddresses[k];
+            ROWContact.ContactName = ContactNameAscii;
+            ROWContact.inputID = "NewContactName" + k;
+            JSONAllContacts.push(ROWContact);
+        }
+
+
+        /*data processing:shared accounts*/
+        SharedApps = AllSharedAccounts[0];
+        SharedUsernames = AllSharedAccounts[1];
+        fromAddresses = AllSharedAccounts[2];
+        timestamps_year = AllSharedAccounts[3];
+        timestamps_times = AllSharedAccounts[4];
+
+        SharedAccountslength = SharedApps.length;
+
+        for (var j = 0; j < SharedAccountslength; j++) {
+            SharedAppAscii = web3.toAscii(SharedApps[j]);
+            SharedUsernameAscii = web3.toAscii(SharedUsernames[j]);
+            ROWSharedAccount = {};
+            ROWSharedAccount.SharedApp = SharedAppAscii;
+            ROWSharedAccount.fromAddress = fromAddresses[j];
+            ROWSharedAccount.fromName = "not current contact";
+
+            /*show sender name*/
+            for (var y in JSONAllContacts) {
+                if (fromAddresses[j] == JSONAllContacts[y].ContactAddress)
+                    ROWSharedAccount.fromName = JSONAllContacts[y].ContactName;
+            }
+
+            /*get sender public key and calculate shared key*/
+            senderPubKeyResult;
+            senderPubKeyResult = Nettoken.getTargetContactPubKey.call(identity, fromAddresses[j]);
+            if (senderPubKeyResult[4] == true) {
+                senderPubKey = {};
+                senderPubKey.x1 = web3.toAscii(senderPubKeyResult[0]);
+                senderPubKey.x2 = web3.toAscii(senderPubKeyResult[1]);
+                senderPubKey.y1 = web3.toAscii(senderPubKeyResult[2]);
+                senderPubKey.y2 = web3.toAscii(senderPubKeyResult[3]);
+                sender_pubkey_recover = recoverPubkey(senderPubKey.x1, senderPubKey.x2, senderPubKey.y1, senderPubKey.y2);
+                sender_contact_sharedkey = getShared_key(priv, sender_pubkey_recover);
+                sender_contact_sharedkey = String(sender_contact_sharedkey);
+                ROWSharedAccount.SharedKey = sender_contact_sharedkey;
+                /*decrypt*/
+                SharedUsernameAscii = aes_decrypt(sender_contact_sharedkey, SharedUsernameAscii);
+                SharedUsernameAscii = unpadding(SharedUsernameAscii);
+
+                ROWSharedAccount.SharedUsername = SharedUsernameAscii;
+            }
+            else
+                console.log("The contact information has been deleted. Failed to decrypt.");
+
+            /*convert timestamp to readable type*/
+            ROWSharedAccount.timestamp = getReadableTime(timestamps_year[j], timestamps_times[j]);
+            JSONAllSharedAccounts.push(ROWSharedAccount);
+        }
+
+
+        /*show data on page*/
+        VueName.MyName = AccountName;
+        VueSocialAccount.JSONAllSocialAccounts = JSONAllSocialAccounts;
+        VueSocialAccount.JSONAllContacts = JSONAllContacts;
+        VueSharedAccount.JSONAllSharedAccounts = JSONAllSharedAccounts;
+        VueContact.JSONAllContacts = JSONAllContacts;
+
+        /*monitor useraccount*/
+        var address = Nettoken.getAddress.call(identity);
+        var ThisAccount = UserAccountContract.at(address);
+        var ThisAccounteventLog = ThisAccount.Log();
+        var ThisAccounteventLogs;
+        ThisAccounteventLog.watch(function (error, result) {
+            if (!error) {
+                ThisAccounteventLogs = result.args.description;
+                console.log(ThisAccounteventLogs);
+                alert(ThisAccounteventLogs);
+            }
+        });
+    }
+    else
+        console.error(error);
 });
+
 
 /*Button: setMyName*/
 function setMyName() {
@@ -184,6 +181,7 @@ function setMyName() {
         if (!error) {
             AccountName = web3.toAscii(Nettoken.getMyName.call(identity));
             VueName.MyName = AccountName;
+            window.location.reload();
         }
     });
 };
@@ -203,6 +201,12 @@ function AddSocialAccount() {
     Nettoken.AddSocialAccount.sendTransaction(identity, newApp, newUsername, newPassword, {
         from: web3.eth.accounts[0],
         gas: '400000'
+    }, function (error, result) {
+        if (error)
+            console.error(error);
+        else {
+            window.location.reload();
+        }
     });
 };
 
@@ -213,6 +217,12 @@ function DelSocialAccount(delApp, delUsername) {
     Nettoken.DelSocialAccount.sendTransaction(identity, delApp, delUsername, {
         from: web3.eth.accounts[0],
         gas: '200000'
+    }, function (error, result) {
+        if (error)
+            console.error(error);
+        else {
+            window.location.reload();
+        }
     });
 };
 
@@ -265,6 +275,7 @@ function ShareAccount(targetApp, targetUsername, id) {
             /*share*/
             var targetPassword = web3.toAscii(getSocialAccountPWResult[0]);
             targetPassword = aes_decrypt(shared_key, targetPassword);
+            targetPassword = unpadding(targetPassword);
 
             /*get target public key and calculate shared key*/
             var TargetPubKeyResult;
@@ -277,9 +288,9 @@ function ShareAccount(targetApp, targetUsername, id) {
                 ContactPubKey.y2 = web3.toAscii(TargetPubKeyResult[3]);
                 var target_pubkey_recover = recoverPubkey(ContactPubKey.x1, ContactPubKey.x2, ContactPubKey.y1, ContactPubKey.y2);
                 var target_shared_key = getShared_key(priv, target_pubkey_recover);
-
                 /*encrypt*/
                 targetUsername = padding_16bytes(targetUsername);
+                targetPassword = padding_16bytes(targetPassword);
                 targetUsername = aes_encrypt(target_shared_key, targetUsername);
                 targetPassword = aes_encrypt(target_shared_key, targetPassword);
 
@@ -302,16 +313,23 @@ function ShareAccount(targetApp, targetUsername, id) {
 /*Functions:Contact*/
 /*Button: AddContact*/
 function AddContact() {
-    var newContactAddress = String($("#Contacts input#newContactAddress").val());
-    var CheckAddressFormat = web3.isAddress(newContactAddress);
-    if (CheckAddressFormat == true) {
-        Nettoken.AddContact.sendTransaction(identity, newContactAddress, {
+    var ContactName = String($("#Contacts input#newContactAddress").val());
+    var result = Nettoken.getAddressFromName.call(ContactName);
+    if (result[1]) {
+        Nettoken.AddContact.sendTransaction(identity, result[0], {
             from: web3.eth.accounts[0],
             gas: '550000'
+        }, function (error, result) {
+            if (error)
+                console.error(error);
+            else {
+                window.location.reload();
+            }
         });
     }
     else
-        console.log("Address format is incorrect!");
+        alert("No such user. Please check again.");
+
 };
 
 /*Item Button: getTargetContactPubKey*/
@@ -349,6 +367,12 @@ function AlterContactName(targetAddress, Index) {
     Nettoken.AlterContactName.sendTransaction(identity, targetAddress, NewContactName, {
         from: web3.eth.accounts[0],
         gas: '53000'
+    }, function (error, result) {
+        if (error)
+            console.error(error);
+        else {
+            window.location.reload();
+        }
     });
 }
 
@@ -439,6 +463,7 @@ function goShared(app, username, shared_key) {
                     var target_password = web3.toAscii(getSharedAccountPWResult[0]);
                     target_password = aes_decrypt(shared_key, target_password);
                     target_password = unpadding(target_password);
+
                     console.log("The shared password is:" + target_password);
 
                     /*build data structure*/

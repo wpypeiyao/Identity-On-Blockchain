@@ -11,14 +11,13 @@ contract TokenFunctions {
 
     mapping (address => bool) private isAddressUsed;
 
+    mapping (bytes32 => address) private AddressNaming;
+
     bytes32[4] private ManagerPubkey;
 
-    address private DateTimeAddress="0xA47965a03542F82EcaB56C596D8754fF8D2114D3";
+    address private DateTimeAddress = "0xA47965a03542F82EcaB56C596D8754fF8D2114D3";
 
     event Log(string description);
-
-    event LogAddress(address outputAddress);
-
 
     uint public timeLimited;//This is for SharedAccounts. When the difference between timestamp of target and current time is larger than this "timeLimited", it should be deleted from record.
 
@@ -50,12 +49,18 @@ contract TokenFunctions {
     function newUserAccount(bytes32 Identity, bytes32 Name, bytes32 PubKey_x1, bytes32 PubKey_x2, bytes32 PubKey_y1, bytes32 PubKey_y2){
         address target = UserMappingList[sha256(Identity)];
         if (!isAddressUsed[target]) {
-            UserAccount newAccount = new UserAccount(Name, PubKey_x1, PubKey_x2, PubKey_y1, PubKey_y2);
-            address newAddress = newAccount;
-            UserMappingList[sha256(Identity)] = newAddress;
-            isAddressUsed[newAddress] = true;
-            Log("Successfully added a UserAccount!");
-            LogAddress(newAddress);}
+            address addr = AddressNaming[Name];
+            if (!isAddressUsed[addr]) {
+                UserAccount newAccount = new UserAccount(Name, PubKey_x1, PubKey_x2, PubKey_y1, PubKey_y2);
+                address newAddress = newAccount;
+                UserMappingList[sha256(Identity)] = newAddress;
+                isAddressUsed[newAddress] = true;
+                AddressNaming[Name] = newAddress;
+                Log("Successfully added a UserAccount!");}
+            else {
+                Log("Failed! This name has been occupied. Please use another one.");
+            }
+        }
         else {
             Log("Failed! Identity is occupied!");}
     }
@@ -67,6 +72,9 @@ contract TokenFunctions {
             AccountAddress = target;}
     }
 
+    function getAddress(bytes32 Identity) constant returns (address addr){
+        addr = UserMappingList[sha256(Identity)];
+    }
 
     //Functions to interact with attributes of UserAccount:MyName,MyPubKey
     function getMyName(bytes32 Identity) constant returns (bytes32 MyName) {
@@ -80,9 +88,32 @@ contract TokenFunctions {
     }
 
     function setMyName(bytes32 Identity, bytes32 newName){
-        address target = UserMappingList[sha256(Identity)];
-        UserAccount(target).setName(newName);
-        Log("Successfully modified MyName.");
+        address addr = AddressNaming[newName];
+        if (isAddressUsed[addr]) {
+            Log("Failed! This name has been occupied. Please use another one.");}
+        else {
+            address target = UserMappingList[sha256(Identity)];
+            UserAccount targetAccount = UserAccount(target);
+            bytes32 prename = targetAccount.MyNickname();
+            delete AddressNaming[prename];
+            targetAccount.setName(newName);
+            AddressNaming[newName] = target;
+            Log("Successfully modified MyName.");}
+    }
+
+    //function: get address from name. This is for mapping contact address-readable name.
+    function getAddressFromName(bytes32 name) constant returns (address addr, bool found){
+        addr = AddressNaming[name];
+        if (isAddressUsed[addr]) {
+            found = true;
+        }
+    }
+
+    function checkNameOccupied(bytes32 name) constant returns (bool occupied){
+        address addr = AddressNaming[name];
+        if (isAddressUsed[addr]) {
+            occupied = true;
+        }
     }
 
     function setMyPubKey(bytes32 Identity, bytes32 PubKey_x1, bytes32 PubKey_x2, bytes32 PubKey_y1, bytes32 PubKey_y2){
@@ -140,16 +171,20 @@ contract TokenFunctions {
     function AddContact(bytes32 Identity, address newCAddress){
         address target = UserMappingList[sha256(Identity)];
         if (isAddressUsed[newCAddress]) {
-            UserAccount AccountOne = UserAccount(target);
-            UserAccount AccountTwo = UserAccount(newCAddress);
-            bytes32[4] memory PubKey_one;
-            bytes32[4] memory PubKey_two;
-            bytes32 AccountOneName = AccountOne.MyNickname();
-            (PubKey_one[0], PubKey_one[1], PubKey_one[2], PubKey_one[3]) = AccountOne.getPublicKey();
-            bytes32 AccountTwoName = AccountTwo.MyNickname();
-            (PubKey_two[0], PubKey_two[1], PubKey_two[2], PubKey_two[3]) = AccountTwo.getPublicKey();
-            AccountOne.AddContact(newCAddress, AccountTwoName, PubKey_two[0], PubKey_two[1], PubKey_two[2], PubKey_two[3]);
-            AccountTwo.AddContact(target, AccountOneName, PubKey_one[0], PubKey_one[1], PubKey_one[2], PubKey_one[3]);}
+            if (target == newCAddress) {
+                Log("Failed! You cannot add yourself as contact.");
+            }
+            else {
+                UserAccount AccountOne = UserAccount(target);
+                UserAccount AccountTwo = UserAccount(newCAddress);
+                bytes32[4] memory PubKey_one;
+                bytes32[4] memory PubKey_two;
+                bytes32 AccountOneName = AccountOne.MyNickname();
+                (PubKey_one[0], PubKey_one[1], PubKey_one[2], PubKey_one[3]) = AccountOne.getPublicKey();
+                bytes32 AccountTwoName = AccountTwo.MyNickname();
+                (PubKey_two[0], PubKey_two[1], PubKey_two[2], PubKey_two[3]) = AccountTwo.getPublicKey();
+                AccountOne.AddContact(newCAddress, AccountTwoName, PubKey_two[0], PubKey_two[1], PubKey_two[2], PubKey_two[3]);
+                AccountTwo.AddContact(target, AccountOneName, PubKey_one[0], PubKey_one[1], PubKey_one[2], PubKey_one[3]);}}
         else {
             Log("Failed! Address of contact is incorrect!");}
     }

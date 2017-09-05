@@ -4,51 +4,105 @@
     <link rel="stylesheet" href="css/app.css">
     <script src="js/lib.js"></script>
     <script src="js/app.js"></script>
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+    <style type="text/css">
+        body {
+            background: url('http://www.wallpaperup.com/uploads/wallpapers/2012/10/21/20181/cad2441dd3252cf53f12154412286ba0.jpg');
+            padding: 120px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-<!--to set the Timelimited value of Tokenfunctions contract-->
-<label>New Timelimited:</label><input type="text" placeholder="The new timelimited." id="newTimelimited"/>
-<button class="btn btn-info" onclick="setTimeLimited()">Change Timelimited</button>
-
-<!--main container-->
-<div class="login-screen" id="Register-and-Login">
+<div id="login-dp">
     <!--login pane-->
-    <div class="login-form" id="login-pane">
-        <div class="control-group">
-            <label class="index-label fui-user" for="login-identity">Identity: </label>
-            <input type="text" class="login-field index-input" value="" placeholder="Enter your identity"
-                   id="login-identity"/>
+    <div id="login-pane">
+        <div class="row">
+            <div class="col-md-12">
+                <table>
+                    <tr>
+                        <td id="login-qrcode-td" colspan="2">
+                            <!--qrcode-->
+                            <div id="outdiv">outdiv</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td id="login-scan-td">
+                            <button class="btn btn-primary btn-block" onclick="setwebcam()">- Scan -</button>
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-block" onclick="setimg()">- Upload -</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <div class="form-group">
+                                <input type="password" class="form-control" id="LoginPW"
+                                       placeholder="Enter your Password"
+                                       onblur="if(/[^0-9a-zA-Z/@/./_]/g.test(value))alert('Invalid input. Please use alphanumeric characters, underscores, dots and at signs')"/>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <button class="btn btn-info btn-block" onclick="login()"> Sign in</button>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div class="bottom text-center">
+                New here? <a onclick="to_register()"><b>Sign up</b></a>
+            </div>
         </div>
-        <button class="btn btn-success btn-block" onclick="login()">Login</button>
-        <button class="btn btn-primary btn-block" onclick="to_register()">To Register</button>
     </div>
 
     <!--register pane-->
-    <div class="login-form" id="register-pane">
-        <div class="control-group">
-            <label class="index-label fui-user" for="RegisterID">ID number: </label>
-            <input type="text" class="login-field index-input" value="" placeholder="Enter your ID" id="RegisterID"/>
+    <div id="register-pane">
+        <div class="row">
+            <div class="col-md-12">
+                <table>
+                    <tr>
+                        <td id="register-form-td">
+                            <div class="form-group">
+                                <input type="text" class="form-control" id="RegisterID" placeholder="Enter your ID"
+                                       onblur="if(/[^0-9a-zA-Z/@/./_]/g.test(value))alert('Invalid input-text. Please use alphanumeric characters, underscores, dots and at signs')"
+                                       required/>
+                            </div>
+                            <div class="form-group">
+                                <input type="text" class="form-control" id="RegisterName"
+                                       placeholder="Enter your Nickname"
+                                       onblur="if(/[^0-9a-zA-Z/@/./_]/g.test(value))alert('Invalid input-text. Please use alphanumeric characters, underscores, dots and at signs')"
+                                       required/>
+                            </div>
+                            <div class="form-group">
+                                <input type="password" class="form-control" id="RegisterPW"
+                                       placeholder="Enter your Password"
+                                       onblur="if(/[^0-9a-zA-Z/@/./_]/g.test(value))alert('Invalid input-text. Please use alphanumeric characters, underscores, dots and at signs')"/>
+                            </div>
+                            <button class="btn btn-info btn-block" onclick="register()"> Sign up</button>
+                        </td>
+                        <td id="register-qrcode-td">
+                            <div id="QR-Code-image">
+                                <span id="QR-Code-name"></span>
+                                <div id="qrcode"></div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+
+            </div>
+            <div class="bottom text-center">
+                Already using Nettoken? <a onclick="to_login()"><b>Sign in</b></a>
+            </div>
         </div>
-        <div class="control-group">
-            <label class="index-label fui-user" for="RegisterName">Nickname: </label>
-            <input type="text" class="login-field index-input" value="" placeholder="Enter your name"
-                   id="RegisterName"/>
-        </div>
-        <button class="btn btn-success btn-block" onclick="register()">Register</button>
-        <button class="btn btn-primary btn-block" onclick="to_login()">To Login</button>
     </div>
 </div>
-<div id="QR-Code-image">
-    <span id="QR-Code-name"></span>
-    <div id="qrcode"></div>
+
 </div>
-
-<!--<div id="QR-Code-decode">
-    <img src="images/chart.png" id="qrcode-img">
-    <button onclick="decode_qrcode()" class="btn btn-primary btn-block">decode</button>
-</div>-->
-<a href="decoder.html">decoder</a>
-
+<canvas id="qr-canvas" width="800" height="600"></canvas>
+<script type="text/javascript" src="js/qrdecoder.js"></script>
+<script type="text/javascript">load();</script>
 <script src="js/index.js"></script>
+
 </body>
 </html>

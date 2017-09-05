@@ -1,0 +1,64 @@
+#QR-Code-image {
+    text-align: center;
+    border: 2px;
+    border-color: #1b6d85;
+    border-radius: 6px;
+}
+
+#QR-Code-decode {
+    position: absolute;
+    left: 66%;
+    top: 30%;
+    text-align: center;
+    border: 2px;
+    border-color: #1b6d85;
+    border-radius: 6px;
+    background-color: #edeff1;
+}
+
+#time-panel {
+    position: relative;
+    top: 10px;
+    left: 10px;
+}
+
+#qr-canvas{
+    display:none;
+}
+#qrfile{
+    width:320px;
+    height:240px;
+}
+#mp1{
+    text-align:center;
+    font-size:35px;
+}
+
+
+#imghelp{
+    position:relative;
+    left:0px;
+    top:-160px;
+    z-index:100;
+    font:18px arial,sans-serif;
+    background:#f0f0f0;
+    margin-left:35px;
+    margin-right:35px;
+    padding-top:10px;
+    padding-bottom:10px;
+    border-radius:20px;
+}
+#outdiv
+{
+    width:320px;
+    height:240px;
+    border: solid;
+    border-radius: 2px;
+    border-color: #3399CC;
+    border-width: 0.5px;
+    margin: 0 auto;
+}
+#v{
+    width:320px;
+    height:240px;
+}

@@ -1,0 +1,8 @@
+.idea
+.node_modules
+node_modules
+.embark/
+node_modules/
+dist/
+config/production/password
+config/livenet/password

@@ -101,6 +101,46 @@ var TokenFunctionsContract = web3.eth.contract([
             {
                 "name": "Identity",
                 "type": "bytes32"
+            }
+        ],
+        "name": "getAddress",
+        "outputs": [
+            {
+                "name": "addr",
+                "type": "address"
+            }
+        ],
+        "payable": false,
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "name": "name",
+                "type": "bytes32"
+            }
+        ],
+        "name": "getAddressFromName",
+        "outputs": [
+            {
+                "name": "addr",
+                "type": "address"
+            },
+            {
+                "name": "found",
+                "type": "bool"
+            }
+        ],
+        "payable": false,
+        "type": "function"
+    },
+    {
+        "constant": true,
+        "inputs": [
+            {
+                "name": "Identity",
+                "type": "bytes32"
             },
             {
                 "name": "targetApp",
@@ -545,6 +585,24 @@ var TokenFunctionsContract = web3.eth.contract([
         "type": "function"
     },
     {
+        "constant": true,
+        "inputs": [
+            {
+                "name": "name",
+                "type": "bytes32"
+            }
+        ],
+        "name": "checkNameOccupied",
+        "outputs": [
+            {
+                "name": "occupied",
+                "type": "bool"
+            }
+        ],
+        "payable": false,
+        "type": "function"
+    },
+    {
         "constant": false,
         "inputs": [
             {
@@ -576,18 +634,6 @@ var TokenFunctionsContract = web3.eth.contract([
             }
         ],
         "name": "Log",
-        "type": "event"
-    },
-    {
-        "anonymous": false,
-        "inputs": [
-            {
-                "indexed": false,
-                "name": "outputAddress",
-                "type": "address"
-            }
-        ],
-        "name": "LogAddress",
         "type": "event"
     }
 ]);
@@ -1135,7 +1181,7 @@ var UserAccountContract = web3.eth.contract([
     }
 ]);
 
-var Nettoken = TokenFunctionsContract.at("0x122d327c3ae500d2fe1782c51d429e961a7831f3");
+var Nettoken = TokenFunctionsContract.at("0x069d2423f43dc7bd629dd63c8776e631dcc309bd");
 
 var eventLog = Nettoken.Log();
 var eventLogs;

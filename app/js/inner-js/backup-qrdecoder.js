@@ -1,6 +1,6 @@
 // QRCODE reader Copyright 2011 Lazar Laszlo
 // http://www.webqr.com
-
+var output;
 var gCtx = null;
 var gCanvas = null;
 var c = 0;
@@ -97,10 +97,14 @@ function htmlEntities(str) {
 }
 
 function read(a) {
-    alert("read!");
-    a = String(a);
-    sessionStorage.clear();
-    sessionStorage.setItem("token", a);
+    var user_data = JSON.parse(a);
+    sessionStorage.setItem("identity", user_data.identity);
+    sessionStorage.setItem("address", user_data.address);
+    sessionStorage.setItem("private", user_data.private);
+    sessionStorage.setItem("public_x1", user_data.public_x1);
+    sessionStorage.setItem("public_x2", user_data.public_x2);
+    sessionStorage.setItem("public_y1", user_data.public_y1);
+    sessionStorage.setItem("public_y2", user_data.public_y2);
 }
 
 function isCanvasSupported() {
@@ -170,9 +174,7 @@ function setwebcam() {
 
 function setwebcam2(options) {
     console.log(options);
-    /*
-     document.getElementById("result").innerHTML="- scanning -";
-     */
+    /*  document.getElementById("result").innerHTML="- scanning -";*/
     if (stype == 1) {
         setTimeout(captureToCanvas, 500);
         return;
@@ -195,11 +197,15 @@ function setwebcam2(options) {
         n.mozGetUserMedia({video: options, audio: false}, success, error);
     }
 
+    document.getElementById("qrimg").style.opacity = 0.2;
+    document.getElementById("webcamimg").style.opacity = 1.0;
+
     stype = 1;
     setTimeout(captureToCanvas, 500);
 }
 
 function setimg() {
+    /* document.getElementById("result").innerHTML="";*/
     if (stype == 2)
         return;
     document.getElementById("outdiv").innerHTML = imghtml;

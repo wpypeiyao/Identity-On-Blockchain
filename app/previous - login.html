@@ -1,0 +1,54 @@
+<html>
+<head>
+    <title>Nettoken - Identity on the Blockchain</title>
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/lib.js"></script>
+    <script src="js/app.js"></script>
+</head>
+<body>
+<!--to set the Timelimited value of Tokenfunctions contract-->
+<div id="time-panel">
+    <label>New Timelimited:</label><input type="text" placeholder="The new timelimited." id="newTimelimited"/>
+    <button class="btn btn-info" onclick="setTimeLimited()">Change Timelimited</button>
+</div>
+
+<!--main container-->
+<div id="Register-and-Login">
+    <!--login pane-->
+    <div class="login-form" id="login-pane">
+        <div class="control-group">
+            <label class="index-label fui-user">Identity: </label>
+        </div>
+        <button class="btn btn-success btn-block" onclick="login()">Login</button>
+        <button class="btn btn-primary btn-block" onclick="to_register()">To Register</button>
+        <!--qrcode-->
+        <div id="outdiv">outdiv</div>
+    </div>
+
+    <!--register pane-->
+    <div class="login-form" id="register-pane">
+        <div class="control-group">
+            <label class="index-label fui-user" for="RegisterID">ID number: </label>
+            <input type="text" class="login-field index-input" value="" placeholder="Enter your ID" id="RegisterID"/>
+        </div>
+        <div class="control-group">
+            <label class="index-label fui-user" for="RegisterName">Nickname: </label>
+            <input type="text" class="login-field index-input" value="" placeholder="Enter your name"
+                   id="RegisterName"/>
+        </div>
+        <button class="btn btn-success btn-block" onclick="register()">Register</button>
+        <button class="btn btn-primary btn-block" onclick="to_login()">To Login</button>
+    </div>
+</div>
+<div id="QR-Code-image">
+    <span id="QR-Code-name"></span>
+    <div id="qrcode"></div>
+</div>
+
+<canvas id="qr-canvas" width="800" height="600"></canvas>
+<script type="text/javascript" src="js/qrdecoder.js"></script>
+<script type="text/javascript">load();</script>
+
+<script src="js/index.js"></script>
+</body>
+</html>

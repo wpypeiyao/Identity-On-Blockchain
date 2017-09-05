@@ -796,6 +796,1387 @@
 
 
 })(this);
+!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.buffer=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+var lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+;(function (exports) {
+	'use strict';
+
+  var Arr = (typeof Uint8Array !== 'undefined')
+    ? Uint8Array
+    : Array
+
+	var PLUS   = '+'.charCodeAt(0)
+	var SLASH  = '/'.charCodeAt(0)
+	var NUMBER = '0'.charCodeAt(0)
+	var LOWER  = 'a'.charCodeAt(0)
+	var UPPER  = 'A'.charCodeAt(0)
+
+	function decode (elt) {
+		var code = elt.charCodeAt(0)
+		if (code === PLUS)
+			return 62 // '+'
+		if (code === SLASH)
+			return 63 // '/'
+		if (code < NUMBER)
+			return -1 //no match
+		if (code < NUMBER + 10)
+			return code - NUMBER + 26 + 26
+		if (code < UPPER + 26)
+			return code - UPPER
+		if (code < LOWER + 26)
+			return code - LOWER + 26
+	}
+
+	function b64ToByteArray (b64) {
+		var i, j, l, tmp, placeHolders, arr
+
+		if (b64.length % 4 > 0) {
+			throw new Error('Invalid string. Length must be a multiple of 4')
+		}
+
+		// the number of equal signs (place holders)
+		// if there are two placeholders, than the two characters before it
+		// represent one byte
+		// if there is only one, then the three characters before it represent 2 bytes
+		// this is just a cheap hack to not do indexOf twice
+		var len = b64.length
+		placeHolders = '=' === b64.charAt(len - 2) ? 2 : '=' === b64.charAt(len - 1) ? 1 : 0
+
+		// base64 is 4/3 + up to two characters of the original data
+		arr = new Arr(b64.length * 3 / 4 - placeHolders)
+
+		// if there are placeholders, only get up to the last complete 4 chars
+		l = placeHolders > 0 ? b64.length - 4 : b64.length
+
+		var L = 0
+
+		function push (v) {
+			arr[L++] = v
+		}
+
+		for (i = 0, j = 0; i < l; i += 4, j += 3) {
+			tmp = (decode(b64.charAt(i)) << 18) | (decode(b64.charAt(i + 1)) << 12) | (decode(b64.charAt(i + 2)) << 6) | decode(b64.charAt(i + 3))
+			push((tmp & 0xFF0000) >> 16)
+			push((tmp & 0xFF00) >> 8)
+			push(tmp & 0xFF)
+		}
+
+		if (placeHolders === 2) {
+			tmp = (decode(b64.charAt(i)) << 2) | (decode(b64.charAt(i + 1)) >> 4)
+			push(tmp & 0xFF)
+		} else if (placeHolders === 1) {
+			tmp = (decode(b64.charAt(i)) << 10) | (decode(b64.charAt(i + 1)) << 4) | (decode(b64.charAt(i + 2)) >> 2)
+			push((tmp >> 8) & 0xFF)
+			push(tmp & 0xFF)
+		}
+
+		return arr
+	}
+
+	function uint8ToBase64 (uint8) {
+		var i,
+			extraBytes = uint8.length % 3, // if we have 1 byte left, pad 2 bytes
+			output = "",
+			temp, length
+
+		function encode (num) {
+			return lookup.charAt(num)
+		}
+
+		function tripletToBase64 (num) {
+			return encode(num >> 18 & 0x3F) + encode(num >> 12 & 0x3F) + encode(num >> 6 & 0x3F) + encode(num & 0x3F)
+		}
+
+		// go through the array every three bytes, we'll deal with trailing stuff later
+		for (i = 0, length = uint8.length - extraBytes; i < length; i += 3) {
+			temp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
+			output += tripletToBase64(temp)
+		}
+
+		// pad the end with zeros, but make sure to not forget the extra bytes
+		switch (extraBytes) {
+			case 1:
+				temp = uint8[uint8.length - 1]
+				output += encode(temp >> 2)
+				output += encode((temp << 4) & 0x3F)
+				output += '=='
+				break
+			case 2:
+				temp = (uint8[uint8.length - 2] << 8) + (uint8[uint8.length - 1])
+				output += encode(temp >> 10)
+				output += encode((temp >> 4) & 0x3F)
+				output += encode((temp << 2) & 0x3F)
+				output += '='
+				break
+		}
+
+		return output
+	}
+
+	exports.toByteArray = b64ToByteArray
+	exports.fromByteArray = uint8ToBase64
+}(typeof exports === 'undefined' ? (this.base64js = {}) : exports))
+
+},{}],2:[function(require,module,exports){
+exports.read = function(buffer, offset, isLE, mLen, nBytes) {
+  var e, m,
+      eLen = nBytes * 8 - mLen - 1,
+      eMax = (1 << eLen) - 1,
+      eBias = eMax >> 1,
+      nBits = -7,
+      i = isLE ? (nBytes - 1) : 0,
+      d = isLE ? -1 : 1,
+      s = buffer[offset + i];
+
+  i += d;
+
+  e = s & ((1 << (-nBits)) - 1);
+  s >>= (-nBits);
+  nBits += eLen;
+  for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8);
+
+  m = e & ((1 << (-nBits)) - 1);
+  e >>= (-nBits);
+  nBits += mLen;
+  for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8);
+
+  if (e === 0) {
+    e = 1 - eBias;
+  } else if (e === eMax) {
+    return m ? NaN : ((s ? -1 : 1) * Infinity);
+  } else {
+    m = m + Math.pow(2, mLen);
+    e = e - eBias;
+  }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen);
+};
+
+exports.write = function(buffer, value, offset, isLE, mLen, nBytes) {
+  var e, m, c,
+      eLen = nBytes * 8 - mLen - 1,
+      eMax = (1 << eLen) - 1,
+      eBias = eMax >> 1,
+      rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0),
+      i = isLE ? 0 : (nBytes - 1),
+      d = isLE ? 1 : -1,
+      s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0;
+
+  value = Math.abs(value);
+
+  if (isNaN(value) || value === Infinity) {
+    m = isNaN(value) ? 1 : 0;
+    e = eMax;
+  } else {
+    e = Math.floor(Math.log(value) / Math.LN2);
+    if (value * (c = Math.pow(2, -e)) < 1) {
+      e--;
+      c *= 2;
+    }
+    if (e + eBias >= 1) {
+      value += rt / c;
+    } else {
+      value += rt * Math.pow(2, 1 - eBias);
+    }
+    if (value * c >= 2) {
+      e++;
+      c /= 2;
+    }
+
+    if (e + eBias >= eMax) {
+      m = 0;
+      e = eMax;
+    } else if (e + eBias >= 1) {
+      m = (value * c - 1) * Math.pow(2, mLen);
+      e = e + eBias;
+    } else {
+      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen);
+      e = 0;
+    }
+  }
+
+  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8);
+
+  e = (e << mLen) | m;
+  eLen += mLen;
+  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8);
+
+  buffer[offset + i - d] |= s * 128;
+};
+
+},{}],"buffer":[function(require,module,exports){
+/*!
+ * The buffer module from node.js, for the browser.
+ *
+ * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
+ * @license  MIT
+ */
+
+var base64 = require('base64-js')
+var ieee754 = require('ieee754')
+
+exports.Buffer = Buffer
+exports.SlowBuffer = Buffer
+exports.INSPECT_MAX_BYTES = 50
+Buffer.poolSize = 8192
+
+/**
+ * If `TYPED_ARRAY_SUPPORT`:
+ *   === true    Use Uint8Array implementation (fastest)
+ *   === false   Use Object implementation (most compatible, even IE6)
+ *
+ * Browsers that support typed arrays are IE 10+, Firefox 4+, Chrome 7+, Safari 5.1+,
+ * Opera 11.6+, iOS 4.2+.
+ *
+ * Note:
+ *
+ * - Implementation must support adding new properties to `Uint8Array` instances.
+ *   Firefox 4-29 lacked support, fixed in Firefox 30+.
+ *   See: https://bugzilla.mozilla.org/show_bug.cgi?id=695438.
+ *
+ *  - Chrome 9-10 is missing the `TypedArray.prototype.subarray` function.
+ *
+ *  - IE10 has a broken `TypedArray.prototype.subarray` function which returns arrays of
+ *    incorrect length in some situations.
+ *
+ * We detect these buggy browsers and set `TYPED_ARRAY_SUPPORT` to `false` so they will
+ * get the Object implementation, which is slower but will work correctly.
+ */
+var TYPED_ARRAY_SUPPORT = (function () {
+  try {
+    var buf = new ArrayBuffer(0)
+    var arr = new Uint8Array(buf)
+    arr.foo = function () { return 42 }
+    return 42 === arr.foo() && // typed array instances can be augmented
+        typeof arr.subarray === 'function' && // chrome 9-10 lack `subarray`
+        new Uint8Array(1).subarray(1, 1).byteLength === 0 // ie10 has broken `subarray`
+  } catch (e) {
+    return false
+  }
+})()
+
+/**
+ * Class: Buffer
+ * =============
+ *
+ * The Buffer constructor returns instances of `Uint8Array` that are augmented
+ * with function properties for all the node `Buffer` API functions. We use
+ * `Uint8Array` so that square bracket notation works as expected -- it returns
+ * a single octet.
+ *
+ * By augmenting the instances, we can avoid modifying the `Uint8Array`
+ * prototype.
+ */
+function Buffer (subject, encoding, noZero) {
+  if (!(this instanceof Buffer))
+    return new Buffer(subject, encoding, noZero)
+
+  var type = typeof subject
+
+  // Find the length
+  var length
+  if (type === 'number')
+    length = subject > 0 ? subject >>> 0 : 0
+  else if (type === 'string') {
+    if (encoding === 'base64')
+      subject = base64clean(subject)
+    length = Buffer.byteLength(subject, encoding)
+  } else if (type === 'object' && subject !== null) { // assume object is array-like
+    if (subject.type === 'Buffer' && isArray(subject.data))
+      subject = subject.data
+    length = +subject.length > 0 ? Math.floor(+subject.length) : 0
+  } else
+    throw new Error('First argument needs to be a number, array or string.')
+
+  var buf
+  if (TYPED_ARRAY_SUPPORT) {
+    // Preferred: Return an augmented `Uint8Array` instance for best performance
+    buf = Buffer._augment(new Uint8Array(length))
+  } else {
+    // Fallback: Return THIS instance of Buffer (created by `new`)
+    buf = this
+    buf.length = length
+    buf._isBuffer = true
+  }
+
+  var i
+  if (TYPED_ARRAY_SUPPORT && typeof subject.byteLength === 'number') {
+    // Speed optimization -- use set if we're copying from a typed array
+    buf._set(subject)
+  } else if (isArrayish(subject)) {
+    // Treat array-ish objects as a byte array
+    if (Buffer.isBuffer(subject)) {
+      for (i = 0; i < length; i++)
+        buf[i] = subject.readUInt8(i)
+    } else {
+      for (i = 0; i < length; i++)
+        buf[i] = ((subject[i] % 256) + 256) % 256
+    }
+  } else if (type === 'string') {
+    buf.write(subject, 0, encoding)
+  } else if (type === 'number' && !TYPED_ARRAY_SUPPORT && !noZero) {
+    for (i = 0; i < length; i++) {
+      buf[i] = 0
+    }
+  }
+
+  return buf
+}
+
+// STATIC METHODS
+// ==============
+
+Buffer.isEncoding = function (encoding) {
+  switch (String(encoding).toLowerCase()) {
+    case 'hex':
+    case 'utf8':
+    case 'utf-8':
+    case 'ascii':
+    case 'binary':
+    case 'base64':
+    case 'raw':
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      return true
+    default:
+      return false
+  }
+}
+
+Buffer.isBuffer = function (b) {
+  return !!(b != null && b._isBuffer)
+}
+
+Buffer.byteLength = function (str, encoding) {
+  var ret
+  str = str.toString()
+  switch (encoding || 'utf8') {
+    case 'hex':
+      ret = str.length / 2
+      break
+    case 'utf8':
+    case 'utf-8':
+      ret = utf8ToBytes(str).length
+      break
+    case 'ascii':
+    case 'binary':
+    case 'raw':
+      ret = str.length
+      break
+    case 'base64':
+      ret = base64ToBytes(str).length
+      break
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      ret = str.length * 2
+      break
+    default:
+      throw new Error('Unknown encoding')
+  }
+  return ret
+}
+
+Buffer.concat = function (list, totalLength) {
+  assert(isArray(list), 'Usage: Buffer.concat(list[, length])')
+
+  if (list.length === 0) {
+    return new Buffer(0)
+  } else if (list.length === 1) {
+    return list[0]
+  }
+
+  var i
+  if (totalLength === undefined) {
+    totalLength = 0
+    for (i = 0; i < list.length; i++) {
+      totalLength += list[i].length
+    }
+  }
+
+  var buf = new Buffer(totalLength)
+  var pos = 0
+  for (i = 0; i < list.length; i++) {
+    var item = list[i]
+    item.copy(buf, pos)
+    pos += item.length
+  }
+  return buf
+}
+
+Buffer.compare = function (a, b) {
+  assert(Buffer.isBuffer(a) && Buffer.isBuffer(b), 'Arguments must be Buffers')
+  var x = a.length
+  var y = b.length
+  for (var i = 0, len = Math.min(x, y); i < len && a[i] === b[i]; i++) {}
+  if (i !== len) {
+    x = a[i]
+    y = b[i]
+  }
+  if (x < y) {
+    return -1
+  }
+  if (y < x) {
+    return 1
+  }
+  return 0
+}
+
+// BUFFER INSTANCE METHODS
+// =======================
+
+function hexWrite (buf, string, offset, length) {
+  offset = Number(offset) || 0
+  var remaining = buf.length - offset
+  if (!length) {
+    length = remaining
+  } else {
+    length = Number(length)
+    if (length > remaining) {
+      length = remaining
+    }
+  }
+
+  // must be an even number of digits
+  var strLen = string.length
+  assert(strLen % 2 === 0, 'Invalid hex string')
+
+  if (length > strLen / 2) {
+    length = strLen / 2
+  }
+  for (var i = 0; i < length; i++) {
+    var byte = parseInt(string.substr(i * 2, 2), 16)
+    assert(!isNaN(byte), 'Invalid hex string')
+    buf[offset + i] = byte
+  }
+  return i
+}
+
+function utf8Write (buf, string, offset, length) {
+  var charsWritten = blitBuffer(utf8ToBytes(string), buf, offset, length)
+  return charsWritten
+}
+
+function asciiWrite (buf, string, offset, length) {
+  var charsWritten = blitBuffer(asciiToBytes(string), buf, offset, length)
+  return charsWritten
+}
+
+function binaryWrite (buf, string, offset, length) {
+  return asciiWrite(buf, string, offset, length)
+}
+
+function base64Write (buf, string, offset, length) {
+  var charsWritten = blitBuffer(base64ToBytes(string), buf, offset, length)
+  return charsWritten
+}
+
+function utf16leWrite (buf, string, offset, length) {
+  var charsWritten = blitBuffer(utf16leToBytes(string), buf, offset, length)
+  return charsWritten
+}
+
+Buffer.prototype.write = function (string, offset, length, encoding) {
+  // Support both (string, offset, length, encoding)
+  // and the legacy (string, encoding, offset, length)
+  if (isFinite(offset)) {
+    if (!isFinite(length)) {
+      encoding = length
+      length = undefined
+    }
+  } else {  // legacy
+    var swap = encoding
+    encoding = offset
+    offset = length
+    length = swap
+  }
+
+  offset = Number(offset) || 0
+  var remaining = this.length - offset
+  if (!length) {
+    length = remaining
+  } else {
+    length = Number(length)
+    if (length > remaining) {
+      length = remaining
+    }
+  }
+  encoding = String(encoding || 'utf8').toLowerCase()
+
+  var ret
+  switch (encoding) {
+    case 'hex':
+      ret = hexWrite(this, string, offset, length)
+      break
+    case 'utf8':
+    case 'utf-8':
+      ret = utf8Write(this, string, offset, length)
+      break
+    case 'ascii':
+      ret = asciiWrite(this, string, offset, length)
+      break
+    case 'binary':
+      ret = binaryWrite(this, string, offset, length)
+      break
+    case 'base64':
+      ret = base64Write(this, string, offset, length)
+      break
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      ret = utf16leWrite(this, string, offset, length)
+      break
+    default:
+      throw new Error('Unknown encoding')
+  }
+  return ret
+}
+
+Buffer.prototype.toString = function (encoding, start, end) {
+  var self = this
+
+  encoding = String(encoding || 'utf8').toLowerCase()
+  start = Number(start) || 0
+  end = (end === undefined) ? self.length : Number(end)
+
+  // Fastpath empty strings
+  if (end === start)
+    return ''
+
+  var ret
+  switch (encoding) {
+    case 'hex':
+      ret = hexSlice(self, start, end)
+      break
+    case 'utf8':
+    case 'utf-8':
+      ret = utf8Slice(self, start, end)
+      break
+    case 'ascii':
+      ret = asciiSlice(self, start, end)
+      break
+    case 'binary':
+      ret = binarySlice(self, start, end)
+      break
+    case 'base64':
+      ret = base64Slice(self, start, end)
+      break
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      ret = utf16leSlice(self, start, end)
+      break
+    default:
+      throw new Error('Unknown encoding')
+  }
+  return ret
+}
+
+Buffer.prototype.toJSON = function () {
+  return {
+    type: 'Buffer',
+    data: Array.prototype.slice.call(this._arr || this, 0)
+  }
+}
+
+Buffer.prototype.equals = function (b) {
+  assert(Buffer.isBuffer(b), 'Argument must be a Buffer')
+  return Buffer.compare(this, b) === 0
+}
+
+Buffer.prototype.compare = function (b) {
+  assert(Buffer.isBuffer(b), 'Argument must be a Buffer')
+  return Buffer.compare(this, b)
+}
+
+// copy(targetBuffer, targetStart=0, sourceStart=0, sourceEnd=buffer.length)
+Buffer.prototype.copy = function (target, target_start, start, end) {
+  var source = this
+
+  if (!start) start = 0
+  if (!end && end !== 0) end = this.length
+  if (!target_start) target_start = 0
+
+  // Copy 0 bytes; we're done
+  if (end === start) return
+  if (target.length === 0 || source.length === 0) return
+
+  // Fatal error conditions
+  assert(end >= start, 'sourceEnd < sourceStart')
+  assert(target_start >= 0 && target_start < target.length,
+      'targetStart out of bounds')
+  assert(start >= 0 && start < source.length, 'sourceStart out of bounds')
+  assert(end >= 0 && end <= source.length, 'sourceEnd out of bounds')
+
+  // Are we oob?
+  if (end > this.length)
+    end = this.length
+  if (target.length - target_start < end - start)
+    end = target.length - target_start + start
+
+  var len = end - start
+
+  if (len < 100 || !TYPED_ARRAY_SUPPORT) {
+    for (var i = 0; i < len; i++) {
+      target[i + target_start] = this[i + start]
+    }
+  } else {
+    target._set(this.subarray(start, start + len), target_start)
+  }
+}
+
+function base64Slice (buf, start, end) {
+  if (start === 0 && end === buf.length) {
+    return base64.fromByteArray(buf)
+  } else {
+    return base64.fromByteArray(buf.slice(start, end))
+  }
+}
+
+function utf8Slice (buf, start, end) {
+  var res = ''
+  var tmp = ''
+  end = Math.min(buf.length, end)
+
+  for (var i = start; i < end; i++) {
+    if (buf[i] <= 0x7F) {
+      res += decodeUtf8Char(tmp) + String.fromCharCode(buf[i])
+      tmp = ''
+    } else {
+      tmp += '%' + buf[i].toString(16)
+    }
+  }
+
+  return res + decodeUtf8Char(tmp)
+}
+
+function asciiSlice (buf, start, end) {
+  var ret = ''
+  end = Math.min(buf.length, end)
+
+  for (var i = start; i < end; i++) {
+    ret += String.fromCharCode(buf[i])
+  }
+  return ret
+}
+
+function binarySlice (buf, start, end) {
+  return asciiSlice(buf, start, end)
+}
+
+function hexSlice (buf, start, end) {
+  var len = buf.length
+
+  if (!start || start < 0) start = 0
+  if (!end || end < 0 || end > len) end = len
+
+  var out = ''
+  for (var i = start; i < end; i++) {
+    out += toHex(buf[i])
+  }
+  return out
+}
+
+function utf16leSlice (buf, start, end) {
+  var bytes = buf.slice(start, end)
+  var res = ''
+  for (var i = 0; i < bytes.length; i += 2) {
+    res += String.fromCharCode(bytes[i] + bytes[i + 1] * 256)
+  }
+  return res
+}
+
+Buffer.prototype.slice = function (start, end) {
+  var len = this.length
+  start = ~~start
+  end = end === undefined ? len : ~~end
+
+  if (start < 0) {
+    start += len;
+    if (start < 0)
+      start = 0
+  } else if (start > len) {
+    start = len
+  }
+
+  if (end < 0) {
+    end += len
+    if (end < 0)
+      end = 0
+  } else if (end > len) {
+    end = len
+  }
+
+  if (end < start)
+    end = start
+
+  if (TYPED_ARRAY_SUPPORT) {
+    return Buffer._augment(this.subarray(start, end))
+  } else {
+    var sliceLen = end - start
+    var newBuf = new Buffer(sliceLen, undefined, true)
+    for (var i = 0; i < sliceLen; i++) {
+      newBuf[i] = this[i + start]
+    }
+    return newBuf
+  }
+}
+
+// `get` will be removed in Node 0.13+
+Buffer.prototype.get = function (offset) {
+  console.log('.get() is deprecated. Access using array indexes instead.')
+  return this.readUInt8(offset)
+}
+
+// `set` will be removed in Node 0.13+
+Buffer.prototype.set = function (v, offset) {
+  console.log('.set() is deprecated. Access using array indexes instead.')
+  return this.writeUInt8(v, offset)
+}
+
+Buffer.prototype.readUInt8 = function (offset, noAssert) {
+  if (!noAssert) {
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset < this.length, 'Trying to read beyond buffer length')
+  }
+
+  if (offset >= this.length)
+    return
+
+  return this[offset]
+}
+
+function readUInt16 (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 1 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  var val
+  if (littleEndian) {
+    val = buf[offset]
+    if (offset + 1 < len)
+      val |= buf[offset + 1] << 8
+  } else {
+    val = buf[offset] << 8
+    if (offset + 1 < len)
+      val |= buf[offset + 1]
+  }
+  return val
+}
+
+Buffer.prototype.readUInt16LE = function (offset, noAssert) {
+  return readUInt16(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readUInt16BE = function (offset, noAssert) {
+  return readUInt16(this, offset, false, noAssert)
+}
+
+function readUInt32 (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  var val
+  if (littleEndian) {
+    if (offset + 2 < len)
+      val = buf[offset + 2] << 16
+    if (offset + 1 < len)
+      val |= buf[offset + 1] << 8
+    val |= buf[offset]
+    if (offset + 3 < len)
+      val = val + (buf[offset + 3] << 24 >>> 0)
+  } else {
+    if (offset + 1 < len)
+      val = buf[offset + 1] << 16
+    if (offset + 2 < len)
+      val |= buf[offset + 2] << 8
+    if (offset + 3 < len)
+      val |= buf[offset + 3]
+    val = val + (buf[offset] << 24 >>> 0)
+  }
+  return val
+}
+
+Buffer.prototype.readUInt32LE = function (offset, noAssert) {
+  return readUInt32(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readUInt32BE = function (offset, noAssert) {
+  return readUInt32(this, offset, false, noAssert)
+}
+
+Buffer.prototype.readInt8 = function (offset, noAssert) {
+  if (!noAssert) {
+    assert(offset !== undefined && offset !== null,
+        'missing offset')
+    assert(offset < this.length, 'Trying to read beyond buffer length')
+  }
+
+  if (offset >= this.length)
+    return
+
+  var neg = this[offset] & 0x80
+  if (neg)
+    return (0xff - this[offset] + 1) * -1
+  else
+    return this[offset]
+}
+
+function readInt16 (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 1 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  var val = readUInt16(buf, offset, littleEndian, true)
+  var neg = val & 0x8000
+  if (neg)
+    return (0xffff - val + 1) * -1
+  else
+    return val
+}
+
+Buffer.prototype.readInt16LE = function (offset, noAssert) {
+  return readInt16(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readInt16BE = function (offset, noAssert) {
+  return readInt16(this, offset, false, noAssert)
+}
+
+function readInt32 (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  var val = readUInt32(buf, offset, littleEndian, true)
+  var neg = val & 0x80000000
+  if (neg)
+    return (0xffffffff - val + 1) * -1
+  else
+    return val
+}
+
+Buffer.prototype.readInt32LE = function (offset, noAssert) {
+  return readInt32(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readInt32BE = function (offset, noAssert) {
+  return readInt32(this, offset, false, noAssert)
+}
+
+function readFloat (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset + 3 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  return ieee754.read(buf, offset, littleEndian, 23, 4)
+}
+
+Buffer.prototype.readFloatLE = function (offset, noAssert) {
+  return readFloat(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readFloatBE = function (offset, noAssert) {
+  return readFloat(this, offset, false, noAssert)
+}
+
+function readDouble (buf, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset + 7 < buf.length, 'Trying to read beyond buffer length')
+  }
+
+  return ieee754.read(buf, offset, littleEndian, 52, 8)
+}
+
+Buffer.prototype.readDoubleLE = function (offset, noAssert) {
+  return readDouble(this, offset, true, noAssert)
+}
+
+Buffer.prototype.readDoubleBE = function (offset, noAssert) {
+  return readDouble(this, offset, false, noAssert)
+}
+
+Buffer.prototype.writeUInt8 = function (value, offset, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset < this.length, 'trying to write beyond buffer length')
+    verifuint(value, 0xff)
+  }
+
+  if (offset >= this.length) return
+
+  this[offset] = value
+  return offset + 1
+}
+
+function writeUInt16 (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 1 < buf.length, 'trying to write beyond buffer length')
+    verifuint(value, 0xffff)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  for (var i = 0, j = Math.min(len - offset, 2); i < j; i++) {
+    buf[offset + i] =
+        (value & (0xff << (8 * (littleEndian ? i : 1 - i)))) >>>
+            (littleEndian ? i : 1 - i) * 8
+  }
+  return offset + 2
+}
+
+Buffer.prototype.writeUInt16LE = function (value, offset, noAssert) {
+  return writeUInt16(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeUInt16BE = function (value, offset, noAssert) {
+  return writeUInt16(this, value, offset, false, noAssert)
+}
+
+function writeUInt32 (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'trying to write beyond buffer length')
+    verifuint(value, 0xffffffff)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  for (var i = 0, j = Math.min(len - offset, 4); i < j; i++) {
+    buf[offset + i] =
+        (value >>> (littleEndian ? i : 3 - i) * 8) & 0xff
+  }
+  return offset + 4
+}
+
+Buffer.prototype.writeUInt32LE = function (value, offset, noAssert) {
+  return writeUInt32(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeUInt32BE = function (value, offset, noAssert) {
+  return writeUInt32(this, value, offset, false, noAssert)
+}
+
+Buffer.prototype.writeInt8 = function (value, offset, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset < this.length, 'Trying to write beyond buffer length')
+    verifsint(value, 0x7f, -0x80)
+  }
+
+  if (offset >= this.length)
+    return
+
+  if (value >= 0)
+    this.writeUInt8(value, offset, noAssert)
+  else
+    this.writeUInt8(0xff + value + 1, offset, noAssert)
+  return offset + 1
+}
+
+function writeInt16 (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 1 < buf.length, 'Trying to write beyond buffer length')
+    verifsint(value, 0x7fff, -0x8000)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  if (value >= 0)
+    writeUInt16(buf, value, offset, littleEndian, noAssert)
+  else
+    writeUInt16(buf, 0xffff + value + 1, offset, littleEndian, noAssert)
+  return offset + 2
+}
+
+Buffer.prototype.writeInt16LE = function (value, offset, noAssert) {
+  return writeInt16(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeInt16BE = function (value, offset, noAssert) {
+  return writeInt16(this, value, offset, false, noAssert)
+}
+
+function writeInt32 (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'Trying to write beyond buffer length')
+    verifsint(value, 0x7fffffff, -0x80000000)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  if (value >= 0)
+    writeUInt32(buf, value, offset, littleEndian, noAssert)
+  else
+    writeUInt32(buf, 0xffffffff + value + 1, offset, littleEndian, noAssert)
+  return offset + 4
+}
+
+Buffer.prototype.writeInt32LE = function (value, offset, noAssert) {
+  return writeInt32(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeInt32BE = function (value, offset, noAssert) {
+  return writeInt32(this, value, offset, false, noAssert)
+}
+
+function writeFloat (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 3 < buf.length, 'Trying to write beyond buffer length')
+    verifIEEE754(value, 3.4028234663852886e+38, -3.4028234663852886e+38)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  ieee754.write(buf, value, offset, littleEndian, 23, 4)
+  return offset + 4
+}
+
+Buffer.prototype.writeFloatLE = function (value, offset, noAssert) {
+  return writeFloat(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeFloatBE = function (value, offset, noAssert) {
+  return writeFloat(this, value, offset, false, noAssert)
+}
+
+function writeDouble (buf, value, offset, littleEndian, noAssert) {
+  if (!noAssert) {
+    assert(value !== undefined && value !== null, 'missing value')
+    assert(typeof littleEndian === 'boolean', 'missing or invalid endian')
+    assert(offset !== undefined && offset !== null, 'missing offset')
+    assert(offset + 7 < buf.length,
+        'Trying to write beyond buffer length')
+    verifIEEE754(value, 1.7976931348623157E+308, -1.7976931348623157E+308)
+  }
+
+  var len = buf.length
+  if (offset >= len)
+    return
+
+  ieee754.write(buf, value, offset, littleEndian, 52, 8)
+  return offset + 8
+}
+
+Buffer.prototype.writeDoubleLE = function (value, offset, noAssert) {
+  return writeDouble(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeDoubleBE = function (value, offset, noAssert) {
+  return writeDouble(this, value, offset, false, noAssert)
+}
+
+// fill(value, start=0, end=buffer.length)
+Buffer.prototype.fill = function (value, start, end) {
+  if (!value) value = 0
+  if (!start) start = 0
+  if (!end) end = this.length
+
+  assert(end >= start, 'end < start')
+
+  // Fill 0 bytes; we're done
+  if (end === start) return
+  if (this.length === 0) return
+
+  assert(start >= 0 && start < this.length, 'start out of bounds')
+  assert(end >= 0 && end <= this.length, 'end out of bounds')
+
+  var i
+  if (typeof value === 'number') {
+    for (i = start; i < end; i++) {
+      this[i] = value
+    }
+  } else {
+    var bytes = utf8ToBytes(value.toString())
+    var len = bytes.length
+    for (i = start; i < end; i++) {
+      this[i] = bytes[i % len]
+    }
+  }
+
+  return this
+}
+
+Buffer.prototype.inspect = function () {
+  var out = []
+  var len = this.length
+  for (var i = 0; i < len; i++) {
+    out[i] = toHex(this[i])
+    if (i === exports.INSPECT_MAX_BYTES) {
+      out[i + 1] = '...'
+      break
+    }
+  }
+  return '<Buffer ' + out.join(' ') + '>'
+}
+
+/**
+ * Creates a new `ArrayBuffer` with the *copied* memory of the buffer instance.
+ * Added in Node 0.12. Only available in browsers that support ArrayBuffer.
+ */
+Buffer.prototype.toArrayBuffer = function () {
+  if (typeof Uint8Array !== 'undefined') {
+    if (TYPED_ARRAY_SUPPORT) {
+      return (new Buffer(this)).buffer
+    } else {
+      var buf = new Uint8Array(this.length)
+      for (var i = 0, len = buf.length; i < len; i += 1) {
+        buf[i] = this[i]
+      }
+      return buf.buffer
+    }
+  } else {
+    throw new Error('Buffer.toArrayBuffer not supported in this browser')
+  }
+}
+
+// HELPER FUNCTIONS
+// ================
+
+var BP = Buffer.prototype
+
+/**
+ * Augment a Uint8Array *instance* (not the Uint8Array class!) with Buffer methods
+ */
+Buffer._augment = function (arr) {
+  arr._isBuffer = true
+
+  // save reference to original Uint8Array get/set methods before overwriting
+  arr._get = arr.get
+  arr._set = arr.set
+
+  // deprecated, will be removed in node 0.13+
+  arr.get = BP.get
+  arr.set = BP.set
+
+  arr.write = BP.write
+  arr.toString = BP.toString
+  arr.toLocaleString = BP.toString
+  arr.toJSON = BP.toJSON
+  arr.equals = BP.equals
+  arr.compare = BP.compare
+  arr.copy = BP.copy
+  arr.slice = BP.slice
+  arr.readUInt8 = BP.readUInt8
+  arr.readUInt16LE = BP.readUInt16LE
+  arr.readUInt16BE = BP.readUInt16BE
+  arr.readUInt32LE = BP.readUInt32LE
+  arr.readUInt32BE = BP.readUInt32BE
+  arr.readInt8 = BP.readInt8
+  arr.readInt16LE = BP.readInt16LE
+  arr.readInt16BE = BP.readInt16BE
+  arr.readInt32LE = BP.readInt32LE
+  arr.readInt32BE = BP.readInt32BE
+  arr.readFloatLE = BP.readFloatLE
+  arr.readFloatBE = BP.readFloatBE
+  arr.readDoubleLE = BP.readDoubleLE
+  arr.readDoubleBE = BP.readDoubleBE
+  arr.writeUInt8 = BP.writeUInt8
+  arr.writeUInt16LE = BP.writeUInt16LE
+  arr.writeUInt16BE = BP.writeUInt16BE
+  arr.writeUInt32LE = BP.writeUInt32LE
+  arr.writeUInt32BE = BP.writeUInt32BE
+  arr.writeInt8 = BP.writeInt8
+  arr.writeInt16LE = BP.writeInt16LE
+  arr.writeInt16BE = BP.writeInt16BE
+  arr.writeInt32LE = BP.writeInt32LE
+  arr.writeInt32BE = BP.writeInt32BE
+  arr.writeFloatLE = BP.writeFloatLE
+  arr.writeFloatBE = BP.writeFloatBE
+  arr.writeDoubleLE = BP.writeDoubleLE
+  arr.writeDoubleBE = BP.writeDoubleBE
+  arr.fill = BP.fill
+  arr.inspect = BP.inspect
+  arr.toArrayBuffer = BP.toArrayBuffer
+
+  return arr
+}
+
+var INVALID_BASE64_RE = /[^+\/0-9A-z]/g
+
+function base64clean (str) {
+  // Node strips out invalid characters like \n and \t from the string, base64-js does not
+  str = stringtrim(str).replace(INVALID_BASE64_RE, '')
+  // Node allows for non-padded base64 strings (missing trailing ===), base64-js does not
+  while (str.length % 4 !== 0) {
+    str = str + '='
+  }
+  return str
+}
+
+function stringtrim (str) {
+  if (str.trim) return str.trim()
+  return str.replace(/^\s+|\s+$/g, '')
+}
+
+function isArray (subject) {
+  return (Array.isArray || function (subject) {
+    return Object.prototype.toString.call(subject) === '[object Array]'
+  })(subject)
+}
+
+function isArrayish (subject) {
+  return isArray(subject) || Buffer.isBuffer(subject) ||
+      subject && typeof subject === 'object' &&
+      typeof subject.length === 'number'
+}
+
+function toHex (n) {
+  if (n < 16) return '0' + n.toString(16)
+  return n.toString(16)
+}
+
+function utf8ToBytes (str) {
+  var byteArray = []
+  for (var i = 0; i < str.length; i++) {
+    var b = str.charCodeAt(i)
+    if (b <= 0x7F) {
+      byteArray.push(b)
+    } else {
+      var start = i
+      if (b >= 0xD800 && b <= 0xDFFF) i++
+      var h = encodeURIComponent(str.slice(start, i+1)).substr(1).split('%')
+      for (var j = 0; j < h.length; j++) {
+        byteArray.push(parseInt(h[j], 16))
+      }
+    }
+  }
+  return byteArray
+}
+
+function asciiToBytes (str) {
+  var byteArray = []
+  for (var i = 0; i < str.length; i++) {
+    // Node's code seems to be doing this and not & 0x7F..
+    byteArray.push(str.charCodeAt(i) & 0xFF)
+  }
+  return byteArray
+}
+
+function utf16leToBytes (str) {
+  var c, hi, lo
+  var byteArray = []
+  for (var i = 0; i < str.length; i++) {
+    c = str.charCodeAt(i)
+    hi = c >> 8
+    lo = c % 256
+    byteArray.push(lo)
+    byteArray.push(hi)
+  }
+
+  return byteArray
+}
+
+function base64ToBytes (str) {
+  return base64.toByteArray(str)
+}
+
+function blitBuffer (src, dst, offset, length) {
+  for (var i = 0; i < length; i++) {
+    if ((i + offset >= dst.length) || (i >= src.length))
+      break
+    dst[i + offset] = src[i]
+  }
+  return i
+}
+
+function decodeUtf8Char (str) {
+  try {
+    return decodeURIComponent(str)
+  } catch (err) {
+    return String.fromCharCode(0xFFFD) // UTF 8 invalid char
+  }
+}
+
+/*
+ * We have to make sure that the value is a valid integer. This means that it
+ * is non-negative. It has no fractional component and that it does not
+ * exceed the maximum allowed value.
+ */
+function verifuint (value, max) {
+  assert(typeof value === 'number', 'cannot write a non-number as a number')
+  assert(value >= 0, 'specified a negative value for writing an unsigned value')
+  assert(value <= max, 'value is larger than maximum value for type')
+  assert(Math.floor(value) === value, 'value has a fractional component')
+}
+
+function verifsint (value, max, min) {
+  assert(typeof value === 'number', 'cannot write a non-number as a number')
+  assert(value <= max, 'value larger than maximum allowed value')
+  assert(value >= min, 'value smaller than minimum allowed value')
+  assert(Math.floor(value) === value, 'value has a fractional component')
+}
+
+function verifIEEE754 (value, max, min) {
+  assert(typeof value === 'number', 'cannot write a non-number as a number')
+  assert(value <= max, 'value larger than maximum allowed value')
+  assert(value >= min, 'value smaller than minimum allowed value')
+}
+
+function assert (test, message) {
+  if (!test) throw new Error(message || 'Failed assertion')
+}
+
+},{"base64-js":1,"ieee754":2}]},{},[])("buffer")
+});
 !function (e) {
     if ("object" == typeof exports && "undefined" != typeof module)module.exports = e(); else if ("function" == typeof define && define.amd)define([], e); else {
         var t;
@@ -13119,6 +14500,4204 @@ if ( !noGlobal ) {
 return jQuery;
 } );
 
+var _aa = {};
+_aa._ab = function (f, e) {
+    var d = qrcode.width;
+    var b = qrcode.height;
+    var c = true;
+    for (var g = 0; g < e.length && c; g += 2) {
+        var a = Math.floor(e[g]);
+        var h = Math.floor(e[g + 1]);
+        if (a < -1 || a > d || h < -1 || h > b) {
+            throw"Error._ab "
+        }
+        c = false;
+        if (a == -1) {
+            e[g] = 0;
+            c = true
+        } else {
+            if (a == d) {
+                e[g] = d - 1;
+                c = true
+            }
+        }
+        if (h == -1) {
+            e[g + 1] = 0;
+            c = true
+        } else {
+            if (h == b) {
+                e[g + 1] = b - 1;
+                c = true
+            }
+        }
+    }
+    c = true;
+    for (var g = e.length - 2; g >= 0 && c; g -= 2) {
+        var a = Math.floor(e[g]);
+        var h = Math.floor(e[g + 1]);
+        if (a < -1 || a > d || h < -1 || h > b) {
+            throw"Error._ab "
+        }
+        c = false;
+        if (a == -1) {
+            e[g] = 0;
+            c = true
+        } else {
+            if (a == d) {
+                e[g] = d - 1;
+                c = true
+            }
+        }
+        if (h == -1) {
+            e[g + 1] = 0;
+            c = true
+        } else {
+            if (h == b) {
+                e[g + 1] = b - 1;
+                c = true
+            }
+        }
+    }
+};
+_aa._af = function (b, d, a) {
+    var k = new _ac(d);
+    var j = new Array(d << 1);
+    for (var f = 0; f < d; f++) {
+        var g = j.length;
+        var i = f + 0.5;
+        for (var h = 0; h < g; h += 2) {
+            j[h] = (h >> 1) + 0.5;
+            j[h + 1] = i
+        }
+        a._ad(j);
+        _aa._ab(b, j);
+        try {
+            for (var h = 0; h < g; h += 2) {
+                var e = b[Math.floor(j[h]) + qrcode.width * Math.floor(j[h + 1])];
+                if (e) {
+                    k._dq(h >> 1, f)
+                }
+            }
+        } catch (c) {
+            throw"Error._ab"
+        }
+    }
+    return k
+};
+_aa._ah = function (h, o, l, k, q, p, b, a, f, e, n, m, s, r, d, c, j, i) {
+    var g = _ae._ag(l, k, q, p, b, a, f, e, n, m, s, r, d, c, j, i);
+    return _aa._af(h, o, g)
+};
+function _a1(b, a) {
+    this.count = b;
+    this._fc = a;
+    this.__defineGetter__("Count", function () {
+        return this.count
+    });
+    this.__defineGetter__("_dm", function () {
+        return this._fc
+    })
+}
+function _a2(a, c, b) {
+    this._bm = a;
+    if (b) {
+        this._do = new Array(c, b)
+    } else {
+        this._do = new Array(c)
+    }
+    this.__defineGetter__("_bo", function () {
+        return this._bm
+    });
+    this.__defineGetter__("_dn", function () {
+        return this._bm * this._fo
+    });
+    this.__defineGetter__("_fo", function () {
+        var e = 0;
+        for (var d = 0; d < this._do.length; d++) {
+            e += this._do[d].length
+        }
+        return e
+    });
+    this._fb = function () {
+        return this._do
+    }
+}
+function _a3(k, l, h, g, f, e) {
+    this._bs = k;
+    this._ar = l;
+    this._do = new Array(h, g, f, e);
+    var j = 0;
+    var b = h._bo;
+    var a = h._fb();
+    for (var d = 0; d < a.length; d++) {
+        var c = a[d];
+        j += c.Count * (c._dm + b)
+    }
+    this._br = j;
+    this.__defineGetter__("_fd", function () {
+        return this._bs
+    });
+    this.__defineGetter__("_as", function () {
+        return this._ar
+    });
+    this.__defineGetter__("_dp", function () {
+        return this._br
+    });
+    this.__defineGetter__("_cr", function () {
+        return 17 + 4 * this._bs
+    });
+    this._aq = function () {
+        var q = this._cr;
+        var o = new _ac(q);
+        o._bq(0, 0, 9, 9);
+        o._bq(q - 8, 0, 8, 9);
+        o._bq(0, q - 8, 9, 8);
+        var n = this._ar.length;
+        for (var m = 0; m < n; m++) {
+            var p = this._ar[m] - 2;
+            for (var r = 0; r < n; r++) {
+                if ((m == 0 && (r == 0 || r == n - 1)) || (m == n - 1 && r == 0)) {
+                    continue
+                }
+                o._bq(this._ar[r] - 2, p, 5, 5)
+            }
+        }
+        o._bq(6, 9, 1, q - 17);
+        o._bq(9, 6, q - 17, 1);
+        if (this._bs > 6) {
+            o._bq(q - 11, 0, 3, 6);
+            o._bq(0, q - 11, 6, 3)
+        }
+        return o
+    };
+    this._bu = function (i) {
+        return this._do[i.ordinal()]
+    }
+}
+_a3._bv = new Array(31892, 34236, 39577, 42195, 48118, 51042, 55367, 58893, 63784, 68472, 70749, 76311, 79154, 84390, 87683, 92361, 96236, 102084, 102881, 110507, 110734, 117786, 119615, 126325, 127568, 133589, 136944, 141498, 145311, 150283, 152622, 158308, 161089, 167017);
+_a3.VERSIONS = _ay();
+_a3._av = function (a) {
+    if (a < 1 || a > 40) {
+        throw"bad arguments"
+    }
+    return _a3.VERSIONS[a - 1]
+};
+_a3._at = function (b) {
+    if (b % 4 != 1) {
+        throw"Error _at"
+    }
+    try {
+        return _a3._av((b - 17) >> 2)
+    } catch (a) {
+        throw"Error _av"
+    }
+};
+_a3._aw = function (d) {
+    var b = 4294967295;
+    var f = 0;
+    for (var c = 0; c < _a3._bv.length; c++) {
+        var a = _a3._bv[c];
+        if (a == d) {
+            return this._av(c + 7)
+        }
+        var e = _ax._gj(d, a);
+        if (e < b) {
+            f = c + 7;
+            b = e
+        }
+    }
+    if (b <= 3) {
+        return this._av(f)
+    }
+    return null
+};
+function _ay() {
+    return new Array(new _a3(1, new Array(), new _a2(7, new _a1(1, 19)), new _a2(10, new _a1(1, 16)), new _a2(13, new _a1(1, 13)), new _a2(17, new _a1(1, 9))), new _a3(2, new Array(6, 18), new _a2(10, new _a1(1, 34)), new _a2(16, new _a1(1, 28)), new _a2(22, new _a1(1, 22)), new _a2(28, new _a1(1, 16))), new _a3(3, new Array(6, 22), new _a2(15, new _a1(1, 55)), new _a2(26, new _a1(1, 44)), new _a2(18, new _a1(2, 17)), new _a2(22, new _a1(2, 13))), new _a3(4, new Array(6, 26), new _a2(20, new _a1(1, 80)), new _a2(18, new _a1(2, 32)), new _a2(26, new _a1(2, 24)), new _a2(16, new _a1(4, 9))), new _a3(5, new Array(6, 30), new _a2(26, new _a1(1, 108)), new _a2(24, new _a1(2, 43)), new _a2(18, new _a1(2, 15), new _a1(2, 16)), new _a2(22, new _a1(2, 11), new _a1(2, 12))), new _a3(6, new Array(6, 34), new _a2(18, new _a1(2, 68)), new _a2(16, new _a1(4, 27)), new _a2(24, new _a1(4, 19)), new _a2(28, new _a1(4, 15))), new _a3(7, new Array(6, 22, 38), new _a2(20, new _a1(2, 78)), new _a2(18, new _a1(4, 31)), new _a2(18, new _a1(2, 14), new _a1(4, 15)), new _a2(26, new _a1(4, 13), new _a1(1, 14))), new _a3(8, new Array(6, 24, 42), new _a2(24, new _a1(2, 97)), new _a2(22, new _a1(2, 38), new _a1(2, 39)), new _a2(22, new _a1(4, 18), new _a1(2, 19)), new _a2(26, new _a1(4, 14), new _a1(2, 15))), new _a3(9, new Array(6, 26, 46), new _a2(30, new _a1(2, 116)), new _a2(22, new _a1(3, 36), new _a1(2, 37)), new _a2(20, new _a1(4, 16), new _a1(4, 17)), new _a2(24, new _a1(4, 12), new _a1(4, 13))), new _a3(10, new Array(6, 28, 50), new _a2(18, new _a1(2, 68), new _a1(2, 69)), new _a2(26, new _a1(4, 43), new _a1(1, 44)), new _a2(24, new _a1(6, 19), new _a1(2, 20)), new _a2(28, new _a1(6, 15), new _a1(2, 16))), new _a3(11, new Array(6, 30, 54), new _a2(20, new _a1(4, 81)), new _a2(30, new _a1(1, 50), new _a1(4, 51)), new _a2(28, new _a1(4, 22), new _a1(4, 23)), new _a2(24, new _a1(3, 12), new _a1(8, 13))), new _a3(12, new Array(6, 32, 58), new _a2(24, new _a1(2, 92), new _a1(2, 93)), new _a2(22, new _a1(6, 36), new _a1(2, 37)), new _a2(26, new _a1(4, 20), new _a1(6, 21)), new _a2(28, new _a1(7, 14), new _a1(4, 15))), new _a3(13, new Array(6, 34, 62), new _a2(26, new _a1(4, 107)), new _a2(22, new _a1(8, 37), new _a1(1, 38)), new _a2(24, new _a1(8, 20), new _a1(4, 21)), new _a2(22, new _a1(12, 11), new _a1(4, 12))), new _a3(14, new Array(6, 26, 46, 66), new _a2(30, new _a1(3, 115), new _a1(1, 116)), new _a2(24, new _a1(4, 40), new _a1(5, 41)), new _a2(20, new _a1(11, 16), new _a1(5, 17)), new _a2(24, new _a1(11, 12), new _a1(5, 13))), new _a3(15, new Array(6, 26, 48, 70), new _a2(22, new _a1(5, 87), new _a1(1, 88)), new _a2(24, new _a1(5, 41), new _a1(5, 42)), new _a2(30, new _a1(5, 24), new _a1(7, 25)), new _a2(24, new _a1(11, 12), new _a1(7, 13))), new _a3(16, new Array(6, 26, 50, 74), new _a2(24, new _a1(5, 98), new _a1(1, 99)), new _a2(28, new _a1(7, 45), new _a1(3, 46)), new _a2(24, new _a1(15, 19), new _a1(2, 20)), new _a2(30, new _a1(3, 15), new _a1(13, 16))), new _a3(17, new Array(6, 30, 54, 78), new _a2(28, new _a1(1, 107), new _a1(5, 108)), new _a2(28, new _a1(10, 46), new _a1(1, 47)), new _a2(28, new _a1(1, 22), new _a1(15, 23)), new _a2(28, new _a1(2, 14), new _a1(17, 15))), new _a3(18, new Array(6, 30, 56, 82), new _a2(30, new _a1(5, 120), new _a1(1, 121)), new _a2(26, new _a1(9, 43), new _a1(4, 44)), new _a2(28, new _a1(17, 22), new _a1(1, 23)), new _a2(28, new _a1(2, 14), new _a1(19, 15))), new _a3(19, new Array(6, 30, 58, 86), new _a2(28, new _a1(3, 113), new _a1(4, 114)), new _a2(26, new _a1(3, 44), new _a1(11, 45)), new _a2(26, new _a1(17, 21), new _a1(4, 22)), new _a2(26, new _a1(9, 13), new _a1(16, 14))), new _a3(20, new Array(6, 34, 62, 90), new _a2(28, new _a1(3, 107), new _a1(5, 108)), new _a2(26, new _a1(3, 41), new _a1(13, 42)), new _a2(30, new _a1(15, 24), new _a1(5, 25)), new _a2(28, new _a1(15, 15), new _a1(10, 16))), new _a3(21, new Array(6, 28, 50, 72, 94), new _a2(28, new _a1(4, 116), new _a1(4, 117)), new _a2(26, new _a1(17, 42)), new _a2(28, new _a1(17, 22), new _a1(6, 23)), new _a2(30, new _a1(19, 16), new _a1(6, 17))), new _a3(22, new Array(6, 26, 50, 74, 98), new _a2(28, new _a1(2, 111), new _a1(7, 112)), new _a2(28, new _a1(17, 46)), new _a2(30, new _a1(7, 24), new _a1(16, 25)), new _a2(24, new _a1(34, 13))), new _a3(23, new Array(6, 30, 54, 74, 102), new _a2(30, new _a1(4, 121), new _a1(5, 122)), new _a2(28, new _a1(4, 47), new _a1(14, 48)), new _a2(30, new _a1(11, 24), new _a1(14, 25)), new _a2(30, new _a1(16, 15), new _a1(14, 16))), new _a3(24, new Array(6, 28, 54, 80, 106), new _a2(30, new _a1(6, 117), new _a1(4, 118)), new _a2(28, new _a1(6, 45), new _a1(14, 46)), new _a2(30, new _a1(11, 24), new _a1(16, 25)), new _a2(30, new _a1(30, 16), new _a1(2, 17))), new _a3(25, new Array(6, 32, 58, 84, 110), new _a2(26, new _a1(8, 106), new _a1(4, 107)), new _a2(28, new _a1(8, 47), new _a1(13, 48)), new _a2(30, new _a1(7, 24), new _a1(22, 25)), new _a2(30, new _a1(22, 15), new _a1(13, 16))), new _a3(26, new Array(6, 30, 58, 86, 114), new _a2(28, new _a1(10, 114), new _a1(2, 115)), new _a2(28, new _a1(19, 46), new _a1(4, 47)), new _a2(28, new _a1(28, 22), new _a1(6, 23)), new _a2(30, new _a1(33, 16), new _a1(4, 17))), new _a3(27, new Array(6, 34, 62, 90, 118), new _a2(30, new _a1(8, 122), new _a1(4, 123)), new _a2(28, new _a1(22, 45), new _a1(3, 46)), new _a2(30, new _a1(8, 23), new _a1(26, 24)), new _a2(30, new _a1(12, 15), new _a1(28, 16))), new _a3(28, new Array(6, 26, 50, 74, 98, 122), new _a2(30, new _a1(3, 117), new _a1(10, 118)), new _a2(28, new _a1(3, 45), new _a1(23, 46)), new _a2(30, new _a1(4, 24), new _a1(31, 25)), new _a2(30, new _a1(11, 15), new _a1(31, 16))), new _a3(29, new Array(6, 30, 54, 78, 102, 126), new _a2(30, new _a1(7, 116), new _a1(7, 117)), new _a2(28, new _a1(21, 45), new _a1(7, 46)), new _a2(30, new _a1(1, 23), new _a1(37, 24)), new _a2(30, new _a1(19, 15), new _a1(26, 16))), new _a3(30, new Array(6, 26, 52, 78, 104, 130), new _a2(30, new _a1(5, 115), new _a1(10, 116)), new _a2(28, new _a1(19, 47), new _a1(10, 48)), new _a2(30, new _a1(15, 24), new _a1(25, 25)), new _a2(30, new _a1(23, 15), new _a1(25, 16))), new _a3(31, new Array(6, 30, 56, 82, 108, 134), new _a2(30, new _a1(13, 115), new _a1(3, 116)), new _a2(28, new _a1(2, 46), new _a1(29, 47)), new _a2(30, new _a1(42, 24), new _a1(1, 25)), new _a2(30, new _a1(23, 15), new _a1(28, 16))), new _a3(32, new Array(6, 34, 60, 86, 112, 138), new _a2(30, new _a1(17, 115)), new _a2(28, new _a1(10, 46), new _a1(23, 47)), new _a2(30, new _a1(10, 24), new _a1(35, 25)), new _a2(30, new _a1(19, 15), new _a1(35, 16))), new _a3(33, new Array(6, 30, 58, 86, 114, 142), new _a2(30, new _a1(17, 115), new _a1(1, 116)), new _a2(28, new _a1(14, 46), new _a1(21, 47)), new _a2(30, new _a1(29, 24), new _a1(19, 25)), new _a2(30, new _a1(11, 15), new _a1(46, 16))), new _a3(34, new Array(6, 34, 62, 90, 118, 146), new _a2(30, new _a1(13, 115), new _a1(6, 116)), new _a2(28, new _a1(14, 46), new _a1(23, 47)), new _a2(30, new _a1(44, 24), new _a1(7, 25)), new _a2(30, new _a1(59, 16), new _a1(1, 17))), new _a3(35, new Array(6, 30, 54, 78, 102, 126, 150), new _a2(30, new _a1(12, 121), new _a1(7, 122)), new _a2(28, new _a1(12, 47), new _a1(26, 48)), new _a2(30, new _a1(39, 24), new _a1(14, 25)), new _a2(30, new _a1(22, 15), new _a1(41, 16))), new _a3(36, new Array(6, 24, 50, 76, 102, 128, 154), new _a2(30, new _a1(6, 121), new _a1(14, 122)), new _a2(28, new _a1(6, 47), new _a1(34, 48)), new _a2(30, new _a1(46, 24), new _a1(10, 25)), new _a2(30, new _a1(2, 15), new _a1(64, 16))), new _a3(37, new Array(6, 28, 54, 80, 106, 132, 158), new _a2(30, new _a1(17, 122), new _a1(4, 123)), new _a2(28, new _a1(29, 46), new _a1(14, 47)), new _a2(30, new _a1(49, 24), new _a1(10, 25)), new _a2(30, new _a1(24, 15), new _a1(46, 16))), new _a3(38, new Array(6, 32, 58, 84, 110, 136, 162), new _a2(30, new _a1(4, 122), new _a1(18, 123)), new _a2(28, new _a1(13, 46), new _a1(32, 47)), new _a2(30, new _a1(48, 24), new _a1(14, 25)), new _a2(30, new _a1(42, 15), new _a1(32, 16))), new _a3(39, new Array(6, 26, 54, 82, 110, 138, 166), new _a2(30, new _a1(20, 117), new _a1(4, 118)), new _a2(28, new _a1(40, 47), new _a1(7, 48)), new _a2(30, new _a1(43, 24), new _a1(22, 25)), new _a2(30, new _a1(10, 15), new _a1(67, 16))), new _a3(40, new Array(6, 30, 58, 86, 114, 142, 170), new _a2(30, new _a1(19, 118), new _a1(6, 119)), new _a2(28, new _a1(18, 47), new _a1(31, 48)), new _a2(30, new _a1(34, 24), new _a1(34, 25)), new _a2(30, new _a1(20, 15), new _a1(61, 16))))
+}
+function _ae(i, f, c, h, e, b, g, d, a) {
+    this.a11 = i;
+    this.a12 = h;
+    this.a13 = g;
+    this.a21 = f;
+    this.a22 = e;
+    this.a23 = d;
+    this.a31 = c;
+    this.a32 = b;
+    this.a33 = a;
+    this._ad = function (v) {
+        var s = v.length;
+        var z = this.a11;
+        var w = this.a12;
+        var u = this.a13;
+        var q = this.a21;
+        var p = this.a22;
+        var o = this.a23;
+        var m = this.a31;
+        var k = this.a32;
+        var j = this.a33;
+        for (var n = 0; n < s; n += 2) {
+            var t = v[n];
+            var r = v[n + 1];
+            var l = u * t + o * r + j;
+            v[n] = (z * t + q * r + m) / l;
+            v[n + 1] = (w * t + p * r + k) / l
+        }
+    };
+    this._fp = function (m, k) {
+        var q = m.length;
+        for (var l = 0; l < q; l++) {
+            var j = m[l];
+            var p = k[l];
+            var o = this.a13 * j + this.a23 * p + this.a33;
+            m[l] = (this.a11 * j + this.a21 * p + this.a31) / o;
+            k[l] = (this.a12 * j + this.a22 * p + this.a32) / o
+        }
+    };
+    this._fr = function () {
+        return new _ae(this.a22 * this.a33 - this.a23 * this.a32, this.a23 * this.a31 - this.a21 * this.a33, this.a21 * this.a32 - this.a22 * this.a31, this.a13 * this.a32 - this.a12 * this.a33, this.a11 * this.a33 - this.a13 * this.a31, this.a12 * this.a31 - this.a11 * this.a32, this.a12 * this.a23 - this.a13 * this.a22, this.a13 * this.a21 - this.a11 * this.a23, this.a11 * this.a22 - this.a12 * this.a21)
+    };
+    this.times = function (j) {
+        return new _ae(this.a11 * j.a11 + this.a21 * j.a12 + this.a31 * j.a13, this.a11 * j.a21 + this.a21 * j.a22 + this.a31 * j.a23, this.a11 * j.a31 + this.a21 * j.a32 + this.a31 * j.a33, this.a12 * j.a11 + this.a22 * j.a12 + this.a32 * j.a13, this.a12 * j.a21 + this.a22 * j.a22 + this.a32 * j.a23, this.a12 * j.a31 + this.a22 * j.a32 + this.a32 * j.a33, this.a13 * j.a11 + this.a23 * j.a12 + this.a33 * j.a13, this.a13 * j.a21 + this.a23 * j.a22 + this.a33 * j.a23, this.a13 * j.a31 + this.a23 * j.a32 + this.a33 * j.a33)
+    }
+}
+_ae._ag = function (p, e, o, d, n, c, m, b, h, q, l, f, a, j, i, r) {
+    var g = this._be(p, e, o, d, n, c, m, b);
+    var k = this._bf(h, q, l, f, a, j, i, r);
+    return k.times(g)
+};
+_ae._bf = function (d, p, c, m, b, k, a, j) {
+    var h = j - k;
+    var f = p - m + k - j;
+    if (h == 0 && f == 0) {
+        return new _ae(c - d, b - c, d, m - p, k - m, p, 0, 0, 1)
+    } else {
+        var q = c - b;
+        var o = a - b;
+        var l = d - c + b - a;
+        var i = m - k;
+        var e = q * h - o * i;
+        var n = (l * h - o * f) / e;
+        var g = (q * f - l * i) / e;
+        return new _ae(c - d + n * c, a - d + g * a, d, m - p + n * m, j - p + g * j, p, n, g, 1)
+    }
+};
+_ae._be = function (f, h, d, g, b, e, a, c) {
+    return this._bf(f, h, d, g, b, e, a, c)._fr()
+};
+function _bg(b, a) {
+    this.bits = b;
+    this.points = a
+}
+function Detector(a) {
+    this.image = a;
+    this._am = null;
+    this._bi = function (m, l, c, b) {
+        var d = Math.abs(b - l) > Math.abs(c - m);
+        if (d) {
+            var r = m;
+            m = l;
+            l = r;
+            r = c;
+            c = b;
+            b = r
+        }
+        var j = Math.abs(c - m);
+        var i = Math.abs(b - l);
+        var p = -j >> 1;
+        var u = l < b ? 1 : -1;
+        var f = m < c ? 1 : -1;
+        var e = 0;
+        for (var h = m, g = l; h != c; h += f) {
+            var t = d ? g : h;
+            var s = d ? h : g;
+            if (e == 1) {
+                if (this.image[t + s * qrcode.width]) {
+                    e++
+                }
+            } else {
+                if (!this.image[t + s * qrcode.width]) {
+                    e++
+                }
+            }
+            if (e == 3) {
+                var o = h - m;
+                var n = g - l;
+                return Math.sqrt((o * o + n * n))
+            }
+            p += i;
+            if (p > 0) {
+                if (g == b) {
+                    break
+                }
+                g += u;
+                p -= j
+            }
+        }
+        var k = c - m;
+        var q = b - l;
+        return Math.sqrt((k * k + q * q))
+    };
+    this._bh = function (i, g, h, f) {
+        var b = this._bi(i, g, h, f);
+        var e = 1;
+        var d = i - (h - i);
+        if (d < 0) {
+            e = i / (i - d);
+            d = 0
+        } else {
+            if (d >= qrcode.width) {
+                e = (qrcode.width - 1 - i) / (d - i);
+                d = qrcode.width - 1
+            }
+        }
+        var c = Math.floor(g - (f - g) * e);
+        e = 1;
+        if (c < 0) {
+            e = g / (g - c);
+            c = 0
+        } else {
+            if (c >= qrcode.height) {
+                e = (qrcode.height - 1 - g) / (c - g);
+                c = qrcode.height - 1
+            }
+        }
+        d = Math.floor(i + (d - i) * e);
+        b += this._bi(i, g, d, c);
+        return b - 1
+    };
+    this._bj = function (c, d) {
+        var b = this._bh(Math.floor(c.X), Math.floor(c.Y), Math.floor(d.X), Math.floor(d.Y));
+        var e = this._bh(Math.floor(d.X), Math.floor(d.Y), Math.floor(c.X), Math.floor(c.Y));
+        if (isNaN(b)) {
+            return e / 7
+        }
+        if (isNaN(e)) {
+            return b / 7
+        }
+        return (b + e) / 14
+    };
+    this._bk = function (d, c, b) {
+        return (this._bj(d, c) + this._bj(d, b)) / 2
+    };
+    this.distance = function (d, b) {
+        var e = d.X - b.X;
+        var c = d.Y - b.Y;
+        return Math.sqrt((e * e + c * c))
+    };
+    this._bx = function (g, f, d, e) {
+        var b = Math.round(this.distance(g, f) / e);
+        var c = Math.round(this.distance(g, d) / e);
+        var h = ((b + c) >> 1) + 7;
+        switch (h & 3) {
+            case 0:
+                h++;
+                break;
+            case 2:
+                h--;
+                break;
+            case 3:
+                throw"Error"
+        }
+        return h
+    };
+    this._bl = function (g, f, d, j) {
+        var k = Math.floor(j * g);
+        var h = Math.max(0, f - k);
+        var i = Math.min(qrcode.width - 1, f + k);
+        if (i - h < g * 3) {
+            throw"Error"
+        }
+        var b = Math.max(0, d - k);
+        var c = Math.min(qrcode.height - 1, d + k);
+        var e = new _ak(this.image, h, b, i - h, c - b, g, this._am);
+        return e.find()
+    };
+    this.createTransform = function (l, h, k, b, g) {
+        var j = g - 3.5;
+        var i;
+        var f;
+        var e;
+        var c;
+        if (b != null) {
+            i = b.X;
+            f = b.Y;
+            e = c = j - 3
+        } else {
+            i = (h.X - l.X) + k.X;
+            f = (h.Y - l.Y) + k.Y;
+            e = c = j
+        }
+        var d = _ae._ag(3.5, 3.5, j, 3.5, e, c, 3.5, j, l.X, l.Y, h.X, h.Y, i, f, k.X, k.Y);
+        return d
+    };
+    this._bz = function (e, b, d) {
+        var c = _aa;
+        return c._af(e, d, b)
+    };
+    this._cd = function (q) {
+        var j = q._gq;
+        var h = q._gs;
+        var n = q._gp;
+        var d = this._bk(j, h, n);
+        if (d < 1) {
+            throw"Error"
+        }
+        var r = this._bx(j, h, n, d);
+        var b = _a3._at(r);
+        var k = b._cr - 7;
+        var l = null;
+        if (b._as.length > 0) {
+            var f = h.X - j.X + n.X;
+            var e = h.Y - j.Y + n.Y;
+            var c = 1 - 3 / k;
+            var t = Math.floor(j.X + c * (f - j.X));
+            var s = Math.floor(j.Y + c * (e - j.Y));
+            for (var p = 4; p <= 16; p <<= 1) {
+                l = this._bl(d, t, s, p);
+                break
+            }
+        }
+        var g = this.createTransform(j, h, n, l, r);
+        var m = this._bz(this.image, g, r);
+        var o;
+        if (l == null) {
+            o = new Array(n, j, h)
+        } else {
+            o = new Array(n, j, h, l)
+        }
+        return new _bg(m, o)
+    };
+    this.detect = function () {
+        var b = new _cc()._ce(this.image);
+        return this._cd(b)
+    }
+}
+var _ca = 21522;
+var _cb = new Array(new Array(21522, 0), new Array(20773, 1), new Array(24188, 2), new Array(23371, 3), new Array(17913, 4), new Array(16590, 5), new Array(20375, 6), new Array(19104, 7), new Array(30660, 8), new Array(29427, 9), new Array(32170, 10), new Array(30877, 11), new Array(26159, 12), new Array(25368, 13), new Array(27713, 14), new Array(26998, 15), new Array(5769, 16), new Array(5054, 17), new Array(7399, 18), new Array(6608, 19), new Array(1890, 20), new Array(597, 21), new Array(3340, 22), new Array(2107, 23), new Array(13663, 24), new Array(12392, 25), new Array(16177, 26), new Array(14854, 27), new Array(9396, 28), new Array(8579, 29), new Array(11994, 30), new Array(11245, 31));
+var _ch = new Array(0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4);
+function _ax(a) {
+    this._cf = _cg.forBits((a >> 3) & 3);
+    this._fe = (a & 7);
+    this.__defineGetter__("_cg", function () {
+        return this._cf
+    });
+    this.__defineGetter__("_dx", function () {
+        return this._fe
+    });
+    this.GetHashCode = function () {
+        return (this._cf.ordinal() << 3) | this._fe
+    };
+    this.Equals = function (c) {
+        var b = c;
+        return this._cf == b._cf && this._fe == b._fe
+    }
+}
+_ax._gj = function (d, c) {
+    d ^= c;
+    return _ch[d & 15] + _ch[(_ew(d, 4) & 15)] + _ch[(_ew(d, 8) & 15)] + _ch[(_ew(d, 12) & 15)] + _ch[(_ew(d, 16) & 15)] + _ch[(_ew(d, 20) & 15)] + _ch[(_ew(d, 24) & 15)] + _ch[(_ew(d, 28) & 15)]
+};
+_ax._ci = function (a) {
+    var b = _ax._cj(a);
+    if (b != null) {
+        return b
+    }
+    return _ax._cj(a ^ _ca)
+};
+_ax._cj = function (d) {
+    var b = 4294967295;
+    var a = 0;
+    for (var c = 0; c < _cb.length; c++) {
+        var g = _cb[c];
+        var f = g[0];
+        if (f == d) {
+            return new _ax(g[1])
+        }
+        var e = this._gj(d, f);
+        if (e < b) {
+            a = g[1];
+            b = e
+        }
+    }
+    if (b <= 3) {
+        return new _ax(a)
+    }
+    return null
+};
+function _cg(a, c, b) {
+    this._ff = a;
+    this.bits = c;
+    this.name = b;
+    this.__defineGetter__("Bits", function () {
+        return this.bits
+    });
+    this.__defineGetter__("Name", function () {
+        return this.name
+    });
+    this.ordinal = function () {
+        return this._ff
+    }
+}
+_cg.forBits = function (a) {
+    if (a < 0 || a >= FOR_BITS.length) {
+        throw"bad arguments"
+    }
+    return FOR_BITS[a]
+};
+var L = new _cg(0, 1, "L");
+var M = new _cg(1, 0, "M");
+var Q = new _cg(2, 3, "Q");
+var H = new _cg(3, 2, "H");
+var FOR_BITS = new Array(M, L, H, Q);
+function _ac(d, a) {
+    if (!a) {
+        a = d
+    }
+    if (d < 1 || a < 1) {
+        throw"Both dimensions must be greater than 0"
+    }
+    this.width = d;
+    this.height = a;
+    var c = d >> 5;
+    if ((d & 31) != 0) {
+        c++
+    }
+    this.rowSize = c;
+    this.bits = new Array(c * a);
+    for (var b = 0; b < this.bits.length; b++) {
+        this.bits[b] = 0
+    }
+    this.__defineGetter__("Width", function () {
+        return this.width
+    });
+    this.__defineGetter__("Height", function () {
+        return this.height
+    });
+    this.__defineGetter__("Dimension", function () {
+        if (this.width != this.height) {
+            throw"Can't call getDimension() on a non-square matrix"
+        }
+        return this.width
+    });
+    this._ds = function (e, g) {
+        var f = g * this.rowSize + (e >> 5);
+        return ((_ew(this.bits[f], (e & 31))) & 1) != 0
+    };
+    this._dq = function (e, g) {
+        var f = g * this.rowSize + (e >> 5);
+        this.bits[f] |= 1 << (e & 31)
+    };
+    this.flip = function (e, g) {
+        var f = g * this.rowSize + (e >> 5);
+        this.bits[f] ^= 1 << (e & 31)
+    };
+    this.clear = function () {
+        var e = this.bits.length;
+        for (var f = 0; f < e; f++) {
+            this.bits[f] = 0
+        }
+    };
+    this._bq = function (g, j, f, m) {
+        if (j < 0 || g < 0) {
+            throw"Left and top must be nonnegative"
+        }
+        if (m < 1 || f < 1) {
+            throw"Height and width must be at least 1"
+        }
+        var l = g + f;
+        var e = j + m;
+        if (e > this.height || l > this.width) {
+            throw"The region must fit inside the matrix"
+        }
+        for (var i = j; i < e; i++) {
+            var h = i * this.rowSize;
+            for (var k = g; k < l; k++) {
+                this.bits[h + (k >> 5)] |= 1 << (k & 31)
+            }
+        }
+    }
+}
+function _dl(a, b) {
+    this._dv = a;
+    this._dw = b;
+    this.__defineGetter__("_du", function () {
+        return this._dv
+    });
+    this.__defineGetter__("Codewords", function () {
+        return this._dw
+    })
+}
+_dl._gn = function (c, h, r) {
+    if (c.length != h._dp) {
+        throw"bad arguments"
+    }
+    var k = h._bu(r);
+    var e = 0;
+    var d = k._fb();
+    for (var q = 0; q < d.length; q++) {
+        e += d[q].Count
+    }
+    var l = new Array(e);
+    var n = 0;
+    for (var o = 0; o < d.length; o++) {
+        var f = d[o];
+        for (var q = 0; q < f.Count; q++) {
+            var m = f._dm;
+            var s = k._bo + m;
+            l[n++] = new _dl(m, new Array(s))
+        }
+    }
+    var t = l[0]._dw.length;
+    var b = l.length - 1;
+    while (b >= 0) {
+        var v = l[b]._dw.length;
+        if (v == t) {
+            break
+        }
+        b--
+    }
+    b++;
+    var g = t - k._bo;
+    var a = 0;
+    for (var q = 0; q < g; q++) {
+        for (var o = 0; o < n; o++) {
+            l[o]._dw[q] = c[a++]
+        }
+    }
+    for (var o = b; o < n; o++) {
+        l[o]._dw[g] = c[a++]
+    }
+    var p = l[0]._dw.length;
+    for (var q = g; q < p; q++) {
+        for (var o = 0; o < n; o++) {
+            var u = o < b ? q : q + 1;
+            l[o]._dw[u] = c[a++]
+        }
+    }
+    return l
+};
+function _cl(a) {
+    var b = a.Dimension;
+    if (b < 21 || (b & 3) != 1) {
+        throw"Error _cl"
+    }
+    this._au = a;
+    this._cp = null;
+    this._co = null;
+    this._dk = function (d, c, e) {
+        return this._au._ds(d, c) ? (e << 1) | 1 : e << 1
+    };
+    this._cm = function () {
+        if (this._co != null) {
+            return this._co
+        }
+        var g = 0;
+        for (var e = 0; e < 6; e++) {
+            g = this._dk(e, 8, g)
+        }
+        g = this._dk(7, 8, g);
+        g = this._dk(8, 8, g);
+        g = this._dk(8, 7, g);
+        for (var c = 5; c >= 0; c--) {
+            g = this._dk(8, c, g)
+        }
+        this._co = _ax._ci(g);
+        if (this._co != null) {
+            return this._co
+        }
+        var f = this._au.Dimension;
+        g = 0;
+        var d = f - 8;
+        for (var e = f - 1; e >= d; e--) {
+            g = this._dk(e, 8, g)
+        }
+        for (var c = f - 7; c < f; c++) {
+            g = this._dk(8, c, g)
+        }
+        this._co = _ax._ci(g);
+        if (this._co != null) {
+            return this._co
+        }
+        throw"Error _cm"
+    };
+    this._cq = function () {
+        if (this._cp != null) {
+            return this._cp
+        }
+        var h = this._au.Dimension;
+        var f = (h - 17) >> 2;
+        if (f <= 6) {
+            return _a3._av(f)
+        }
+        var g = 0;
+        var e = h - 11;
+        for (var c = 5; c >= 0; c--) {
+            for (var d = h - 9; d >= e; d--) {
+                g = this._dk(d, c, g)
+            }
+        }
+        this._cp = _a3._aw(g);
+        if (this._cp != null && this._cp._cr == h) {
+            return this._cp
+        }
+        g = 0;
+        for (var d = 5; d >= 0; d--) {
+            for (var c = h - 9; c >= e; c--) {
+                g = this._dk(d, c, g)
+            }
+        }
+        this._cp = _a3._aw(g);
+        if (this._cp != null && this._cp._cr == h) {
+            return this._cp
+        }
+        throw"Error _cq"
+    };
+    this._gk = function () {
+        var q = this._cm();
+        var o = this._cq();
+        var c = _dx._gl(q._dx);
+        var f = this._au.Dimension;
+        c._dj(this._au, f);
+        var k = o._aq();
+        var n = true;
+        var r = new Array(o._dp);
+        var m = 0;
+        var p = 0;
+        var h = 0;
+        for (var e = f - 1; e > 0; e -= 2) {
+            if (e == 6) {
+                e--
+            }
+            for (var l = 0; l < f; l++) {
+                var g = n ? f - 1 - l : l;
+                for (var d = 0; d < 2; d++) {
+                    if (!k._ds(e - d, g)) {
+                        h++;
+                        p <<= 1;
+                        if (this._au._ds(e - d, g)) {
+                            p |= 1
+                        }
+                        if (h == 8) {
+                            r[m++] = p;
+                            h = 0;
+                            p = 0
+                        }
+                    }
+                }
+            }
+            n ^= true
+        }
+        if (m != o._dp) {
+            throw"Error _gk"
+        }
+        return r
+    }
+}
+var _dx = {};
+_dx._gl = function (a) {
+    if (a < 0 || a > 7) {
+        throw"bad arguments"
+    }
+    return _dx._dy[a]
+};
+function _fg() {
+    this._dj = function (c, d) {
+        for (var b = 0; b < d; b++) {
+            for (var a = 0; a < d; a++) {
+                if (this._fw(b, a)) {
+                    c.flip(a, b)
+                }
+            }
+        }
+    };
+    this._fw = function (b, a) {
+        return ((b + a) & 1) == 0
+    }
+}
+function _fh() {
+    this._dj = function (c, d) {
+        for (var b = 0; b < d; b++) {
+            for (var a = 0; a < d; a++) {
+                if (this._fw(b, a)) {
+                    c.flip(a, b)
+                }
+            }
+        }
+    };
+    this._fw = function (b, a) {
+        return (b & 1) == 0
+    }
+}
+function _fi() {
+    this._dj = function (c, d) {
+        for (var b = 0; b < d; b++) {
+            for (var a = 0; a < d; a++) {
+                if (this._fw(b, a)) {
+                    c.flip(a, b)
+                }
+            }
+        }
+    };
+    this._fw = function (b, a) {
+        return a % 3 == 0
+    }
+}
+function _fj() {
+    this._dj = function (c, d) {
+        for (var b = 0; b < d; b++) {
+            for (var a = 0; a < d; a++) {
+                if (this._fw(b, a)) {
+                    c.flip(a, b)
+                }
+            }
+        }
+    };
+    this._fw = function (b, a) {
+        return (b + a) % 3 == 0
+    }
+}
+function _fk() {
+    this._dj = function (c, d) {
+        for (var b = 0; b < d; b++) {
+            for (var a = 0; a < d; a++) {
+                if (this._fw(b, a)) {
+                    c.flip(a, b)
+                }
+            }
+        }
+    };
+    this._fw = function (b, a) {
+        return (((_ew(b, 1)) + (a / 3)) & 1) == 0
+    }
+}
+function _fl() {
+    this._dj = function (c, d) {
+        for (var b = 0; b < d; b++) {
+            for (var a = 0; a < d; a++) {
+                if (this._fw(b, a)) {
+                    c.flip(a, b)
+                }
+            }
+        }
+    };
+    this._fw = function (c, b) {
+        var a = c * b;
+        return (a & 1) + (a % 3) == 0
+    }
+}
+function _fm() {
+    this._dj = function (c, d) {
+        for (var b = 0; b < d; b++) {
+            for (var a = 0; a < d; a++) {
+                if (this._fw(b, a)) {
+                    c.flip(a, b)
+                }
+            }
+        }
+    };
+    this._fw = function (c, b) {
+        var a = c * b;
+        return (((a & 1) + (a % 3)) & 1) == 0
+    }
+}
+function _fn() {
+    this._dj = function (c, d) {
+        for (var b = 0; b < d; b++) {
+            for (var a = 0; a < d; a++) {
+                if (this._fw(b, a)) {
+                    c.flip(a, b)
+                }
+            }
+        }
+    };
+    this._fw = function (b, a) {
+        return ((((b + a) & 1) + ((b * a) % 3)) & 1) == 0
+    }
+}
+_dx._dy = new Array(new _fg(), new _fh(), new _fi(), new _fj(), new _fk(), new _fl(), new _fm(), new _fn());
+function _db(a) {
+    this._fa = a;
+    this.decode = function (j, f) {
+        var c = new _bp(this._fa, j);
+        var p = new Array(f);
+        for (var g = 0; g < p.length; g++) {
+            p[g] = 0
+        }
+        var m = false;
+        var d = true;
+        for (var g = 0; g < f; g++) {
+            var q = c.evaluateAt(this._fa.exp(m ? g + 1 : g));
+            p[p.length - 1 - g] = q;
+            if (q != 0) {
+                d = false
+            }
+        }
+        if (d) {
+            return
+        }
+        var b = new _bp(this._fa, p);
+        var l = this._eb(this._fa._ba(f, 1), b, f);
+        var o = l[0];
+        var n = l[1];
+        var k = this._ey(o);
+        var e = this._di(n, k, m);
+        for (var g = 0; g < k.length; g++) {
+            var h = j.length - 1 - this._fa.log(k[g]);
+            if (h < 0) {
+                throw"ReedSolomonException Bad error location"
+            }
+            j[h] = _az._bd(j[h], e[g])
+        }
+    };
+    this._eb = function (z, y, f) {
+        if (z._ec < y._ec) {
+            var w = z;
+            z = y;
+            y = w
+        }
+        var B = z;
+        var k = y;
+        var o = this._fa.One;
+        var j = this._fa.Zero;
+        var e = this._fa.Zero;
+        var i = this._fa.One;
+        while (k._ec >= Math.floor(f / 2)) {
+            var x = B;
+            var g = o;
+            var v = e;
+            B = k;
+            o = j;
+            e = i;
+            if (B.Zero) {
+                throw"r_{i-1} was zero"
+            }
+            k = x;
+            var m = this._fa.Zero;
+            var p = B._ex(B._ec);
+            var h = this._fa.inverse(p);
+            while (k._ec >= B._ec && !k.Zero) {
+                var c = k._ec - B._ec;
+                var A = this._fa.multiply(k._ex(k._ec), h);
+                m = m._bd(this._fa._ba(c, A));
+                k = k._bd(B._dc(c, A))
+            }
+            j = m.multiply1(o)._bd(g);
+            i = m.multiply1(e)._bd(v)
+        }
+        var u = i._ex(0);
+        if (u == 0) {
+            throw"ReedSolomonException sigmaTilde(0) was zero"
+        }
+        var d = this._fa.inverse(u);
+        var n = i.multiply2(d);
+        var l = k.multiply2(d);
+        return new Array(n, l)
+    };
+    this._ey = function (f) {
+        var g = f._ec;
+        if (g == 1) {
+            return new Array(f._ex(1))
+        }
+        var b = new Array(g);
+        var d = 0;
+        for (var c = 1; c < 256 && d < g; c++) {
+            if (f.evaluateAt(c) == 0) {
+                b[d] = this._fa.inverse(c);
+                d++
+            }
+        }
+        if (d != g) {
+            throw"Error locator degree does not match number of roots"
+        }
+        return b
+    };
+    this._di = function (f, h, g) {
+        var k = h.length;
+        var l = new Array(k);
+        for (var e = 0; e < k; e++) {
+            var b = this._fa.inverse(h[e]);
+            var c = 1;
+            for (var d = 0; d < k; d++) {
+                if (e != d) {
+                    c = this._fa.multiply(c, _az._bd(1, this._fa.multiply(h[d], b)))
+                }
+            }
+            l[e] = this._fa.multiply(f.evaluateAt(b), this._fa.inverse(c));
+            if (g) {
+                l[e] = this._fa.multiply(l[e], b)
+            }
+        }
+        return l
+    }
+}
+function _bp(f, e) {
+    if (e == null || e.length == 0) {
+        throw"bad arguments"
+    }
+    this._fa = f;
+    var c = e.length;
+    if (c > 1 && e[0] == 0) {
+        var d = 1;
+        while (d < c && e[d] == 0) {
+            d++
+        }
+        if (d == c) {
+            this._dd = f.Zero._dd
+        } else {
+            this._dd = new Array(c - d);
+            for (var b = 0; b < this._dd.length; b++) {
+                this._dd[b] = 0
+            }
+            for (var a = 0; a < this._dd.length; a++) {
+                this._dd[a] = e[d + a]
+            }
+        }
+    } else {
+        this._dd = e
+    }
+    this.__defineGetter__("Zero", function () {
+        return this._dd[0] == 0
+    });
+    this.__defineGetter__("_ec", function () {
+        return this._dd.length - 1
+    });
+    this.__defineGetter__("Coefficients", function () {
+        return this._dd
+    });
+    this._ex = function (g) {
+        return this._dd[this._dd.length - 1 - g]
+    };
+    this.evaluateAt = function (h) {
+        if (h == 0) {
+            return this._ex(0)
+        }
+        var l = this._dd.length;
+        if (h == 1) {
+            var g = 0;
+            for (var k = 0; k < l; k++) {
+                g = _az._bd(g, this._dd[k])
+            }
+            return g
+        }
+        var j = this._dd[0];
+        for (var k = 1; k < l; k++) {
+            j = _az._bd(this._fa.multiply(h, j), this._dd[k])
+        }
+        return j
+    };
+    this._bd = function (g) {
+        if (this._fa != g._fa) {
+            throw"GF256Polys do not have same _az _fa"
+        }
+        if (this.Zero) {
+            return g
+        }
+        if (g.Zero) {
+            return this
+        }
+        var o = this._dd;
+        var n = g._dd;
+        if (o.length > n.length) {
+            var j = o;
+            o = n;
+            n = j
+        }
+        var h = new Array(n.length);
+        var k = n.length - o.length;
+        for (var m = 0; m < k; m++) {
+            h[m] = n[m]
+        }
+        for (var l = k; l < n.length; l++) {
+            h[l] = _az._bd(o[l - k], n[l])
+        }
+        return new _bp(f, h)
+    };
+    this.multiply1 = function (o) {
+        if (this._fa != o._fa) {
+            throw"GF256Polys do not have same _az _fa"
+        }
+        if (this.Zero || o.Zero) {
+            return this._fa.Zero
+        }
+        var q = this._dd;
+        var g = q.length;
+        var l = o._dd;
+        var n = l.length;
+        var p = new Array(g + n - 1);
+        for (var m = 0; m < g; m++) {
+            var h = q[m];
+            for (var k = 0; k < n; k++) {
+                p[m + k] = _az._bd(p[m + k], this._fa.multiply(h, l[k]))
+            }
+        }
+        return new _bp(this._fa, p)
+    };
+    this.multiply2 = function (g) {
+        if (g == 0) {
+            return this._fa.Zero
+        }
+        if (g == 1) {
+            return this
+        }
+        var j = this._dd.length;
+        var k = new Array(j);
+        for (var h = 0; h < j; h++) {
+            k[h] = this._fa.multiply(this._dd[h], g)
+        }
+        return new _bp(this._fa, k)
+    };
+    this._dc = function (l, g) {
+        if (l < 0) {
+            throw"bad arguments"
+        }
+        if (g == 0) {
+            return this._fa.Zero
+        }
+        var j = this._dd.length;
+        var k = new Array(j + l);
+        for (var h = 0; h < k.length; h++) {
+            k[h] = 0
+        }
+        for (var h = 0; h < j; h++) {
+            k[h] = this._fa.multiply(this._dd[h], g)
+        }
+        return new _bp(this._fa, k)
+    };
+    this.divide = function (l) {
+        if (this._fa != l._fa) {
+            throw"GF256Polys do not have same _az _fa"
+        }
+        if (l.Zero) {
+            throw"Divide by 0"
+        }
+        var j = this._fa.Zero;
+        var o = this;
+        var g = l._ex(l._ec);
+        var n = this._fa.inverse(g);
+        while (o._ec >= l._ec && !o.Zero) {
+            var m = o._ec - l._ec;
+            var h = this._fa.multiply(o._ex(o._ec), n);
+            var i = l._dc(m, h);
+            var k = this._fa._ba(m, h);
+            j = j._bd(k);
+            o = o._bd(i)
+        }
+        return new Array(j, o)
+    }
+}
+function _az(b) {
+    this._gh = new Array(256);
+    this._gi = new Array(256);
+    var a = 1;
+    for (var e = 0; e < 256; e++) {
+        this._gh[e] = a;
+        a <<= 1;
+        if (a >= 256) {
+            a ^= b
+        }
+    }
+    for (var e = 0; e < 255; e++) {
+        this._gi[this._gh[e]] = e
+    }
+    var d = new Array(1);
+    d[0] = 0;
+    this.zero = new _bp(this, new Array(d));
+    var c = new Array(1);
+    c[0] = 1;
+    this.one = new _bp(this, new Array(c));
+    this.__defineGetter__("Zero", function () {
+        return this.zero
+    });
+    this.__defineGetter__("One", function () {
+        return this.one
+    });
+    this._ba = function (j, f) {
+        if (j < 0) {
+            throw"bad arguments"
+        }
+        if (f == 0) {
+            return this.zero
+        }
+        var h = new Array(j + 1);
+        for (var g = 0; g < h.length; g++) {
+            h[g] = 0
+        }
+        h[0] = f;
+        return new _bp(this, h)
+    };
+    this.exp = function (f) {
+        return this._gh[f]
+    };
+    this.log = function (f) {
+        if (f == 0) {
+            throw"bad arguments"
+        }
+        return this._gi[f]
+    };
+    this.inverse = function (f) {
+        if (f == 0) {
+            throw"System.ArithmeticException"
+        }
+        return this._gh[255 - this._gi[f]]
+    };
+    this.multiply = function (g, f) {
+        if (g == 0 || f == 0) {
+            return 0
+        }
+        if (g == 1) {
+            return f
+        }
+        if (f == 1) {
+            return g
+        }
+        return this._gh[(this._gi[g] + this._gi[f]) % 255]
+    }
+}
+_az._bb = new _az(285);
+_az._bc = new _az(301);
+_az._bd = function (d, c) {
+    return d ^ c
+};
+var Decoder = {};
+Decoder.rsDecoder = new _db(_az._bb);
+Decoder.correctErrors = function (g, b) {
+    var d = g.length;
+    var f = new Array(d);
+    for (var e = 0; e < d; e++) {
+        f[e] = g[e] & 255
+    }
+    var a = g.length - b;
+    try {
+        Decoder.rsDecoder.decode(f, a)
+    } catch (c) {
+        throw c
+    }
+    for (var e = 0; e < b; e++) {
+        g[e] = f[e]
+    }
+};
+Decoder.decode = function (q) {
+    var b = new _cl(q);
+    var o = b._cq();
+    var c = b._cm()._cg;
+    var p = b._gk();
+    var a = _dl._gn(p, o, c);
+    var f = 0;
+    for (var k = 0; k < a.length; k++) {
+        f += a[k]._du
+    }
+    var e = new Array(f);
+    var n = 0;
+    for (var h = 0; h < a.length; h++) {
+        var m = a[h];
+        var d = m.Codewords;
+        var g = m._du;
+        Decoder.correctErrors(d, g);
+        for (var k = 0; k < g; k++) {
+            e[n++] = d[k]
+        }
+    }
+    var l = new QRCodeDataBlockReader(e, o._fd, c.Bits);
+    return l
+};
+var qrcode = {};
+qrcode.imagedata = null;
+qrcode.width = 0;
+qrcode.height = 0;
+qrcode.qrCodeSymbol = null;
+qrcode.debug = false;
+qrcode.maxImgSize = 1024 * 1024;
+qrcode._eo = [[10, 9, 8, 8], [12, 11, 16, 10], [14, 13, 16, 12]];
+qrcode.callback = null;
+qrcode.vidSuccess = function (a) {
+    qrcode.localstream = a;
+    if (qrcode.webkit) {
+        qrcode.video.src = window.webkitURL.createObjectURL(a)
+    } else {
+        if (qrcode.moz) {
+            qrcode.video.mozSrcObject = a;
+            qrcode.video.play()
+        } else {
+            qrcode.video.src = a
+        }
+    }
+    qrcode.gUM = true;
+    qrcode.canvas_qr2 = document.createElement("canvas");
+    qrcode.canvas_qr2.id = "qr-canvas";
+    qrcode.qrcontext2 = qrcode.canvas_qr2.getContext("2d");
+    qrcode.canvas_qr2.width = qrcode.video.videoWidth;
+    qrcode.canvas_qr2.height = qrcode.video.videoHeight;
+    setTimeout(qrcode.captureToCanvas, 500)
+};
+qrcode.vidError = function (a) {
+    qrcode.gUM = false;
+    return
+};
+qrcode.captureToCanvas = function () {
+    if (qrcode.gUM) {
+        try {
+            if (qrcode.video.videoWidth == 0) {
+                setTimeout(qrcode.captureToCanvas, 500);
+                return
+            } else {
+                qrcode.canvas_qr2.width = qrcode.video.videoWidth;
+                qrcode.canvas_qr2.height = qrcode.video.videoHeight
+            }
+            qrcode.qrcontext2.drawImage(qrcode.video, 0, 0);
+            try {
+                qrcode.decode()
+            } catch (a) {
+                console.log(a);
+                setTimeout(qrcode.captureToCanvas, 500)
+            }
+        } catch (a) {
+            console.log(a);
+            setTimeout(qrcode.captureToCanvas, 500)
+        }
+    }
+};
+qrcode.setWebcam = function (c) {
+    var d = navigator;
+    qrcode.video = document.getElementById(c);
+    var a = true;
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        try {
+            navigator.mediaDevices.enumerateDevices().then(function (e) {
+                e.forEach(function (f) {
+                    console.log("deb1");
+                    if (f.kind === "videoinput") {
+                        if (f.label.toLowerCase().search("back") > -1) {
+                            a = [{sourceId: f.deviceId}]
+                        }
+                    }
+                    console.log(f.kind + ": " + f.label + " id = " + f.deviceId)
+                })
+            })
+        } catch (b) {
+            console.log(b)
+        }
+    } else {
+        console.log("no navigator.mediaDevices.enumerateDevices")
+    }
+    if (d.getUserMedia) {
+        d.getUserMedia({video: a, audio: false}, qrcode.vidSuccess, qrcode.vidError)
+    } else {
+        if (d.webkitGetUserMedia) {
+            qrcode.webkit = true;
+            d.webkitGetUserMedia({video: a, audio: false}, qrcode.vidSuccess, qrcode.vidError)
+        } else {
+            if (d.mozGetUserMedia) {
+                qrcode.moz = true;
+                d.mozGetUserMedia({video: a, audio: false}, qrcode.vidSuccess, qrcode.vidError)
+            }
+        }
+    }
+};
+qrcode.decode = function (d) {
+    if (arguments.length == 0) {
+        if (qrcode.canvas_qr2) {
+            var b = qrcode.canvas_qr2;
+            var a = qrcode.qrcontext2
+        } else {
+            var b = document.getElementById("qr-canvas");
+            var a = b.getContext("2d")
+        }
+        qrcode.width = b.width;
+        qrcode.height = b.height;
+        qrcode.imagedata = a.getImageData(0, 0, qrcode.width, qrcode.height);
+        qrcode.result = qrcode.process(a);
+        if (qrcode.callback != null) {
+            qrcode.callback(qrcode.result)
+        }
+        return qrcode.result
+    } else {
+        var c = new Image();
+        c.crossOrigin = "Anonymous";
+        c.onload = function () {
+            var g = document.getElementById("out-canvas");
+            if (g != null) {
+                var j = g.getContext("2d");
+                j.clearRect(0, 0, 320, 240);
+                j.drawImage(c, 0, 0, 320, 240)
+            }
+            var i = document.createElement("canvas");
+            var h = i.getContext("2d");
+            var f = c.height;
+            var l = c.width;
+            if (c.width * c.height > qrcode.maxImgSize) {
+                var k = c.width / c.height;
+                f = Math.sqrt(qrcode.maxImgSize / k);
+                l = k * f
+            }
+            i.width = l;
+            i.height = f;
+            h.drawImage(c, 0, 0, i.width, i.height);
+            qrcode.width = i.width;
+            qrcode.height = i.height;
+            try {
+                qrcode.imagedata = h.getImageData(0, 0, i.width, i.height)
+            } catch (m) {
+                qrcode.result = "Cross domain image reading not supported in your browser! Save it to your computer then drag and drop the file!";
+                if (qrcode.callback != null) {
+                    qrcode.callback(qrcode.result)
+                }
+                return
+            }
+            try {
+                qrcode.result = qrcode.process(h)
+            } catch (m) {
+                console.log(m);
+                qrcode.result = "error decoding QR Code"
+            }
+            if (qrcode.callback != null) {
+                qrcode.callback(qrcode.result)
+            }
+        };
+        c.onerror = function () {
+            if (qrcode.callback != null) {
+                qrcode.callback("Failed to load the image")
+            }
+        };
+        c.src = d
+    }
+};
+qrcode.isUrl = function (a) {
+    var b = /(ftp|http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/;
+    return b.test(a)
+};
+qrcode.decode_url = function (b) {
+    var d = "";
+    try {
+        d = escape(b)
+    } catch (c) {
+        console.log(c);
+        d = b
+    }
+    var a = "";
+    try {
+        a = decodeURIComponent(d)
+    } catch (c) {
+        console.log(c);
+        a = d
+    }
+    return a
+};
+qrcode.decode_utf8 = function (a) {
+    if (qrcode.isUrl(a)) {
+        return qrcode.decode_url(a)
+    } else {
+        return a
+    }
+};
+qrcode.process = function (q) {
+    var a = new Date().getTime();
+    var c = qrcode.grayScaleToBitmap(qrcode.grayscale());
+    if (qrcode.debug) {
+        for (var m = 0; m < qrcode.height; m++) {
+            for (var n = 0; n < qrcode.width; n++) {
+                var o = (n * 4) + (m * qrcode.width * 4);
+                qrcode.imagedata.data[o] = c[n + m * qrcode.width] ? 0 : 0;
+                qrcode.imagedata.data[o + 1] = c[n + m * qrcode.width] ? 0 : 0;
+                qrcode.imagedata.data[o + 2] = c[n + m * qrcode.width] ? 255 : 0
+            }
+        }
+        q.putImageData(qrcode.imagedata, 0, 0)
+    }
+    var h = new Detector(c);
+    var p = h.detect();
+    if (qrcode.debug) {
+        for (var m = 0; m < p.bits.Height; m++) {
+            for (var n = 0; n < p.bits.Width; n++) {
+                var o = (n * 4 * 2) + (m * 2 * qrcode.width * 4);
+                qrcode.imagedata.data[o] = p.bits._ds(n, m) ? 0 : 0;
+                qrcode.imagedata.data[o + 1] = p.bits._ds(n, m) ? 0 : 0;
+                qrcode.imagedata.data[o + 2] = p.bits._ds(n, m) ? 255 : 0
+            }
+        }
+        q.putImageData(qrcode.imagedata, 0, 0)
+    }
+    var k = Decoder.decode(p.bits);
+    var g = k.DataByte;
+    var l = "";
+    for (var f = 0; f < g.length; f++) {
+        for (var e = 0; e < g[f].length; e++) {
+            l += String.fromCharCode(g[f][e])
+        }
+    }
+    var d = new Date().getTime();
+    var b = d - a;
+    console.log(b);
+    return qrcode.decode_utf8(l)
+};
+qrcode.getPixel = function (b, d) {
+    if (qrcode.width < b) {
+        throw"point error"
+    }
+    if (qrcode.height < d) {
+        throw"point error"
+    }
+    var a = (b * 4) + (d * qrcode.width * 4);
+    var c = (qrcode.imagedata.data[a] * 33 + qrcode.imagedata.data[a + 1] * 34 + qrcode.imagedata.data[a + 2] * 33) / 100;
+    return c
+};
+qrcode.binarize = function (d) {
+    var c = new Array(qrcode.width * qrcode.height);
+    for (var e = 0; e < qrcode.height; e++) {
+        for (var b = 0; b < qrcode.width; b++) {
+            var a = qrcode.getPixel(b, e);
+            c[b + e * qrcode.width] = a <= d ? true : false
+        }
+    }
+    return c
+};
+qrcode._em = function (d) {
+    var c = 4;
+    var k = Math.floor(qrcode.width / c);
+    var j = Math.floor(qrcode.height / c);
+    var f = new Array(c);
+    for (var g = 0; g < c; g++) {
+        f[g] = new Array(c);
+        for (var e = 0; e < c; e++) {
+            f[g][e] = new Array(0, 0)
+        }
+    }
+    for (var o = 0; o < c; o++) {
+        for (var a = 0; a < c; a++) {
+            f[a][o][0] = 255;
+            for (var l = 0; l < j; l++) {
+                for (var n = 0; n < k; n++) {
+                    var h = d[k * a + n + (j * o + l) * qrcode.width];
+                    if (h < f[a][o][0]) {
+                        f[a][o][0] = h
+                    }
+                    if (h > f[a][o][1]) {
+                        f[a][o][1] = h
+                    }
+                }
+            }
+        }
+    }
+    var m = new Array(c);
+    for (var b = 0; b < c; b++) {
+        m[b] = new Array(c)
+    }
+    for (var o = 0; o < c; o++) {
+        for (var a = 0; a < c; a++) {
+            m[a][o] = Math.floor((f[a][o][0] + f[a][o][1]) / 2)
+        }
+    }
+    return m
+};
+qrcode.grayScaleToBitmap = function (f) {
+    var k = qrcode._em(f);
+    var b = k.length;
+    var e = Math.floor(qrcode.width / b);
+    var d = Math.floor(qrcode.height / b);
+    var h = new ArrayBuffer(qrcode.width * qrcode.height);
+    var c = new Uint8Array(h);
+    for (var j = 0; j < b; j++) {
+        for (var a = 0; a < b; a++) {
+            for (var g = 0; g < d; g++) {
+                for (var i = 0; i < e; i++) {
+                    c[e * a + i + (d * j + g) * qrcode.width] = (f[e * a + i + (d * j + g) * qrcode.width] < k[a][j]) ? true : false
+                }
+            }
+        }
+    }
+    return c
+};
+qrcode.grayscale = function () {
+    var e = new ArrayBuffer(qrcode.width * qrcode.height);
+    var c = new Uint8Array(e);
+    for (var d = 0; d < qrcode.height; d++) {
+        for (var b = 0; b < qrcode.width; b++) {
+            var a = qrcode.getPixel(b, d);
+            c[b + d * qrcode.width] = a
+        }
+    }
+    return c
+};
+function _ew(a, b) {
+    if (a >= 0) {
+        return a >> b
+    } else {
+        return (a >> b) + (2 << ~b)
+    }
+}
+var _gf = 3;
+var _eh = 57;
+var _el = 8;
+var _eg = 2;
+qrcode._er = function (c) {
+    function b(m, k) {
+        var n = m.X - k.X;
+        var l = m.Y - k.Y;
+        return Math.sqrt((n * n + l * l))
+    }
+
+    function d(k, o, n) {
+        var m = o.x;
+        var l = o.y;
+        return ((n.x - m) * (k.y - l)) - ((n.y - l) * (k.x - m))
+    }
+
+    var i = b(c[0], c[1]);
+    var f = b(c[1], c[2]);
+    var e = b(c[0], c[2]);
+    var a, j, h;
+    if (f >= i && f >= e) {
+        j = c[0];
+        a = c[1];
+        h = c[2]
+    } else {
+        if (e >= f && e >= i) {
+            j = c[1];
+            a = c[0];
+            h = c[2]
+        } else {
+            j = c[2];
+            a = c[0];
+            h = c[1]
+        }
+    }
+    if (d(a, j, h) < 0) {
+        var g = a;
+        a = h;
+        h = g
+    }
+    c[0] = a;
+    c[1] = j;
+    c[2] = h
+};
+function _cz(c, a, b) {
+    this.x = c;
+    this.y = a;
+    this.count = 1;
+    this._aj = b;
+    this.__defineGetter__("_ei", function () {
+        return this._aj
+    });
+    this.__defineGetter__("Count", function () {
+        return this.count
+    });
+    this.__defineGetter__("X", function () {
+        return this.x
+    });
+    this.__defineGetter__("Y", function () {
+        return this.y
+    });
+    this._ek = function () {
+        this.count++
+    };
+    this._ev = function (f, e, d) {
+        if (Math.abs(e - this.y) <= f && Math.abs(d - this.x) <= f) {
+            var g = Math.abs(f - this._aj);
+            return g <= 1 || g / this._aj <= 1
+        }
+        return false
+    }
+}
+function _es(a) {
+    this._go = a[0];
+    this._gu = a[1];
+    this._gr = a[2];
+    this.__defineGetter__("_gp", function () {
+        return this._go
+    });
+    this.__defineGetter__("_gq", function () {
+        return this._gu
+    });
+    this.__defineGetter__("_gs", function () {
+        return this._gr
+    })
+}
+function _cc() {
+    this.image = null;
+    this._cv = [];
+    this._ge = false;
+    this._al = new Array(0, 0, 0, 0, 0);
+    this._am = null;
+    this.__defineGetter__("_da", function () {
+        this._al[0] = 0;
+        this._al[1] = 0;
+        this._al[2] = 0;
+        this._al[3] = 0;
+        this._al[4] = 0;
+        return this._al
+    });
+    this._ao = function (f) {
+        var b = 0;
+        for (var d = 0; d < 5; d++) {
+            var e = f[d];
+            if (e == 0) {
+                return false
+            }
+            b += e
+        }
+        if (b < 7) {
+            return false
+        }
+        var c = Math.floor((b << _el) / 7);
+        var a = Math.floor(c / 2);
+        return Math.abs(c - (f[0] << _el)) < a && Math.abs(c - (f[1] << _el)) < a && Math.abs(3 * c - (f[2] << _el)) < 3 * a && Math.abs(c - (f[3] << _el)) < a && Math.abs(c - (f[4] << _el)) < a
+    };
+    this._an = function (b, a) {
+        return (a - b[4] - b[3]) - b[2] / 2
+    };
+    this._ap = function (a, j, d, g) {
+        var c = this.image;
+        var h = qrcode.height;
+        var b = this._da;
+        var f = a;
+        while (f >= 0 && c[j + f * qrcode.width]) {
+            b[2]++;
+            f--
+        }
+        if (f < 0) {
+            return NaN
+        }
+        while (f >= 0 && !c[j + f * qrcode.width] && b[1] <= d) {
+            b[1]++;
+            f--
+        }
+        if (f < 0 || b[1] > d) {
+            return NaN
+        }
+        while (f >= 0 && c[j + f * qrcode.width] && b[0] <= d) {
+            b[0]++;
+            f--
+        }
+        if (b[0] > d) {
+            return NaN
+        }
+        f = a + 1;
+        while (f < h && c[j + f * qrcode.width]) {
+            b[2]++;
+            f++
+        }
+        if (f == h) {
+            return NaN
+        }
+        while (f < h && !c[j + f * qrcode.width] && b[3] < d) {
+            b[3]++;
+            f++
+        }
+        if (f == h || b[3] >= d) {
+            return NaN
+        }
+        while (f < h && c[j + f * qrcode.width] && b[4] < d) {
+            b[4]++;
+            f++
+        }
+        if (b[4] >= d) {
+            return NaN
+        }
+        var e = b[0] + b[1] + b[2] + b[3] + b[4];
+        if (5 * Math.abs(e - g) >= 2 * g) {
+            return NaN
+        }
+        return this._ao(b) ? this._an(b, f) : NaN
+    };
+    this._ej = function (b, a, e, h) {
+        var d = this.image;
+        var i = qrcode.width;
+        var c = this._da;
+        var g = b;
+        while (g >= 0 && d[g + a * qrcode.width]) {
+            c[2]++;
+            g--
+        }
+        if (g < 0) {
+            return NaN
+        }
+        while (g >= 0 && !d[g + a * qrcode.width] && c[1] <= e) {
+            c[1]++;
+            g--
+        }
+        if (g < 0 || c[1] > e) {
+            return NaN
+        }
+        while (g >= 0 && d[g + a * qrcode.width] && c[0] <= e) {
+            c[0]++;
+            g--
+        }
+        if (c[0] > e) {
+            return NaN
+        }
+        g = b + 1;
+        while (g < i && d[g + a * qrcode.width]) {
+            c[2]++;
+            g++
+        }
+        if (g == i) {
+            return NaN
+        }
+        while (g < i && !d[g + a * qrcode.width] && c[3] < e) {
+            c[3]++;
+            g++
+        }
+        if (g == i || c[3] >= e) {
+            return NaN
+        }
+        while (g < i && d[g + a * qrcode.width] && c[4] < e) {
+            c[4]++;
+            g++
+        }
+        if (c[4] >= e) {
+            return NaN
+        }
+        var f = c[0] + c[1] + c[2] + c[3] + c[4];
+        if (5 * Math.abs(f - h) >= h) {
+            return NaN
+        }
+        return this._ao(c) ? this._an(c, g) : NaN
+    };
+    this._cu = function (c, f, e) {
+        var d = c[0] + c[1] + c[2] + c[3] + c[4];
+        var n = this._an(c, e);
+        var b = this._ap(f, Math.floor(n), c[2], d);
+        if (!isNaN(b)) {
+            n = this._ej(Math.floor(n), Math.floor(b), c[2], d);
+            if (!isNaN(n)) {
+                var l = d / 7;
+                var m = false;
+                var h = this._cv.length;
+                for (var g = 0; g < h; g++) {
+                    var a = this._cv[g];
+                    if (a._ev(l, b, n)) {
+                        a._ek();
+                        m = true;
+                        break
+                    }
+                }
+                if (!m) {
+                    var k = new _cz(n, b, l);
+                    this._cv.push(k);
+                    if (this._am != null) {
+                        this._am._ep(k)
+                    }
+                }
+                return true
+            }
+        }
+        return false
+    };
+    this._ee = function () {
+        var h = this._cv.length;
+        if (h < 3) {
+            throw"Couldn't find enough finder patterns (found " + h + ")"
+        }
+        if (h > 3) {
+            var b = 0;
+            var j = 0;
+            for (var d = 0; d < h; d++) {
+                var g = this._cv[d]._ei;
+                b += g;
+                j += (g * g)
+            }
+            var a = b / h;
+            this._cv.sort(function (m, l) {
+                var k = Math.abs(l._ei - a);
+                var i = Math.abs(m._ei - a);
+                if (k < i) {
+                    return (-1)
+                } else {
+                    if (k == i) {
+                        return 0
+                    } else {
+                        return 1
+                    }
+                }
+            });
+            var e = Math.sqrt(j / h - a * a);
+            var c = Math.max(0.2 * a, e);
+            for (var d = this._cv.length - 1; d >= 0; d--) {
+                var f = this._cv[d];
+                if (Math.abs(f._ei - a) > c) {
+                    this._cv.splice(d, 1)
+                }
+            }
+        }
+        if (this._cv.length > 3) {
+            this._cv.sort(function (k, i) {
+                if (k.count > i.count) {
+                    return -1
+                }
+                if (k.count < i.count) {
+                    return 1
+                }
+                return 0
+            })
+        }
+        return new Array(this._cv[0], this._cv[1], this._cv[2])
+    };
+    this._eq = function () {
+        var b = this._cv.length;
+        if (b <= 1) {
+            return 0
+        }
+        var c = null;
+        for (var d = 0; d < b; d++) {
+            var a = this._cv[d];
+            if (a.Count >= _eg) {
+                if (c == null) {
+                    c = a
+                } else {
+                    this._ge = true;
+                    return Math.floor((Math.abs(c.X - a.X) - Math.abs(c.Y - a.Y)) / 2)
+                }
+            }
+        }
+        return 0
+    };
+    this._cx = function () {
+        var g = 0;
+        var c = 0;
+        var a = this._cv.length;
+        for (var d = 0; d < a; d++) {
+            var f = this._cv[d];
+            if (f.Count >= _eg) {
+                g++;
+                c += f._ei
+            }
+        }
+        if (g < 3) {
+            return false
+        }
+        var e = c / a;
+        var b = 0;
+        for (var d = 0; d < a; d++) {
+            f = this._cv[d];
+            b += Math.abs(f._ei - e)
+        }
+        return b <= 0.05 * c
+    };
+    this._ce = function (e) {
+        var o = false;
+        this.image = e;
+        var n = qrcode.height;
+        var k = qrcode.width;
+        var a = Math.floor((3 * n) / (4 * _eh));
+        if (a < _gf || o) {
+            a = _gf
+        }
+        var g = false;
+        var d = new Array(5);
+        for (var h = a - 1; h < n && !g; h += a) {
+            d[0] = 0;
+            d[1] = 0;
+            d[2] = 0;
+            d[3] = 0;
+            d[4] = 0;
+            var b = 0;
+            for (var f = 0; f < k; f++) {
+                if (e[f + h * qrcode.width]) {
+                    if ((b & 1) == 1) {
+                        b++
+                    }
+                    d[b]++
+                } else {
+                    if ((b & 1) == 0) {
+                        if (b == 4) {
+                            if (this._ao(d)) {
+                                var c = this._cu(d, h, f);
+                                if (c) {
+                                    a = 2;
+                                    if (this._ge) {
+                                        g = this._cx()
+                                    } else {
+                                        var m = this._eq();
+                                        if (m > d[2]) {
+                                            h += m - d[2] - a;
+                                            f = k - 1
+                                        }
+                                    }
+                                } else {
+                                    do {
+                                        f++
+                                    } while (f < k && !e[f + h * qrcode.width]);
+                                    f--
+                                }
+                                b = 0;
+                                d[0] = 0;
+                                d[1] = 0;
+                                d[2] = 0;
+                                d[3] = 0;
+                                d[4] = 0
+                            } else {
+                                d[0] = d[2];
+                                d[1] = d[3];
+                                d[2] = d[4];
+                                d[3] = 1;
+                                d[4] = 0;
+                                b = 3
+                            }
+                        } else {
+                            d[++b]++
+                        }
+                    } else {
+                        d[b]++
+                    }
+                }
+            }
+            if (this._ao(d)) {
+                var c = this._cu(d, h, k);
+                if (c) {
+                    a = d[0];
+                    if (this._ge) {
+                        g = this._cx()
+                    }
+                }
+            }
+        }
+        var l = this._ee();
+        qrcode._er(l);
+        return new _es(l)
+    }
+}
+function _ai(c, a, b) {
+    this.x = c;
+    this.y = a;
+    this.count = 1;
+    this._aj = b;
+    this.__defineGetter__("_ei", function () {
+        return this._aj
+    });
+    this.__defineGetter__("Count", function () {
+        return this.count
+    });
+    this.__defineGetter__("X", function () {
+        return Math.floor(this.x)
+    });
+    this.__defineGetter__("Y", function () {
+        return Math.floor(this.y)
+    });
+    this._ek = function () {
+        this.count++
+    };
+    this._ev = function (f, e, d) {
+        if (Math.abs(e - this.y) <= f && Math.abs(d - this.x) <= f) {
+            var g = Math.abs(f - this._aj);
+            return g <= 1 || g / this._aj <= 1
+        }
+        return false
+    }
+}
+function _ak(g, c, b, f, a, e, d) {
+    this.image = g;
+    this._cv = new Array();
+    this.startX = c;
+    this.startY = b;
+    this.width = f;
+    this.height = a;
+    this._ef = e;
+    this._al = new Array(0, 0, 0);
+    this._am = d;
+    this._an = function (i, h) {
+        return (h - i[2]) - i[1] / 2
+    };
+    this._ao = function (l) {
+        var k = this._ef;
+        var h = k / 2;
+        for (var j = 0; j < 3; j++) {
+            if (Math.abs(k - l[j]) >= h) {
+                return false
+            }
+        }
+        return true
+    };
+    this._ap = function (h, q, l, o) {
+        var k = this.image;
+        var p = qrcode.height;
+        var j = this._al;
+        j[0] = 0;
+        j[1] = 0;
+        j[2] = 0;
+        var n = h;
+        while (n >= 0 && k[q + n * qrcode.width] && j[1] <= l) {
+            j[1]++;
+            n--
+        }
+        if (n < 0 || j[1] > l) {
+            return NaN
+        }
+        while (n >= 0 && !k[q + n * qrcode.width] && j[0] <= l) {
+            j[0]++;
+            n--
+        }
+        if (j[0] > l) {
+            return NaN
+        }
+        n = h + 1;
+        while (n < p && k[q + n * qrcode.width] && j[1] <= l) {
+            j[1]++;
+            n++
+        }
+        if (n == p || j[1] > l) {
+            return NaN
+        }
+        while (n < p && !k[q + n * qrcode.width] && j[2] <= l) {
+            j[2]++;
+            n++
+        }
+        if (j[2] > l) {
+            return NaN
+        }
+        var m = j[0] + j[1] + j[2];
+        if (5 * Math.abs(m - o) >= 2 * o) {
+            return NaN
+        }
+        return this._ao(j) ? this._an(j, n) : NaN
+    };
+    this._cu = function (l, o, n) {
+        var m = l[0] + l[1] + l[2];
+        var t = this._an(l, n);
+        var k = this._ap(o, Math.floor(t), 2 * l[1], m);
+        if (!isNaN(k)) {
+            var s = (l[0] + l[1] + l[2]) / 3;
+            var q = this._cv.length;
+            for (var p = 0; p < q; p++) {
+                var h = this._cv[p];
+                if (h._ev(s, k, t)) {
+                    return new _ai(t, k, s)
+                }
+            }
+            var r = new _ai(t, k, s);
+            this._cv.push(r);
+            if (this._am != null) {
+                this._am._ep(r)
+            }
+        }
+        return null
+    };
+    this.find = function () {
+        var p = this.startX;
+        var s = this.height;
+        var q = p + f;
+        var r = b + (s >> 1);
+        var m = new Array(0, 0, 0);
+        for (var k = 0; k < s; k++) {
+            var o = r + ((k & 1) == 0 ? ((k + 1) >> 1) : -((k + 1) >> 1));
+            m[0] = 0;
+            m[1] = 0;
+            m[2] = 0;
+            var n = p;
+            while (n < q && !g[n + qrcode.width * o]) {
+                n++
+            }
+            var h = 0;
+            while (n < q) {
+                if (g[n + o * qrcode.width]) {
+                    if (h == 1) {
+                        m[h]++
+                    } else {
+                        if (h == 2) {
+                            if (this._ao(m)) {
+                                var l = this._cu(m, o, n);
+                                if (l != null) {
+                                    return l
+                                }
+                            }
+                            m[0] = m[2];
+                            m[1] = 1;
+                            m[2] = 0;
+                            h = 1
+                        } else {
+                            m[++h]++
+                        }
+                    }
+                } else {
+                    if (h == 1) {
+                        h++
+                    }
+                    m[h]++
+                }
+                n++
+            }
+            if (this._ao(m)) {
+                var l = this._cu(m, o, q);
+                if (l != null) {
+                    return l
+                }
+            }
+        }
+        if (!(this._cv.length == 0)) {
+            return this._cv[0]
+        }
+        throw"Couldn't find enough alignment patterns"
+    }
+}
+function QRCodeDataBlockReader(c, a, b) {
+    this._ed = 0;
+    this._cw = 7;
+    this.dataLength = 0;
+    this.blocks = c;
+    this._en = b;
+    if (a <= 9) {
+        this.dataLengthMode = 0
+    } else {
+        if (a >= 10 && a <= 26) {
+            this.dataLengthMode = 1
+        } else {
+            if (a >= 27 && a <= 40) {
+                this.dataLengthMode = 2
+            }
+        }
+    }
+    this._gd = function (f) {
+        var k = 0;
+        if (f < this._cw + 1) {
+            var m = 0;
+            for (var e = 0; e < f; e++) {
+                m += (1 << e)
+            }
+            m <<= (this._cw - f + 1);
+            k = (this.blocks[this._ed] & m) >> (this._cw - f + 1);
+            this._cw -= f;
+            return k
+        } else {
+            if (f < this._cw + 1 + 8) {
+                var j = 0;
+                for (var e = 0; e < this._cw + 1; e++) {
+                    j += (1 << e)
+                }
+                k = (this.blocks[this._ed] & j) << (f - (this._cw + 1));
+                this._ed++;
+                k += ((this.blocks[this._ed]) >> (8 - (f - (this._cw + 1))));
+                this._cw = this._cw - f % 8;
+                if (this._cw < 0) {
+                    this._cw = 8 + this._cw
+                }
+                return k
+            } else {
+                if (f < this._cw + 1 + 16) {
+                    var j = 0;
+                    var h = 0;
+                    for (var e = 0; e < this._cw + 1; e++) {
+                        j += (1 << e)
+                    }
+                    var g = (this.blocks[this._ed] & j) << (f - (this._cw + 1));
+                    this._ed++;
+                    var d = this.blocks[this._ed] << (f - (this._cw + 1 + 8));
+                    this._ed++;
+                    for (var e = 0; e < f - (this._cw + 1 + 8); e++) {
+                        h += (1 << e)
+                    }
+                    h <<= 8 - (f - (this._cw + 1 + 8));
+                    var l = (this.blocks[this._ed] & h) >> (8 - (f - (this._cw + 1 + 8)));
+                    k = g + d + l;
+                    this._cw = this._cw - (f - 8) % 8;
+                    if (this._cw < 0) {
+                        this._cw = 8 + this._cw
+                    }
+                    return k
+                } else {
+                    return 0
+                }
+            }
+        }
+    };
+    this.NextMode = function () {
+        if ((this._ed > this.blocks.length - this._en - 2)) {
+            return 0
+        } else {
+            return this._gd(4)
+        }
+    };
+    this.getDataLength = function (d) {
+        var e = 0;
+        while (true) {
+            if ((d >> e) == 1) {
+                break
+            }
+            e++
+        }
+        return this._gd(qrcode._eo[this.dataLengthMode][e])
+    };
+    this.getRomanAndFigureString = function (h) {
+        var f = h;
+        var g = 0;
+        var j = "";
+        var d = new Array("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", " ", "$", "%", "*", "+", "-", ".", "/", ":");
+        do {
+            if (f > 1) {
+                g = this._gd(11);
+                var i = Math.floor(g / 45);
+                var e = g % 45;
+                j += d[i];
+                j += d[e];
+                f -= 2
+            } else {
+                if (f == 1) {
+                    g = this._gd(6);
+                    j += d[g];
+                    f -= 1
+                }
+            }
+        } while (f > 0);
+        return j
+    };
+    this.getFigureString = function (f) {
+        var d = f;
+        var e = 0;
+        var g = "";
+        do {
+            if (d >= 3) {
+                e = this._gd(10);
+                if (e < 100) {
+                    g += "0"
+                }
+                if (e < 10) {
+                    g += "0"
+                }
+                d -= 3
+            } else {
+                if (d == 2) {
+                    e = this._gd(7);
+                    if (e < 10) {
+                        g += "0"
+                    }
+                    d -= 2
+                } else {
+                    if (d == 1) {
+                        e = this._gd(4);
+                        d -= 1
+                    }
+                }
+            }
+            g += e
+        } while (d > 0);
+        return g
+    };
+    this.get8bitByteArray = function (g) {
+        var e = g;
+        var f = 0;
+        var d = new Array();
+        do {
+            f = this._gd(8);
+            d.push(f);
+            e--
+        } while (e > 0);
+        return d
+    };
+    this.getKanjiString = function (j) {
+        var g = j;
+        var i = 0;
+        var h = "";
+        do {
+            i = this._gd(13);
+            var e = i % 192;
+            var f = i / 192;
+            var k = (f << 8) + e;
+            var d = 0;
+            if (k + 33088 <= 40956) {
+                d = k + 33088
+            } else {
+                d = k + 49472
+            }
+            h += String.fromCharCode(d);
+            g--
+        } while (g > 0);
+        return h
+    };
+    this.parseECIValue = function () {
+        var f = 0;
+        var e = this._gd(8);
+        if ((e & 128) == 0) {
+            f = e & 127
+        }
+        if ((e & 192) == 128) {
+            var d = this._gd(8);
+            f = ((e & 63) << 8) | d
+        }
+        if ((e & 224) == 192) {
+            var g = this._gd(8);
+            f = ((e & 31) << 16) | g
+        }
+        return f
+    };
+    this.__defineGetter__("DataByte", function () {
+        var h = new Array();
+        var e = 1;
+        var f = 2;
+        var d = 4;
+        var n = 7;
+        var p = 8;
+        do {
+            var l = this.NextMode();
+            if (l == 0) {
+                if (h.length > 0) {
+                    break
+                } else {
+                    throw"Empty data block"
+                }
+            }
+            if (l != e && l != f && l != d && l != p && l != n) {
+                throw"Invalid mode: " + l + " in (block:" + this._ed + " bit:" + this._cw + ")"
+            }
+            if (l == n) {
+                var o = this.parseECIValue()
+            } else {
+                var g = this.getDataLength(l);
+                if (g < 1) {
+                    throw"Invalid data length: " + g
+                }
+                switch (l) {
+                    case e:
+                        var m = this.getFigureString(g);
+                        var k = new Array(m.length);
+                        for (var i = 0; i < m.length; i++) {
+                            k[i] = m.charCodeAt(i)
+                        }
+                        h.push(k);
+                        break;
+                    case f:
+                        var m = this.getRomanAndFigureString(g);
+                        var k = new Array(m.length);
+                        for (var i = 0; i < m.length; i++) {
+                            k[i] = m.charCodeAt(i)
+                        }
+                        h.push(k);
+                        break;
+                    case d:
+                        var o = this.get8bitByteArray(g);
+                        h.push(o);
+                        break;
+                    case p:
+                        var m = this.getKanjiString(g);
+                        h.push(m);
+                        break
+                }
+            }
+        } while (true);
+        return h
+    })
+};
+var gapi = window.gapi = window.gapi || {};
+gapi._bs = new Date().getTime();
+(function () {
+    var aa = this, ba = function (a, b, c) {
+        return a.call.apply(a.bind, arguments)
+    }, ca = function (a, b, c) {
+        if (!a)throw Error();
+        if (2 < arguments.length) {
+            var d = Array.prototype.slice.call(arguments, 2);
+            return function () {
+                var c = Array.prototype.slice.call(arguments);
+                Array.prototype.unshift.apply(c, d);
+                return a.apply(b, c)
+            }
+        }
+        return function () {
+            return a.apply(b, arguments)
+        }
+    }, da = function (a, b, c) {
+        da = Function.prototype.bind && -1 != Function.prototype.bind.toString().indexOf("native code") ? ba : ca;
+        return da.apply(null, arguments)
+    };
+    var ea = String.prototype.trim ? function (a) {
+        return a.trim()
+    } : function (a) {
+        return a.replace(/^[\s\xa0]+|[\s\xa0]+$/g, "")
+    }, fa = function (a, b) {
+        return a < b ? -1 : a > b ? 1 : 0
+    };
+    var m;
+    a:{
+        var ha = aa.navigator;
+        if (ha) {
+            var ia = ha.userAgent;
+            if (ia) {
+                m = ia;
+                break a
+            }
+        }
+        m = ""
+    }
+    ;
+    var ka = function (a, b) {
+        var c = ja;
+        Object.prototype.hasOwnProperty.call(c, a) || (c[a] = b(a))
+    };
+    var la = -1 != m.indexOf("Opera"), p = -1 != m.indexOf("Trident") || -1 != m.indexOf("MSIE"), ma = -1 != m.indexOf("Edge"), na = -1 != m.indexOf("Gecko") && !(-1 != m.toLowerCase().indexOf("webkit") && -1 == m.indexOf("Edge")) && !(-1 != m.indexOf("Trident") || -1 != m.indexOf("MSIE")) && -1 == m.indexOf("Edge"), oa = -1 != m.toLowerCase().indexOf("webkit") && -1 == m.indexOf("Edge"), pa = function () {
+        var a = aa.document;
+        return a ? a.documentMode : void 0
+    }, qa;
+    a:{
+        var ra = "", sa = function () {
+            var a = m;
+            if (na)return /rv\:([^\);]+)(\)|;)/.exec(a);
+            if (ma)return /Edge\/([\d\.]+)/.exec(a);
+            if (p)return /\b(?:MSIE|rv)[: ]([^\);]+)(\)|;)/.exec(a);
+            if (oa)return /WebKit\/(\S+)/.exec(a);
+            if (la)return /(?:Version)[ \/]?(\S+)/.exec(a)
+        }();
+        sa && (ra = sa ? sa[1] : "");
+        if (p) {
+            var ta = pa();
+            if (null != ta && ta > parseFloat(ra)) {
+                qa = String(ta);
+                break a
+            }
+        }
+        qa = ra
+    }
+    var ua = qa, ja = {}, va = function (a) {
+        ka(a, function () {
+            for (var b = 0, c = ea(String(ua)).split("."), d = ea(String(a)).split("."), e = Math.max(c.length, d.length), f = 0; 0 == b && f < e; f++) {
+                var g = c[f] || "", h = d[f] || "";
+                do {
+                    g = /(\d*)(\D*)(.*)/.exec(g) || ["", "", "", ""];
+                    h = /(\d*)(\D*)(.*)/.exec(h) || ["", "", "", ""];
+                    if (0 == g[0].length && 0 == h[0].length)break;
+                    b = fa(0 == g[1].length ? 0 : parseInt(g[1], 10), 0 == h[1].length ? 0 : parseInt(h[1], 10)) || fa(0 == g[2].length, 0 == h[2].length) || fa(g[2], h[2]);
+                    g = g[3];
+                    h = h[3]
+                } while (0 == b)
+            }
+            return 0 <= b
+        })
+    }, wa;
+    var xa = aa.document;
+    wa = xa && p ? pa() || ("CSS1Compat" == xa.compatMode ? parseInt(ua, 10) : 5) : void 0;
+    var ya;
+    if (!(ya = !na && !p)) {
+        var za;
+        if (za = p)za = 9 <= Number(wa);
+        ya = za
+    }
+    ya || na && va("1.9.1");
+    p && va("9");
+    /*
+     gapi.loader.OBJECT_CREATE_TEST_OVERRIDE &&*/
+    var t = window, v = document, Aa = t.location, Ba = function () {
+    }, Ca = /\[native code\]/, w = function (a, b, c) {
+        return a[b] = a[b] || c
+    }, Da = function (a) {
+        for (var b = 0; b < this.length; b++)if (this[b] === a)return b;
+        return -1
+    }, Ea = function (a) {
+        a = a.sort();
+        for (var b = [], c = void 0, d = 0; d < a.length; d++) {
+            var e = a[d];
+            e != c && b.push(e);
+            c = e
+        }
+        return b
+    }, Ga = /&/g, Ha = /</g, Ia = />/g, Ja = /"/g, Ka = /'/g, La = function (a) {
+        return String(a).replace(Ga, "&amp;").replace(Ha, "&lt;").replace(Ia, "&gt;").replace(Ja, "&quot;").replace(Ka, "&#39;")
+    }, x = function () {
+        var a;
+        if ((a = Object.create) &&
+            Ca.test(a))a = a(null); else {
+            a = {};
+            for (var b in a)a[b] = void 0
+        }
+        return a
+    }, y = function (a, b) {
+        return Object.prototype.hasOwnProperty.call(a, b)
+    }, Ma = function (a) {
+        if (Ca.test(Object.keys))return Object.keys(a);
+        var b = [], c;
+        for (c in a)y(a, c) && b.push(c);
+        return b
+    }, z = function (a, b) {
+        a = a || {};
+        for (var c in a)y(a, c) && (b[c] = a[c])
+    }, Na = function (a) {
+        return function () {
+            t.setTimeout(a, 0)
+        }
+    }, B = function (a, b) {
+        if (!a)throw Error(b || "");
+    }, C = w(t, "gapi", {});
+    var D = function (a, b, c) {
+        var d = new RegExp("([#].*&|[#])" + b + "=([^&#]*)", "g");
+        b = new RegExp("([?#].*&|[?#])" + b + "=([^&#]*)", "g");
+        if (a = a && (d.exec(a) || b.exec(a)))try {
+            c = decodeURIComponent(a[2])
+        } catch (e) {
+        }
+        return c
+    }, Oa = new RegExp(/^/.source + /([a-zA-Z][-+.a-zA-Z0-9]*:)?/.source + /(\/\/[^\/?#]*)?/.source + /([^?#]*)?/.source + /(\?([^#]*))?/.source + /(#((#|[^#])*))?/.source + /$/.source), Pa = /[\ud800-\udbff][\udc00-\udfff]|[^!-~]/g, Qa = new RegExp(/(%([^0-9a-fA-F%]|[0-9a-fA-F]([^0-9a-fA-F%])?)?)*/.source + /%($|[^0-9a-fA-F]|[0-9a-fA-F]($|[^0-9a-fA-F]))/.source,
+        "g"), Ra = /%([a-f]|[0-9a-fA-F][a-f])/g, Sa = /^(https?|ftp|file|chrome-extension):$/i, E = function (a) {
+        a = String(a);
+        a = a.replace(Pa, function (a) {
+            try {
+                return encodeURIComponent(a)
+            } catch (f) {
+                return encodeURIComponent(a.replace(/^[^%]+$/g, "\ufffd"))
+            }
+        }).replace(Qa, function (a) {
+            return a.replace(/%/g, "%25")
+        }).replace(Ra, function (a) {
+            return a.toUpperCase()
+        });
+        a = a.match(Oa) || [];
+        var b = x(), c = function (a) {
+            return a.replace(/\\/g, "%5C").replace(/\^/g, "%5E").replace(/`/g, "%60").replace(/\{/g, "%7B").replace(/\|/g, "%7C").replace(/\}/g,
+                "%7D")
+        }, d = !!(a[1] || "").match(Sa);
+        b.v = c((a[1] || "") + (a[2] || "") + (a[3] || (a[2] && d ? "/" : "")));
+        d = function (a) {
+            return c(a.replace(/\?/g, "%3F").replace(/\#/g, "%23"))
+        };
+        b.query = a[5] ? [d(a[5])] : [];
+        b.c = a[7] ? [d(a[7])] : [];
+        return b
+    }, Ta = function (a) {
+        return a.v + (0 < a.query.length ? "?" + a.query.join("&") : "") + (0 < a.c.length ? "#" + a.c.join("&") : "")
+    }, Ua = function (a, b) {
+        var c = [];
+        if (a)for (var d in a)if (y(a, d) && null != a[d]) {
+            var e = b ? b(a[d]) : a[d];
+            c.push(encodeURIComponent(d) + "=" + encodeURIComponent(e))
+        }
+        return c
+    }, Va = function (a, b, c, d) {
+        a = E(a);
+        a.query.push.apply(a.query, Ua(b, d));
+        a.c.push.apply(a.c, Ua(c, d));
+        return Ta(a)
+    }, Wa = new RegExp(/\/?\??#?/.source + "(" + /[\/?#]/i.source + "|" + /[\uD800-\uDBFF]/i.source + "|" + /%[c-f][0-9a-f](%[89ab][0-9a-f]){0,2}(%[89ab]?)?/i.source + "|" + /%[0-9a-f]?/i.source + ")$", "i"), Xa = function (a, b) {
+        var c = E(b);
+        b = c.v;
+        c.query.length && (b += "?" + c.query.join(""));
+        c.c.length && (b += "#" + c.c.join(""));
+        var d = "";
+        2E3 < b.length && (c = b, b = b.substr(0, 2E3), b = b.replace(Wa, ""), d = c.substr(b.length));
+        var e = a.createElement("div");
+        a = a.createElement("a");
+        c = E(b);
+        b = c.v;
+        c.query.length && (b += "?" + c.query.join(""));
+        c.c.length && (b += "#" + c.c.join(""));
+        a.href = b;
+        e.appendChild(a);
+        e.innerHTML = e.innerHTML;
+        b = String(e.firstChild.href);
+        e.parentNode && e.parentNode.removeChild(e);
+        c = E(b + d);
+        b = c.v;
+        c.query.length && (b += "?" + c.query.join(""));
+        c.c.length && (b += "#" + c.c.join(""));
+        return b
+    }, Ya = /^https?:\/\/[^\/%\\?#\s]+\/[^\s]*$/i;
+    var Za = function (a, b, c, d) {
+        if (t[c + "EventListener"])t[c + "EventListener"](a, b, !1); else if (t[d + "tachEvent"])t[d + "tachEvent"]("on" + a, b)
+    }, $a = function () {
+        var a = v.readyState;
+        return "complete" === a || "interactive" === a && -1 == navigator.userAgent.indexOf("MSIE")
+    }, cb = function (a) {
+        var b = ab;
+        if (!$a())try {
+            b()
+        } catch (c) {
+        }
+        bb(a)
+    }, bb = function (a) {
+        if ($a())a(); else {
+            var b = !1, c = function () {
+                if (!b)return b = !0, a.apply(this, arguments)
+            };
+            t.addEventListener ? (t.addEventListener("load", c, !1), t.addEventListener("DOMContentLoaded", c, !1)) : t.attachEvent &&
+            (t.attachEvent("onreadystatechange", function () {
+                $a() && c.apply(this, arguments)
+            }), t.attachEvent("onload", c))
+        }
+    }, db = function (a) {
+        for (; a.firstChild;)a.removeChild(a.firstChild)
+    }, eb = {button: !0, div: !0, span: !0};
+    var F;
+    F = w(t, "___jsl", x());
+    w(F, "I", 0);
+    w(F, "hel", 10);
+    var fb = function (a) {
+        return F.dpo ? F.h : D(a, "jsh", F.h)
+    }, gb = function (a) {
+        var b = w(F, "sws", []);
+        b.push.apply(b, a)
+    }, hb = function (a) {
+        return w(F, "watt", x())[a]
+    }, ib = function (a) {
+        var b = w(F, "PQ", []);
+        F.PQ = [];
+        var c = b.length;
+        if (0 === c)a(); else for (var d = 0, e = function () {
+            ++d === c && a()
+        }, f = 0; f < c; f++)b[f](e)
+    }, jb = function (a) {
+        return w(w(F, "H", x()), a, x())
+    };
+    var kb = w(F, "perf", x()), lb = w(kb, "g", x()), mb = w(kb, "i", x());
+    w(kb, "r", []);
+    x();
+    x();
+    var nb = function (a, b, c) {
+        var d = kb.r;
+        "function" === typeof d ? d(a, b, c) : d.push([a, b, c])
+    }, G = function (a, b, c) {
+        lb[a] = !b && lb[a] || c || (new Date).getTime();
+        nb(a)
+    }, pb = function (a, b, c) {
+        b && 0 < b.length && (b = ob(b), c && 0 < c.length && (b += "___" + ob(c)), 28 < b.length && (b = b.substr(0, 28) + (b.length - 28)), c = b, b = w(mb, "_p", x()), w(b, c, x())[a] = (new Date).getTime(), nb(a, "_p", c))
+    }, ob = function (a) {
+        return a.join("__").replace(/\./g, "_").replace(/\-/g, "_").replace(/\,/g, "_")
+    };
+    var qb = x(), J = [], K = function (a) {
+        throw Error("Bad hint" + (a ? ": " + a : ""));
+    };
+    J.push(["jsl", function (a) {
+        for (var b in a)if (y(a, b)) {
+            var c = a[b];
+            "object" == typeof c ? F[b] = w(F, b, []).concat(c) : w(F, b, c)
+        }
+        if (b = a.u)a = w(F, "us", []), a.push(b), (b = /^https:(.*)$/.exec(b)) && a.push("http:" + b[1])
+    }]);
+    var rb = /^(\/[a-zA-Z0-9_\-]+)+$/, sb = [/\/amp\//, /\/amp$/, /^\/amp$/], tb = /^[a-zA-Z0-9\-_\.,!]+$/, ub = /^gapi\.loaded_[0-9]+$/, vb = /^[a-zA-Z0-9,._-]+$/, zb = function (a, b, c, d) {
+            var e = a.split(";"), f = e.shift(), g = qb[f], h = null;
+            g ? h = g(e, b, c, d) : K("no hint processor for: " + f);
+            h || K("failed to generate load url");
+            b = h;
+            c = b.match(wb);
+            (d = b.match(xb)) && 1 === d.length && yb.test(b) && c && 1 === c.length || K("failed sanity: " + a);
+            return h
+        }, Cb = function (a, b, c, d) {
+            a = Ab(a);
+            ub.test(c) || K("invalid_callback");
+            b = Bb(b);
+            d = d && d.length ? Bb(d) : null;
+            var e =
+                function (a) {
+                    return encodeURIComponent(a).replace(/%2C/g, ",")
+                };
+            return [encodeURIComponent(a.Y).replace(/%2C/g, ",").replace(/%2F/g, "/"), "/k=", e(a.version), "/m=", e(b), d ? "/exm=" + e(d) : "", "/rt=j/sv=1/d=1/ed=1", a.K ? "/am=" + e(a.K) : "", a.S ? "/rs=" + e(a.S) : "", a.U ? "/t=" + e(a.U) : "", "/cb=", e(c)].join("")
+        }, Ab = function (a) {
+            "/" !== a.charAt(0) && K("relative path");
+            for (var b = a.substring(1).split("/"), c = []; b.length;) {
+                a = b.shift();
+                if (!a.length || 0 == a.indexOf("."))K("empty/relative directory"); else if (0 < a.indexOf("=")) {
+                    b.unshift(a);
+                    break
+                }
+                c.push(a)
+            }
+            a = {};
+            for (var d = 0, e = b.length; d < e; ++d) {
+                var f = b[d].split("="), g = decodeURIComponent(f[0]), h = decodeURIComponent(f[1]);
+                2 == f.length && g && h && (a[g] = a[g] || h)
+            }
+            b = "/" + c.join("/");
+            rb.test(b) || K("invalid_prefix");
+            c = 0;
+            for (d = sb.length; c < d; ++c)sb[c].test(b) && K("invalid_prefix");
+            c = Db(a, "k", !0);
+            d = Db(a, "am");
+            e = Db(a, "rs");
+            a = Db(a, "t");
+            return {Y: b, version: c, K: d, S: e, U: a}
+        }, Bb = function (a) {
+            for (var b = [], c = 0, d = a.length; c < d; ++c) {
+                var e = a[c].replace(/\./g, "_").replace(/-/g, "_");
+                vb.test(e) && b.push(e)
+            }
+            return b.join(",")
+        },
+        Db = function (a, b, c) {
+            a = a[b];
+            !a && c && K("missing: " + b);
+            if (a) {
+                if (tb.test(a))return a;
+                K("invalid: " + b)
+            }
+            return null
+        }, yb = /^https?:\/\/[a-z0-9_.-]+\.google(rs)?\.com(:\d+)?\/[a-zA-Z0-9_.,!=\-\/]+$/, xb = /\/cb=/g, wb = /\/\//g, Eb = function () {
+            var a = fb(Aa.href);
+            if (!a)throw Error("Bad hint");
+            return a
+        };
+    qb.m = function (a, b, c, d) {
+        (a = a[0]) || K("missing_hint");
+        return "https://apis.google.com" + Cb(a, b, c, d)
+    };
+    var L = decodeURI("%73cript"), Fb = /^[-+_0-9\/A-Za-z]+={0,2}$/, Gb = function (a, b) {
+        for (var c = [], d = 0; d < a.length; ++d) {
+            var e = a[d];
+            e && 0 > Da.call(b, e) && c.push(e)
+        }
+        return c
+    }, Hb = function () {
+        var a = F.nonce;
+        if (void 0 !== a)return a && a === String(a) && a.match(Fb) ? a : F.nonce = null;
+        var b = w(F, "us", []);
+        if (!b || !b.length)return F.nonce = null;
+        for (var c = v.getElementsByTagName(L), d = 0, e = c.length; d < e; ++d) {
+            var f = c[d];
+            if (f.src && (a = String(f.nonce || f.getAttribute("nonce") || "") || null)) {
+                for (var g = 0, h = b.length; g < h && b[g] !== f.src; ++g);
+                if (g !== h &&
+                    a && a === String(a) && a.match(Fb))return F.nonce = a
+            }
+        }
+        return null
+    }, Jb = function (a) {
+        if ("loading" != v.readyState)Ib(a); else {
+            var b = Hb(), c = "";
+            null !== b && (c = ' nonce="' + b + '"');
+            v.write("<" + L + ' src="' + encodeURI(a) + '"' + c + "></" + L + ">")
+        }
+    }, Ib = function (a) {
+        var b = v.createElement(L);
+        b.setAttribute("src", a);
+        a = Hb();
+        null !== a && b.setAttribute("nonce", a);
+        b.async = "true";
+        (a = v.getElementsByTagName(L)[0]) ? a.parentNode.insertBefore(b, a) : (v.head || v.body || v.documentElement).appendChild(b)
+    }, Kb = function (a, b) {
+        var c = b && b._c;
+        if (c)for (var d =
+            0; d < J.length; d++) {
+            var e = J[d][0], f = J[d][1];
+            f && y(c, e) && f(c[e], a, b)
+        }
+    }, Mb = function (a, b, c) {
+        Lb(function () {
+            var c = b === fb(Aa.href) ? w(C, "_", x()) : x();
+            c = w(jb(b), "_", c);
+            a(c)
+        }, c)
+    }, M = function (a, b) {
+        var c = b || {};
+        "function" == typeof b && (c = {}, c.callback = b);
+        Kb(a, c);
+        b = a ? a.split(":") : [];
+        var d = c.h || Eb(), e = w(F, "ah", x());
+        if (e["::"] && b.length) {
+            a = [];
+            for (var f = null; f = b.shift();) {
+                var g = f.split(".");
+                g = e[f] || e[g[1] && "ns:" + g[0] || ""] || d;
+                var h = a.length && a[a.length - 1] || null, k = h;
+                h && h.hint == g || (k = {hint: g, N: []}, a.push(k));
+                k.N.push(f)
+            }
+            var l =
+                a.length;
+            if (1 < l) {
+                var q = c.callback;
+                q && (c.callback = function () {
+                    0 == --l && q()
+                })
+            }
+            for (; b = a.shift();)Nb(b.N, c, b.hint)
+        } else Nb(b || [], c, d)
+    }, Nb = function (a, b, c) {
+        a = Ea(a) || [];
+        var d = b.callback, e = b.config, f = b.timeout, g = b.ontimeout, h = b.onerror, k = void 0;
+        "function" == typeof h && (k = h);
+        var l = null, q = !1;
+        if (f && !g || !f && g)throw"Timeout requires both the timeout parameter and ontimeout parameter to be set";
+        h = w(jb(c), "r", []).sort();
+        var r = w(jb(c), "L", []).sort(), n = [].concat(h), u = function (a, b) {
+            if (q)return 0;
+            t.clearTimeout(l);
+            r.push.apply(r,
+                A);
+            var d = ((C || {}).config || {}).update;
+            d ? d(e) : e && w(F, "cu", []).push(e);
+            if (b) {
+                pb("me0", a, n);
+                try {
+                    Mb(b, c, k)
+                } finally {
+                    pb("me1", a, n)
+                }
+            }
+            return 1
+        };
+        0 < f && (l = t.setTimeout(function () {
+            q = !0;
+            g()
+        }, f));
+        var A = Gb(a, r);
+        if (A.length) {
+            A = Gb(a, h);
+            var H = w(F, "CP", []), I = H.length;
+            H[I] = function (a) {
+                if (!a)return 0;
+                pb("ml1", A, n);
+                var b = function (b) {
+                    H[I] = null;
+                    u(A, a) && ib(function () {
+                        d && d();
+                        b()
+                    })
+                }, c = function () {
+                    var a = H[I + 1];
+                    a && a()
+                };
+                0 < I && H[I - 1] ? H[I] = function () {
+                    b(c)
+                } : b(c)
+            };
+            if (A.length) {
+                var Fa = "loaded_" + F.I++;
+                C[Fa] = function (a) {
+                    H[I](a);
+                    C[Fa] = null
+                };
+                a = zb(c, A, "gapi." + Fa, h);
+                h.push.apply(h, A);
+                pb("ml0", A, n);
+                b.sync || t.___gapisync ? Jb(a) : Ib(a)
+            } else H[I](Ba)
+        } else u(A) && d && d()
+    };
+    var Lb = function (a, b) {
+        if (F.hee && 0 < F.hel)try {
+            return a()
+        } catch (c) {
+            b && b(c), F.hel--, M("debug_error", function () {
+                try {
+                    window.___jsl.hefn(c)
+                } catch (d) {
+                    throw c;
+                }
+            })
+        } else try {
+            return a()
+        } catch (c) {
+            throw b && b(c), c;
+        }
+    };
+    C.load = function (a, b) {
+        return Lb(function () {
+            return M(a, b)
+        })
+    };
+    var N = function (a) {
+        var b = window.___jsl = window.___jsl || {};
+        b[a] = b[a] || [];
+        return b[a]
+    }, O = function (a) {
+        var b = window.___jsl = window.___jsl || {};
+        b.cfg = !a && b.cfg || {};
+        return b.cfg
+    }, Ob = function (a) {
+        return "object" === typeof a && /\[native code\]/.test(a.push)
+    }, P = function (a, b, c) {
+        if (b && "object" === typeof b)for (var d in b)!Object.prototype.hasOwnProperty.call(b, d) || c && "___goc" === d && "undefined" === typeof b[d] || (a[d] && b[d] && "object" === typeof a[d] && "object" === typeof b[d] && !Ob(a[d]) && !Ob(b[d]) ? P(a[d], b[d]) : b[d] && "object" === typeof b[d] ? (a[d] = Ob(b[d]) ? [] : {}, P(a[d], b[d])) : a[d] = b[d])
+    }, Pb = function (a) {
+        if (a && !/^\s+$/.test(a)) {
+            for (; 0 == a.charCodeAt(a.length - 1);)a = a.substring(0, a.length - 1);
+            try {
+                var b = window.JSON.parse(a)
+            } catch (c) {
+            }
+            if ("object" === typeof b)return b;
+            try {
+                b = (new Function("return (" + a + "\n)"))()
+            } catch (c) {
+            }
+            if ("object" === typeof b)return b;
+            try {
+                b = (new Function("return ({" + a + "\n})"))()
+            } catch (c) {
+            }
+            return "object" === typeof b ? b : {}
+        }
+    }, Qb = function (a, b) {
+        var c = {___goc: void 0};
+        a.length && a[a.length - 1] && Object.hasOwnProperty.call(a[a.length -
+        1], "___goc") && "undefined" === typeof a[a.length - 1].___goc && (c = a.pop());
+        P(c, b);
+        a.push(c)
+    }, Rb = function (a) {
+        O(!0);
+        var b = window.___gcfg, c = N("cu"), d = window.___gu;
+        b && b !== d && (Qb(c, b), window.___gu = b);
+        b = N("cu");
+        var e = document.scripts || document.getElementsByTagName("script") || [];
+        d = [];
+        var f = [];
+        f.push.apply(f, N("us"));
+        for (var g = 0; g < e.length; ++g)for (var h = e[g], k = 0; k < f.length; ++k)h.src && 0 == h.src.indexOf(f[k]) && d.push(h);
+        0 == d.length && 0 < e.length && e[e.length - 1].src && d.push(e[e.length - 1]);
+        for (e = 0; e < d.length; ++e)d[e].getAttribute("gapi_processed") ||
+        (d[e].setAttribute("gapi_processed", !0), (f = d[e]) ? (g = f.nodeType, f = 3 == g || 4 == g ? f.nodeValue : f.textContent || f.innerText || f.innerHTML || "") : f = void 0, (f = Pb(f)) && b.push(f));
+        a && Qb(c, a);
+        d = N("cd");
+        a = 0;
+        for (b = d.length; a < b; ++a)P(O(), d[a], !0);
+        d = N("ci");
+        a = 0;
+        for (b = d.length; a < b; ++a)P(O(), d[a], !0);
+        a = 0;
+        for (b = c.length; a < b; ++a)P(O(), c[a], !0)
+    }, Q = function (a) {
+        var b = O();
+        if (!a)return b;
+        a = a.split("/");
+        for (var c = 0, d = a.length; b && "object" === typeof b && c < d; ++c)b = b[a[c]];
+        return c === a.length && void 0 !== b ? b : void 0
+    }, Sb = function (a, b) {
+        var c;
+        if ("string" === typeof a) {
+            var d = c = {};
+            a = a.split("/");
+            for (var e = 0, f = a.length; e < f - 1; ++e) {
+                var g = {};
+                d = d[a[e]] = g
+            }
+            d[a[e]] = b
+        } else c = a;
+        Rb(c)
+    };
+    var Tb = function () {
+        var a = window.__GOOGLEAPIS;
+        a && (a.googleapis && !a["googleapis.config"] && (a["googleapis.config"] = a.googleapis), w(F, "ci", []).push(a), window.__GOOGLEAPIS = void 0)
+    };
+    var Ub = {
+            apppackagename: 1,
+            callback: 1,
+            clientid: 1,
+            cookiepolicy: 1,
+            openidrealm: -1,
+            includegrantedscopes: -1,
+            requestvisibleactions: 1,
+            scope: 1
+        }, Vb = !1, Wb = x(), Xb = function () {
+            if (!Vb) {
+                for (var a = document.getElementsByTagName("meta"), b = 0; b < a.length; ++b) {
+                    var c = a[b].name.toLowerCase();
+                    if (0 == c.lastIndexOf("google-signin-", 0)) {
+                        c = c.substring(14);
+                        var d = a[b].content;
+                        Ub[c] && d && (Wb[c] = d)
+                    }
+                }
+                if (window.self !== window.top) {
+                    a = document.location.toString();
+                    for (var e in Ub)0 < Ub[e] && (b = D(a, e, "")) && (Wb[e] = b)
+                }
+                Vb = !0
+            }
+            e = x();
+            z(Wb, e);
+            return e
+        },
+        Yb = function (a) {
+            return !!(a.clientid && a.scope && a.callback)
+        };
+    var Zb = window.console, $b = function (a) {
+        Zb && Zb.log && Zb.log(a)
+    };
+    var ac = function () {
+        return !!F.oa
+    }, bc = function () {
+    };
+    var R = w(F, "rw", x()), cc = function (a) {
+        for (var b in R)a(R[b])
+    }, dc = function (a, b) {
+        (a = R[a]) && a.state < b && (a.state = b)
+    };
+    var ec;
+    var fc = /^https?:\/\/(?:\w|[\-\.])+\.google\.(?:\w|[\-:\.])+(?:\/[^\?\#]*)?\/u\/(\d)\//, gc = /^https?:\/\/(?:\w|[\-\.])+\.google\.(?:\w|[\-:\.])+(?:\/[^\?\#]*)?\/b\/(\d{10,21})\//, hc = function (a) {
+        var b = Q("googleapis.config/sessionIndex");
+        "string" === typeof b && 254 < b.length && (b = null);
+        null == b && (b = window.__X_GOOG_AUTHUSER);
+        "string" === typeof b && 254 < b.length && (b = null);
+        if (null == b) {
+            var c = window.google;
+            c && (b = c.authuser)
+        }
+        "string" === typeof b && 254 < b.length && (b = null);
+        null == b && (a = a || window.location.href, b = D(a, "authuser") ||
+            null, null == b && (b = (b = a.match(fc)) ? b[1] : null));
+        if (null == b)return null;
+        b = String(b);
+        254 < b.length && (b = null);
+        return b
+    }, ic = function (a) {
+        var b = Q("googleapis.config/sessionDelegate");
+        "string" === typeof b && 21 < b.length && (b = null);
+        null == b && (b = (a = (a || window.location.href).match(gc)) ? a[1] : null);
+        if (null == b)return null;
+        b = String(b);
+        21 < b.length && (b = null);
+        return b
+    };
+    var S = function (a) {
+        return 10 > a ? "0" + a : a
+    }, jc = {
+        "\b": "\\b",
+        "\t": "\\t",
+        "\n": "\\n",
+        "\f": "\\f",
+        "\r": "\\r",
+        '"': '\\"',
+        "\\": "\\\\"
+    }, kc = function (a) {
+        var b;
+        var c = /[\"\\\x00-\x1f\x7f-\x9f]/g;
+        if (void 0 !== a) {
+            switch (typeof a) {
+                case "string":
+                    return c.test(a) ? '"' + a.replace(c, function (a) {
+                        var b = jc[a];
+                        if (b)return b;
+                        b = a.charCodeAt();
+                        return "\\u00" + Math.floor(b / 16).toString(16) + (b % 16).toString(16)
+                    }) + '"' : '"' + a + '"';
+                case "number":
+                    return isFinite(a) ? String(a) : "null";
+                case "boolean":
+                case "null":
+                    return String(a);
+                case "object":
+                    if (!a)return "null";
+                    c = [];
+                    if ("number" === typeof a.length && !a.propertyIsEnumerable("length")) {
+                        var d = a.length;
+                        for (b = 0; b < d; b += 1)c.push(kc(a[b]) || "null");
+                        return "[" + c.join(",") + "]"
+                    }
+                    for (b in a)!/___$/.test(b) && y(a, b) && "string" === typeof b && (d = kc(a[b])) && c.push(kc(b) + ":" + d);
+                    return "{" + c.join(",") + "}"
+            }
+            return ""
+        }
+    }, lc = function (a) {
+        if (!a)return !1;
+        if (/^[\],:{}\s]*$/.test(a.replace(/\\["\\\/b-u]/g, "@").replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, "]").replace(/(?:^|:|,)(?:\s*\[)+/g, "")))try {
+            return eval("(" +
+                a + ")")
+        } catch (b) {
+        }
+        return !1
+    }, mc = !1;
+    try {
+        mc = !!window.JSON && '["a"]' === window.JSON.stringify(["a"]) && "a" === window.JSON.parse('["a"]')[0]
+    } catch (a) {
+    }
+    var nc = function (a) {
+        try {
+            return window.JSON.parse(a)
+        } catch (b) {
+            return !1
+        }
+    }, oc = mc ? window.JSON.stringify : kc, pc = mc ? nc : lc;
+    nc || (Date.prototype.toJSON = function () {
+        return [this.getUTCFullYear(), "-", S(this.getUTCMonth() + 1), "-", S(this.getUTCDate()), "T", S(this.getUTCHours()), ":", S(this.getUTCMinutes()), ":", S(this.getUTCSeconds()), "Z"].join("")
+    });
+    var qc = function () {
+        this.i = -1
+    };
+    var T = function () {
+        this.i = 64;
+        this.b = [];
+        this.D = [];
+        this.V = [];
+        this.A = [];
+        this.A[0] = 128;
+        for (var a = 1; a < this.i; ++a)this.A[a] = 0;
+        this.B = this.l = 0;
+        this.reset()
+    };
+    (function () {
+        function a() {
+        }
+
+        a.prototype = qc.prototype;
+        T.ea = qc.prototype;
+        T.prototype = new a;
+        T.prototype.constructor = T;
+        T.v = function (a, c, d) {
+            for (var b = Array(arguments.length - 2), f = 2; f < arguments.length; f++)b[f - 2] = arguments[f];
+            return qc.prototype[c].apply(a, b)
+        }
+    })();
+    T.prototype.reset = function () {
+        this.b[0] = 1732584193;
+        this.b[1] = 4023233417;
+        this.b[2] = 2562383102;
+        this.b[3] = 271733878;
+        this.b[4] = 3285377520;
+        this.B = this.l = 0
+    };
+    var rc = function (a, b, c) {
+        c || (c = 0);
+        var d = a.V;
+        if ("string" == typeof b)for (var e = 0; 16 > e; e++)d[e] = b.charCodeAt(c) << 24 | b.charCodeAt(c + 1) << 16 | b.charCodeAt(c + 2) << 8 | b.charCodeAt(c + 3), c += 4; else for (e = 0; 16 > e; e++)d[e] = b[c] << 24 | b[c + 1] << 16 | b[c + 2] << 8 | b[c + 3], c += 4;
+        for (e = 16; 80 > e; e++) {
+            var f = d[e - 3] ^ d[e - 8] ^ d[e - 14] ^ d[e - 16];
+            d[e] = (f << 1 | f >>> 31) & 4294967295
+        }
+        b = a.b[0];
+        c = a.b[1];
+        var g = a.b[2], h = a.b[3], k = a.b[4];
+        for (e = 0; 80 > e; e++) {
+            if (40 > e)if (20 > e) {
+                f = h ^ c & (g ^ h);
+                var l = 1518500249
+            } else f = c ^ g ^ h, l = 1859775393; else 60 > e ? (f = c & g | h & (c | g), l = 2400959708) :
+                (f = c ^ g ^ h, l = 3395469782);
+            f = (b << 5 | b >>> 27) + f + k + l + d[e] & 4294967295;
+            k = h;
+            h = g;
+            g = (c << 30 | c >>> 2) & 4294967295;
+            c = b;
+            b = f
+        }
+        a.b[0] = a.b[0] + b & 4294967295;
+        a.b[1] = a.b[1] + c & 4294967295;
+        a.b[2] = a.b[2] + g & 4294967295;
+        a.b[3] = a.b[3] + h & 4294967295;
+        a.b[4] = a.b[4] + k & 4294967295
+    };
+    T.prototype.update = function (a, b) {
+        if (null != a) {
+            void 0 === b && (b = a.length);
+            for (var c = b - this.i, d = 0, e = this.D, f = this.l; d < b;) {
+                if (0 == f)for (; d <= c;)rc(this, a, d), d += this.i;
+                if ("string" == typeof a)for (; d < b;) {
+                    if (e[f] = a.charCodeAt(d), ++f, ++d, f == this.i) {
+                        rc(this, e);
+                        f = 0;
+                        break
+                    }
+                } else for (; d < b;)if (e[f] = a[d], ++f, ++d, f == this.i) {
+                    rc(this, e);
+                    f = 0;
+                    break
+                }
+            }
+            this.l = f;
+            this.B += b
+        }
+    };
+    T.prototype.digest = function () {
+        var a = [], b = 8 * this.B;
+        56 > this.l ? this.update(this.A, 56 - this.l) : this.update(this.A, this.i - (this.l - 56));
+        for (var c = this.i - 1; 56 <= c; c--)this.D[c] = b & 255, b /= 256;
+        rc(this, this.D);
+        for (c = b = 0; 5 > c; c++)for (var d = 24; 0 <= d; d -= 8)a[b] = this.b[c] >> d & 255, ++b;
+        return a
+    };
+    var sc = function () {
+        this.H = new T
+    };
+    sc.prototype.reset = function () {
+        this.H.reset()
+    };
+    var tc = t.crypto, uc = !1, vc = 0, wc = 0, xc = 1, yc = 0, zc = "", Ac = function (a) {
+        a = a || t.event;
+        var b = a.screenX + a.clientX << 16;
+        b += a.screenY + a.clientY;
+        b *= (new Date).getTime() % 1E6;
+        xc = xc * b % yc;
+        0 < vc && ++wc == vc && Za("mousemove", Ac, "remove", "de")
+    }, Bc = function (a) {
+        var b = new sc;
+        a = unescape(encodeURIComponent(a));
+        for (var c = [], d = 0, e = a.length; d < e; ++d)c.push(a.charCodeAt(d));
+        b.H.update(c);
+        b = b.H.digest();
+        a = "";
+        for (c = 0; c < b.length; c++)a += "0123456789ABCDEF".charAt(Math.floor(b[c] / 16)) + "0123456789ABCDEF".charAt(b[c] % 16);
+        return a
+    };
+    uc = !!tc && "function" == typeof tc.getRandomValues;
+    uc || (yc = 1E6 * (screen.width * screen.width + screen.height), zc = Bc(v.cookie + "|" + v.location + "|" + (new Date).getTime() + "|" + Math.random()), vc = Q("random/maxObserveMousemove") || 0, 0 != vc && Za("mousemove", Ac, "add", "at"));
+    var Cc = function () {
+        var a = xc;
+        a += parseInt(zc.substr(0, 20), 16);
+        zc = Bc(zc);
+        return a / (yc + Math.pow(16, 20))
+    }, Dc = function () {
+        var a = new t.Uint32Array(1);
+        tc.getRandomValues(a);
+        return Number("0." + a[0])
+    };
+    var Ec = function () {
+        var a = F.onl;
+        if (!a) {
+            a = x();
+            F.onl = a;
+            var b = x();
+            a.e = function (a) {
+                var c = b[a];
+                c && (delete b[a], c())
+            };
+            a.a = function (a, d) {
+                b[a] = d
+            };
+            a.r = function (a) {
+                delete b[a]
+            }
+        }
+        return a
+    }, Fc = function (a, b) {
+        b = b.onload;
+        return "function" === typeof b ? (Ec().a(a, b), b) : null
+    }, Gc = function (a) {
+        B(/^\w+$/.test(a), "Unsupported id - " + a);
+        Ec();
+        return 'onload="window.___jsl.onl.e(&#34;' + a + '&#34;)"'
+    }, Hc = function (a) {
+        Ec().r(a)
+    };
+    var Ic = {
+        allowtransparency: "true",
+        frameborder: "0",
+        hspace: "0",
+        marginheight: "0",
+        marginwidth: "0",
+        scrolling: "no",
+        style: "",
+        tabindex: "0",
+        vspace: "0",
+        width: "100%"
+    }, Jc = {allowtransparency: !0, onload: !0}, Kc = 0, Lc = function (a) {
+        B(!a || Ya.test(a), "Illegal url for new iframe - " + a)
+    }, Mc = function (a, b, c, d, e) {
+        Lc(c.src);
+        var f, g = Fc(d, c), h = g ? Gc(d) : "";
+        try {
+            document.all && (f = a.createElement('<iframe frameborder="' + La(String(c.frameborder)) + '" scrolling="' + La(String(c.scrolling)) + '" ' + h + ' name="' + La(String(c.name)) + '"/>'))
+        } catch (l) {
+        } finally {
+            f ||
+            (f = a.createElement("iframe"), g && (f.onload = function () {
+                f.onload = null;
+                g.call(this)
+            }, Hc(d)))
+        }
+        f.setAttribute("ng-non-bindable", "");
+        for (var k in c)a = c[k], "style" === k && "object" === typeof a ? z(a, f.style) : Jc[k] || f.setAttribute(k, String(a));
+        (k = e && e.beforeNode || null) || e && e.dontclear || db(b);
+        b.insertBefore(f, k);
+        f = k ? k.previousSibling : b.lastChild;
+        c.allowtransparency && (f.allowTransparency = !0);
+        return f
+    };
+    var Nc = /^:[\w]+$/, Oc = /:([a-zA-Z_]+):/g, Pc = function () {
+        var a = hc() || "0", b = ic();
+        var c = hc(void 0) || a;
+        var d = ic(void 0), e = "";
+        c && (e += "u/" + encodeURIComponent(String(c)) + "/");
+        d && (e += "b/" + encodeURIComponent(String(d)) + "/");
+        c = e || null;
+        (e = (d = !1 === Q("isLoggedIn")) ? "_/im/" : "") && (c = "");
+        var f = Q("iframes/:socialhost:"), g = Q("iframes/:im_socialhost:");
+        return ec = {
+            socialhost: f,
+            ctx_socialhost: d ? g : f,
+            session_index: a,
+            session_delegate: b,
+            session_prefix: c,
+            im_prefix: e
+        }
+    }, Qc = function (a, b) {
+        return Pc()[b] || ""
+    }, Rc = function (a) {
+        return function (b,
+                         c) {
+            return a ? Pc()[c] || a[c] || "" : Pc()[c] || ""
+        }
+    };
+    var Sc = function (a) {
+        var b;
+        a.match(/^https?%3A/i) && (b = decodeURIComponent(a));
+        return Xa(document, b ? b : a)
+    }, Tc = function (a) {
+        a = a || "canonical";
+        for (var b = document.getElementsByTagName("link"), c = 0, d = b.length; c < d; c++) {
+            var e = b[c], f = e.getAttribute("rel");
+            if (f && f.toLowerCase() == a && (e = e.getAttribute("href")) && (e = Sc(e)) && null != e.match(/^https?:\/\/[\w\-\_\.]+/i))return e
+        }
+        return window.location.href
+    };
+    var Uc = {se: "0"}, Vc = {post: !0}, Wc = {style: "position:absolute;top:-10000px;width:450px;margin:0px;border-style:none"}, Xc = "onPlusOne _ready _close _open _resizeMe _renderstart oncircled drefresh erefresh".split(" "), Yc = w(F, "WI", x()), Zc = function (a, b, c) {
+        var d;
+        var e = {};
+        var f = d = a;
+        "plus" == a && b.action && (d = a + "_" + b.action, f = a + "/" + b.action);
+        (d = Q("iframes/" + d + "/url")) || (d = ":im_socialhost:/:session_prefix::im_prefix:_/widget/render/" + f + "?usegapi=1");
+        for (var g in Uc)e[g] = g + "/" + (b[g] || Uc[g]) + "/";
+        e = Xa(v, d.replace(Oc,
+            Rc(e)));
+        g = "iframes/" + a + "/params/";
+        f = {};
+        z(b, f);
+        (d = Q("lang") || Q("gwidget/lang")) && (f.hl = d);
+        Vc[a] || (f.origin = window.location.origin || window.location.protocol + "//" + window.location.host);
+        f.exp = Q(g + "exp");
+        if (g = Q(g + "location"))for (d = 0; d < g.length; d++) {
+            var h = g[d];
+            f[h] = t.location[h]
+        }
+        switch (a) {
+            case "plus":
+            case "follow":
+                g = f.href;
+                d = b.action ? void 0 : "publisher";
+                g = (g = "string" == typeof g ? g : void 0) ? Sc(g) : Tc(d);
+                f.url = g;
+                delete f.href;
+                break;
+            case "plusone":
+                g = (g = b.href) ? Sc(g) : Tc();
+                f.url = g;
+                g = b.db;
+                d = Q();
+                null == g && d && (g = d.db,
+                null == g && (g = d.gwidget && d.gwidget.db));
+                f.db = g || void 0;
+                g = b.ecp;
+                d = Q();
+                null == g && d && (g = d.ecp, null == g && (g = d.gwidget && d.gwidget.ecp));
+                f.ecp = g || void 0;
+                delete f.href;
+                break;
+            case "signin":
+                f.url = Tc()
+        }
+        F.ILI && (f.iloader = "1");
+        delete f["data-onload"];
+        delete f.rd;
+        for (var k in Uc)f[k] && delete f[k];
+        f.gsrc = Q("iframes/:source:");
+        k = Q("inline/css");
+        "undefined" !== typeof k && 0 < c && k >= c && (f.ic = "1");
+        k = /^#|^fr-/;
+        c = {};
+        for (var l in f)y(f, l) && k.test(l) && (c[l.replace(k, "")] = f[l], delete f[l]);
+        l = "q" == Q("iframes/" + a + "/params/si") ? f :
+            c;
+        k = Xb();
+        for (var q in k)!y(k, q) || y(f, q) || y(c, q) || (l[q] = k[q]);
+        q = [].concat(Xc);
+        (l = Q("iframes/" + a + "/methods")) && "object" === typeof l && Ca.test(l.push) && (q = q.concat(l));
+        for (var r in b)y(b, r) && /^on/.test(r) && ("plus" != a || "onconnect" != r) && (q.push(r), delete f[r]);
+        delete f.callback;
+        c._methods = q.join(",");
+        return Va(e, f, c)
+    }, $c = ["style", "data-gapiscan"], bd = function (a) {
+        for (var b = x(), c = 0 != a.nodeName.toLowerCase().indexOf("g:"), d = 0, e = a.attributes.length; d < e; d++) {
+            var f = a.attributes[d], g = f.name, h = f.value;
+            0 <= Da.call($c,
+                g) || c && 0 != g.indexOf("data-") || "null" === h || "specified" in f && !f.specified || (c && (g = g.substr(5)), b[g.toLowerCase()] = h)
+        }
+        a = a.style;
+        (c = ad(a && a.height)) && (b.height = String(c));
+        (a = ad(a && a.width)) && (b.width = String(a));
+        return b
+    }, ad = function (a) {
+        var b = void 0;
+        "number" === typeof a ? b = a : "string" === typeof a && (b = parseInt(a, 10));
+        return b
+    }, dd = function () {
+        var a = F.drw;
+        cc(function (b) {
+            if (a !== b.id && 4 != b.state && "share" != b.type) {
+                var c = b.id, d = b.type, e = b.url;
+                b = b.userParams;
+                var f = v.getElementById(c);
+                if (f) {
+                    var g = Zc(d, b, 0);
+                    g ? (f = f.parentNode,
+                    e.replace(/\#.*/, "").replace(/(\?|&)ic=1/, "") !== g.replace(/\#.*/, "").replace(/(\?|&)ic=1/, "") && (b.dontclear = !0, b.rd = !0, b.ri = !0, b.type = d, cd(f, b), (d = R[f.lastChild.id]) && (d.oid = c), dc(c, 4))) : delete R[c]
+                } else delete R[c]
+            }
+        })
+    };
+    var U, V, W, ed, fd, gd = /(?:^|\s)g-((\S)*)(?:$|\s)/, hd = {
+        plusone: !0,
+        autocomplete: !0,
+        profile: !0,
+        signin: !0,
+        signin2: !0
+    };
+    U = w(F, "SW", x());
+    V = w(F, "SA", x());
+    W = w(F, "SM", x());
+    ed = w(F, "FW", []);
+    fd = null;
+    var jd = function (a, b) {
+        id(void 0, !1, a, b)
+    }, id = function (a, b, c, d) {
+        G("ps0", !0);
+        c = ("string" === typeof c ? document.getElementById(c) : c) || v;
+        var e = v.documentMode;
+        if (c.querySelectorAll && (!e || 8 < e)) {
+            e = d ? [d] : Ma(U).concat(Ma(V)).concat(Ma(W));
+            for (var f = [], g = 0; g < e.length; g++) {
+                var h = e[g];
+                f.push(".g-" + h, "g\\:" + h)
+            }
+            e = c.querySelectorAll(f.join(","))
+        } else e = c.getElementsByTagName("*");
+        c = x();
+        for (f = 0; f < e.length; f++) {
+            g = e[f];
+            var k = g;
+            h = d;
+            var l = k.nodeName.toLowerCase(), q = void 0;
+            k.getAttribute("data-gapiscan") ? h = null : (0 == l.indexOf("g:") ?
+                q = l.substr(2) : (k = (k = String(k.className || k.getAttribute("class"))) && gd.exec(k)) && (q = k[1]), h = !q || !(U[q] || V[q] || W[q]) || h && q !== h ? null : q);
+            h && (hd[h] || 0 == g.nodeName.toLowerCase().indexOf("g:") || 0 != Ma(bd(g)).length) && (g.setAttribute("data-gapiscan", !0), w(c, h, []).push(g))
+        }
+        if (b)for (var r in c)for (b = c[r], d = 0; d < b.length; d++)b[d].setAttribute("data-onload", !0);
+        for (var n in c)ed.push(n);
+        G("ps1", !0);
+        if ((r = ed.join(":")) || a)try {
+            C.load(r, a)
+        } catch (A) {
+            $b(A);
+            return
+        }
+        if (kd(fd || {}))for (var u in c) {
+            a = c[u];
+            n = 0;
+            for (b = a.length; n <
+            b; n++)a[n].removeAttribute("data-gapiscan");
+            ld(u)
+        } else {
+            d = [];
+            for (u in c)for (a = c[u], n = 0, b = a.length; n < b; n++)e = a[n], md(u, e, bd(e), d, b);
+            nd(r, d)
+        }
+    }, od = function (a) {
+        var b = w(C, a, {});
+        b.go || (b.go = function (b) {
+            return jd(b, a)
+        }, b.render = function (b, d) {
+            d = d || {};
+            d.type = a;
+            return cd(b, d)
+        })
+    }, pd = function (a) {
+        U[a] = !0
+    }, qd = function (a) {
+        V[a] = !0
+    }, rd = function (a) {
+        W[a] = !0
+    };
+    var ld = function (a, b) {
+        var c = hb(a);
+        b && c ? (c(b), (c = b.iframeNode) && c.setAttribute("data-gapiattached", !0)) : C.load(a, function () {
+            var c = hb(a), e = b && b.iframeNode, f = b && b.userParams;
+            e && c ? (c(b), e.setAttribute("data-gapiattached", !0)) : (c = C[a].go, "signin2" == a ? c(e, f) : c(e && e.parentNode, f))
+        })
+    }, kd = function () {
+        return !1
+    }, nd = function () {
+    }, md = function (a, b, c, d, e, f, g) {
+        switch (sd(b, a, f)) {
+            case 0:
+                a = W[a] ? a + "_annotation" : a;
+                d = {};
+                d.iframeNode = b;
+                d.userParams = c;
+                ld(a, d);
+                break;
+            case 1:
+                if (b.parentNode) {
+                    for (var h in c) {
+                        if (f = y(c, h))f = c[h],
+                            f = !!f && "object" === typeof f && (!f.toString || f.toString === Object.prototype.toString || f.toString === Array.prototype.toString);
+                        if (f)try {
+                            c[h] = oc(c[h])
+                        } catch (A) {
+                            delete c[h]
+                        }
+                    }
+                    f = !0;
+                    c.dontclear && (f = !1);
+                    delete c.dontclear;
+                    bc();
+                    h = Zc(a, c, e);
+                    e = g || {};
+                    e.allowPost = 1;
+                    e.attributes = Wc;
+                    e.dontclear = !f;
+                    g = {};
+                    g.userParams = c;
+                    g.url = h;
+                    g.type = a;
+                    if (c.rd)var k = b; else k = document.createElement("div"), b.setAttribute("data-gapistub", !0), k.style.cssText = "position:absolute;width:450px;left:-10000px;", b.parentNode.insertBefore(k, b);
+                    g.siteElement =
+                        k;
+                    k.id || (b = k, w(Yc, a, 0), f = "___" + a + "_" + Yc[a]++, b.id = f);
+                    b = x();
+                    b[">type"] = a;
+                    z(c, b);
+                    f = h;
+                    c = k;
+                    h = e || {};
+                    b = h.attributes || {};
+                    B(!(h.allowPost || h.forcePost) || !b.onload, "onload is not supported by post iframe (allowPost or forcePost)");
+                    e = b = f;
+                    Nc.test(b) && (e = Q("iframes/" + e.substring(1) + "/url"), B(!!e, "Unknown iframe url config for - " + b));
+                    f = Xa(v, e.replace(Oc, Qc));
+                    b = c.ownerDocument || v;
+                    k = 0;
+                    do e = h.id || ["I", Kc++, "_", (new Date).getTime()].join(""); while (b.getElementById(e) && 5 > ++k);
+                    B(5 > k, "Error creating iframe id");
+                    k = {};
+                    var l = {};
+                    b.documentMode && 9 > b.documentMode && (k.hostiemode = b.documentMode);
+                    z(h.queryParams || {}, k);
+                    z(h.fragmentParams || {}, l);
+                    var q = h.pfname;
+                    var r = x();
+                    r.id = e;
+                    r.parent = b.location.protocol + "//" + b.location.host;
+                    var n = D(b.location.href, "parent");
+                    q = q || "";
+                    !q && n && (n = D(b.location.href, "id", ""), q = D(b.location.href, "pfname", ""), q = n ? q + "/" + n : "");
+                    q || (n = pc(D(b.location.href, "jcp", ""))) && "object" == typeof n && (q = (q = n.id) ? n.pfname + "/" + q : "");
+                    r.pfname = q;
+                    h.connectWithJsonParam && (n = {}, n.jcp = oc(r), r = n);
+                    n = D(f, "rpctoken") || k.rpctoken ||
+                        l.rpctoken;
+                    n || (n = h.rpctoken || String(Math.round(1E8 * (uc ? Dc() : Cc()))), r.rpctoken = n);
+                    h.rpctoken = n;
+                    z(r, h.connectWithQueryParams ? k : l);
+                    n = b.location.href;
+                    r = x();
+                    (q = D(n, "_bsh", F.bsh)) && (r._bsh = q);
+                    (n = fb(n)) && (r.jsh = n);
+                    h.hintInFragment ? z(r, l) : z(r, k);
+                    f = Va(f, k, l, h.paramsSerializer);
+                    l = x();
+                    z(Ic, l);
+                    z(h.attributes, l);
+                    l.name = l.id = e;
+                    l.src = f;
+                    h.eurl = f;
+                    k = h || {};
+                    r = !!k.allowPost;
+                    if (k.forcePost || r && 2E3 < f.length) {
+                        k = E(f);
+                        l.src = "";
+                        l["data-postorigin"] = f;
+                        f = Mc(b, c, l, e);
+                        if (-1 != navigator.userAgent.indexOf("WebKit")) {
+                            var u = f.contentWindow.document;
+                            u.open();
+                            l = u.createElement("div");
+                            r = {};
+                            n = e + "_inner";
+                            r.name = n;
+                            r.src = "";
+                            r.style = "display:none";
+                            Mc(b, l, r, n, h)
+                        }
+                        l = (h = k.query[0]) ? h.split("&") : [];
+                        h = [];
+                        for (r = 0; r < l.length; r++)n = l[r].split("=", 2), h.push([decodeURIComponent(n[0]), decodeURIComponent(n[1])]);
+                        k.query = [];
+                        l = Ta(k);
+                        B(Ya.test(l), "Invalid URL: " + l);
+                        k = b.createElement("form");
+                        k.action = l;
+                        k.method = "POST";
+                        k.target = e;
+                        k.style.display = "none";
+                        for (e = 0; e < h.length; e++)l = b.createElement("input"), l.type = "hidden", l.name = h[e][0], l.value = h[e][1], k.appendChild(l);
+                        c.appendChild(k);
+                        k.submit();
+                        k.parentNode.removeChild(k);
+                        u && u.close();
+                        u = f
+                    } else u = Mc(b, c, l, e, h);
+                    g.iframeNode = u;
+                    g.id = u.getAttribute("id");
+                    u = g.id;
+                    c = x();
+                    c.id = u;
+                    c.userParams = g.userParams;
+                    c.url = g.url;
+                    c.type = g.type;
+                    c.state = 1;
+                    R[u] = c;
+                    u = g
+                } else u = null;
+                u && ((g = u.id) && d.push(g), ld(a, u))
+        }
+    }, sd = function (a, b, c) {
+        if (a && 1 === a.nodeType && b) {
+            if (c)return 1;
+            if (W[b]) {
+                if (eb[a.nodeName.toLowerCase()])return (a = a.innerHTML) && a.replace(/^[\s\xa0]+|[\s\xa0]+$/g, "") ? 0 : 1
+            } else {
+                if (V[b])return 0;
+                if (U[b])return 1
+            }
+        }
+        return null
+    }, cd = function (a, b) {
+        var c = b.type;
+        delete b.type;
+        var d = ("string" === typeof a ? document.getElementById(a) : a) || void 0;
+        if (d) {
+            a = {};
+            for (var e in b)y(b, e) && (a[e.toLowerCase()] = b[e]);
+            a.rd = 1;
+            (b = !!a.ri) && delete a.ri;
+            e = [];
+            md(c, d, a, e, 0, b, void 0);
+            nd(c, e)
+        } else $b("string" === "gapi." + c + ".render: missing element " + typeof a ? a : "")
+    };
+    w(C, "platform", {}).go = jd;
+    kd = function (a) {
+        for (var b = ["_c", "jsl", "h"], c = 0; c < b.length && a; c++)a = a[b[c]];
+        b = fb(Aa.href);
+        return !a || 0 != a.indexOf("n;") && 0 != b.indexOf("n;") && a !== b
+    };
+    nd = function (a, b) {
+        td(a, b)
+    };
+    var ab = function (a) {
+        id(a, !0)
+    }, ud = function (a, b) {
+        b = b || [];
+        for (var c = 0; c < b.length; ++c)a(b[c]);
+        for (a = 0; a < b.length; a++)od(b[a])
+    };
+    J.push(["platform", function (a, b, c) {
+        fd = c;
+        b && ed.push(b);
+        ud(pd, a);
+        ud(qd, c._c.annotation);
+        ud(rd, c._c.bimodal);
+        Tb();
+        Rb();
+        if ("explicit" != Q("parsetags")) {
+            gb(a);
+            Yb(Xb()) && !Q("disableRealtimeCallback") && bc();
+            if (c && (a = c.callback)) {
+                var d = Na(a);
+                delete c.callback
+            }
+            cb(function () {
+                ab(d)
+            })
+        }
+    }]);
+    C._pl = !0;
+    var vd = function (a) {
+        a = (a = R[a]) ? a.oid : void 0;
+        if (a) {
+            var b = v.getElementById(a);
+            b && b.parentNode.removeChild(b);
+            delete R[a];
+            vd(a)
+        }
+    };
+    var wd = /^\{h\:'/, xd = /^!_/, yd = "", td = function (a, b) {
+        function c() {
+            Za("message", d, "remove", "de")
+        }
+
+        function d(d) {
+            var f = d.data, h = d.origin;
+            if (zd(f, b)) {
+                var k = e;
+                e = !1;
+                k && G("rqe");
+                Ad(a, function () {
+                    k && G("rqd");
+                    c();
+                    for (var a = w(F, "RPMQ", []), b = 0; b < a.length; b++)a[b]({data: f, origin: h})
+                })
+            }
+        }
+
+        if (0 !== b.length) {
+            yd = D(Aa.href, "pfname", "");
+            var e = !0;
+            Za("message", d, "add", "at");
+            M(a, c)
+        }
+    }, zd = function (a, b) {
+        a = String(a);
+        if (wd.test(a))return !0;
+        var c = !1;
+        xd.test(a) && (c = !0, a = a.substr(2));
+        if (!/^\{/.test(a))return !1;
+        var d = pc(a);
+        if (!d)return !1;
+        a = d.f;
+        if (d.s && a && -1 != Da.call(b, a)) {
+            if ("_renderstart" === d.s || d.s === yd + "/" + a + "::_renderstart")if (d = d.a && d.a[c ? 0 : 1], b = v.getElementById(a), dc(a, 2), d && b && d.width && d.height) {
+                a:{
+                    c = b.parentNode;
+                    a = d || {};
+                    if (ac()) {
+                        var e = b.id;
+                        if (e) {
+                            d = (d = R[e]) ? d.state : void 0;
+                            if (1 === d || 4 === d)break a;
+                            vd(e)
+                        }
+                    }
+                    (d = c.nextSibling) && d.getAttribute && d.getAttribute("data-gapistub") && (c.parentNode.removeChild(d), c.style.cssText = "");
+                    d = a.width;
+                    var f = a.height, g = c.style;
+                    g.textIndent = "0";
+                    g.margin = "0";
+                    g.padding = "0";
+                    g.background = "transparent";
+                    g.borderStyle =
+                        "none";
+                    g.cssFloat = "none";
+                    g.styleFloat = "none";
+                    g.lineHeight = "normal";
+                    g.fontSize = "1px";
+                    g.verticalAlign = "baseline";
+                    c = c.style;
+                    c.display = "inline-block";
+                    g = b.style;
+                    g.position = "static";
+                    g.left = "0";
+                    g.top = "0";
+                    g.visibility = "visible";
+                    d && (c.width = g.width = d + "px");
+                    f && (c.height = g.height = f + "px");
+                    a.verticalAlign && (c.verticalAlign = a.verticalAlign);
+                    e && dc(e, 3)
+                }
+                b["data-csi-wdt"] = (new Date).getTime()
+            }
+            return !0
+        }
+        return !1
+    }, Ad = function (a, b) {
+        M(a, b)
+    };
+    var X = function (a, b) {
+        this.G = a;
+        a = b || {};
+        this.X = Number(a.maxAge) || 0;
+        this.M = a.domain;
+        this.P = a.path;
+        this.Z = !!a.secure
+    }, Bd = /^[-+/_=.:|%&a-zA-Z0-9@]*$/, Cd = /^[A-Z_][A-Z0-9_]{0,63}$/;
+    X.prototype.read = function () {
+        for (var a = this.G + "=", b = document.cookie.split(/;\s*/), c = 0; c < b.length; ++c) {
+            var d = b[c];
+            if (0 == d.indexOf(a))return d.substr(a.length)
+        }
+    };
+    X.prototype.write = function (a, b) {
+        if (!Cd.test(this.G))throw"Invalid cookie name";
+        if (!Bd.test(a))throw"Invalid cookie value";
+        a = this.G + "=" + a;
+        this.M && (a += ";domain=" + this.M);
+        this.P && (a += ";path=" + this.P);
+        b = "number" === typeof b ? b : this.X;
+        if (0 <= b) {
+            var c = new Date;
+            c.setSeconds(c.getSeconds() + b);
+            a += ";expires=" + c.toUTCString()
+        }
+        this.Z && (a += ";secure");
+        document.cookie = a;
+        return !0
+    };
+    X.prototype.clear = function () {
+        this.write("", 0)
+    };
+    X.iterate = function (a) {
+        for (var b = document.cookie.split(/;\s*/), c = 0; c < b.length; ++c) {
+            var d = b[c].split("="), e = d.shift();
+            a(e, d.join("="))
+        }
+    };
+    var Dd = function (a) {
+        this.w = a
+    }, Y = {};
+    Dd.prototype.read = function () {
+        if (Y.hasOwnProperty(this.w))return Y[this.w]
+    };
+    Dd.prototype.write = function (a) {
+        Y[this.w] = a;
+        return !0
+    };
+    Dd.prototype.clear = function () {
+        delete Y[this.w]
+    };
+    Dd.iterate = function (a) {
+        for (var b in Y)Y.hasOwnProperty(b) && a(b, Y[b])
+    };
+    var Ed = "https:" === window.location.protocol, Fd = Ed || "http:" === window.location.protocol ? X : Dd, Gd = function (a) {
+        var b = a.substr(1), c = "", d = window.location.hostname;
+        if ("" !== b) {
+            c = parseInt(b, 10);
+            if (isNaN(c))return null;
+            b = d.split(".");
+            if (b.length < c - 1)return null;
+            b.length == c - 1 && (d = "." + d)
+        } else d = "";
+        return {g: "S" == a.charAt(0), domain: d, j: c}
+    }, Hd = function () {
+        var a, b = null;
+        Fd.iterate(function (c, d) {
+            0 === c.indexOf("G_AUTHUSER_") && (c = Gd(c.substring(11)), !a || c.g && !a.g || c.g == a.g && c.j > a.j) && (a = c, b = d)
+        });
+        return {W: a, C: b}
+    };
+    var Id = function (a) {
+        if (0 !== a.indexOf("GCSC"))return null;
+        var b = {O: !1};
+        a = a.substr(4);
+        if (!a)return b;
+        var c = a.charAt(0);
+        a = a.substr(1);
+        var d = a.lastIndexOf("_");
+        if (-1 == d)return b;
+        var e = Gd(a.substr(d + 1));
+        if (null == e)return b;
+        a = a.substring(0, d);
+        if ("_" !== a.charAt(0))return b;
+        d = "E" === c && e.g;
+        return !d && ("U" !== c || e.g) || d && !Ed ? b : {O: !0, g: d, ba: a.substr(1), domain: e.domain, j: e.j}
+    }, Jd = function (a) {
+        if (!a)return [];
+        a = a.split("=");
+        return a[1] ? a[1].split("|") : []
+    }, Kd = function (a) {
+        a = a.split(":");
+        return {
+            clientId: a[0].split("=")[1],
+            aa: Jd(a[1]), da: Jd(a[2]), ca: Jd(a[3])
+        }
+    }, Ld = function () {
+        var a = Hd(), b = a.W;
+        a = a.C;
+        if (null !== a) {
+            var c;
+            Fd.iterate(function (a, d) {
+                (a = Id(a)) && a.O && a.g == b.g && a.j == b.j && (c = d)
+            });
+            if (c) {
+                var d = Kd(c), e = d && d.aa[Number(a)];
+                d = d && d.clientId;
+                if (e)return {C: a, $: e, clientId: d}
+            }
+        }
+        return null
+    };
+    var Z = function (a) {
+        this.L = a
+    };
+    Z.prototype.o = 0;
+    Z.prototype.J = 2;
+    Z.prototype.L = null;
+    Z.prototype.F = !1;
+    Z.prototype.T = function () {
+        this.F || (this.o = 0, this.F = !0, this.R())
+    };
+    Z.prototype.R = function () {
+        this.F && (this.L() ? this.o = this.J : this.o = Math.min(2 * (this.o || this.J), 120), window.setTimeout(da(this.R, this), 1E3 * this.o))
+    };
+    for (var Md = 0; 64 > Md; ++Md);
+    var Nd = null;
+    ac = function () {
+        return F.oa = !0
+    };
+    bc = function () {
+        F.oa = !0;
+        var a = Ld();
+        (a = a && a.C) && Sb("googleapis.config/sessionIndex", a);
+        Nd || (Nd = w(F, "ss", new Z(Od)));
+        a = Nd;
+        a.T && a.T()
+    };
+    var Od = function () {
+        var a = Ld(), b = a && a.$ || null, c = a && a.clientId;
+        M("auth", {
+            callback: function () {
+                var a = t.gapi.auth, e = {client_id: c, session_state: b};
+                a.checkSessionState(e, function (b) {
+                    var c = e.session_state, d = Q("isLoggedIn");
+                    b = Q("debug/forceIm") ? !1 : c && b || !c && !b;
+                    if (d = d != b)Sb("isLoggedIn", b), bc(), dd(), b || ((b = a.signOut) ? b() : (b = a.setToken) && b(null));
+                    b = Xb();
+                    var f = Q("savedUserState");
+                    c = a._guss(b.cookiepolicy);
+                    f = f != c && "undefined" != typeof f;
+                    Sb("savedUserState", c);
+                    (d || f) && Yb(b) && !Q("disableRealtimeCallback") && a._pimf(b,
+                        !0)
+                })
+            }
+        });
+        return !0
+    };
+    G("bs0", !0, window.gapi._bs);
+    G("bs1", !0);
+    delete window.gapi._bs;
+}).call(this);
+gapi.load("plusone", {
+    callback: window["gapi_onload"],
+    _c: {
+        "jsl": {
+            "ci": {
+                "deviceType": "desktop",
+                "oauth-flow": {
+                    "authUrl": "https://accounts.google.com/o/oauth2/auth",
+                    "proxyUrl": "https://accounts.google.com/o/oauth2/postmessageRelay",
+                    "disableOpt": true,
+                    "idpIframeUrl": "https://accounts.google.com/o/oauth2/iframe",
+                    "usegapi": false
+                },
+                "debug": {
+                    "reportExceptionRate": 0.05,
+                    "forceIm": false,
+                    "rethrowException": false,
+                    "host": "https://apis.google.com"
+                },
+                "enableMultilogin": true,
+                "googleapis.config": {"auth": {"useFirstPartyAuthV2": false}},
+                "isPlusUser": false,
+                "inline": {"css": 1},
+                "disableRealtimeCallback": false,
+                "drive_share": {"skipInitCommand": true},
+                "csi": {"rate": 0.01},
+                "client": {"cors": false, "batchPath": {"translate": "batch/translate"}, "perApiBatch": true},
+                "isLoggedIn": false,
+                "signInDeprecation": {"rate": 0.0},
+                "include_granted_scopes": true,
+                "llang": "zh",
+                "iframes": {
+                    "ytsubscribe": {"url": "https://www.youtube.com/subscribe_embed?usegapi\u003d1"},
+                    "plus_share": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix::se:_/+1/sharebutton?plusShare\u003dtrue\u0026usegapi\u003d1"
+                    },
+                    ":source:": "3p",
+                    "playemm": {"url": "https://play.google.com/work/embedded/search?usegapi\u003d1\u0026usegapi\u003d1"},
+                    "partnersbadge": {"url": "https://www.gstatic.com/partners/badge/templates/badge.html?usegapi\u003d1"},
+                    "dataconnector": {"url": "https://dataconnector.corp.google.com/:session_prefix:ui/widgetview?usegapi\u003d1"},
+                    "shortlists": {"url": ""},
+                    "plus_followers": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/_/im/_/widget/render/plus/followers?usegapi\u003d1"
+                    },
+                    "post": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix::im_prefix:_/widget/render/post?usegapi\u003d1"
+                    },
+                    "signin": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix:_/widget/render/signin?usegapi\u003d1",
+                        "methods": ["onauth"]
+                    },
+                    "donation": {"url": "https://onetoday.google.com/home/donationWidget?usegapi\u003d1"},
+                    "plusone": {
+                        "params": {"count": "", "size": "", "url": ""},
+                        "url": ":socialhost:/:session_prefix::se:_/+1/fastbutton?usegapi\u003d1"
+                    },
+                    ":im_socialhost:": "https://plus.googleapis.com",
+                    "backdrop": {"url": "https://clients3.google.com/cast/chromecast/home/widget/backdrop?usegapi\u003d1"},
+                    "visibility": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix:_/widget/render/visibility?usegapi\u003d1"
+                    },
+                    "additnow": {
+                        "url": "https://apis.google.com/additnow/additnow.html?usegapi\u003d1",
+                        "methods": ["launchurl"]
+                    },
+                    ":signuphost:": "https://plus.google.com",
+                    "community": {"url": ":ctx_socialhost:/:session_prefix::im_prefix:_/widget/render/community?usegapi\u003d1"},
+                    "plus": {"url": ":socialhost:/:session_prefix:_/widget/render/badge?usegapi\u003d1"},
+                    "commentcount": {"url": ":socialhost:/:session_prefix:_/widget/render/commentcount?usegapi\u003d1"},
+                    "zoomableimage": {"url": "https://ssl.gstatic.com/microscope/embed/"},
+                    "appfinder": {"url": "https://gsuite.google.com/:session_prefix:marketplace/appfinder?usegapi\u003d1"},
+                    "person": {"url": ":socialhost:/:session_prefix:_/widget/render/person?usegapi\u003d1"},
+                    "savetodrive": {
+                        "url": "https://drive.google.com/savetodrivebutton?usegapi\u003d1",
+                        "methods": ["save"]
+                    },
+                    "page": {"url": ":socialhost:/:session_prefix:_/widget/render/page?usegapi\u003d1"},
+                    "card": {"url": ":socialhost:/:session_prefix:_/hovercard/card"},
+                    "youtube": {
+                        "params": {"location": ["search", "hash"]},
+                        "url": ":socialhost:/:session_prefix:_/widget/render/youtube?usegapi\u003d1",
+                        "methods": ["scroll", "openwindow"]
+                    },
+                    "plus_circle": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix::se:_/widget/plus/circle?usegapi\u003d1"
+                    },
+                    "rbr_s": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix::se:_/widget/render/recobarsimplescroller"
+                    },
+                    "udc_webconsentflow": {
+                        "params": {"url": ""},
+                        "url": "https://myaccount.google.com/webconsent?usegapi\u003d1"
+                    },
+                    "savetoandroidpay": {"url": "https://androidpay.google.com/a/widget/save"},
+                    "blogger": {
+                        "params": {"location": ["search", "hash"]},
+                        "url": ":socialhost:/:session_prefix:_/widget/render/blogger?usegapi\u003d1",
+                        "methods": ["scroll", "openwindow"]
+                    },
+                    "evwidget": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix:_/events/widget?usegapi\u003d1"
+                    },
+                    "surveyoptin": {"url": "https://www.google.com/shopping/customerreviews/optin?usegapi\u003d1"},
+                    ":socialhost:": "https://apis.google.com",
+                    "hangout": {"url": "https://talkgadget.google.com/:session_prefix:talkgadget/_/widget"},
+                    ":gplus_url:": "https://plus.google.com",
+                    "rbr_i": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix::se:_/widget/render/recobarinvitation"
+                    },
+                    "share": {"url": ":socialhost:/:session_prefix::im_prefix:_/widget/render/share?usegapi\u003d1"},
+                    "comments": {
+                        "params": {"location": ["search", "hash"]},
+                        "url": ":socialhost:/:session_prefix:_/widget/render/comments?usegapi\u003d1",
+                        "methods": ["scroll", "openwindow"]
+                    },
+                    "autocomplete": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix:_/widget/render/autocomplete"
+                    },
+                    "ratingbadge": {"url": "https://www.google.com/shopping/customerreviews/badge?usegapi\u003d1"},
+                    "appcirclepicker": {"url": ":socialhost:/:session_prefix:_/widget/render/appcirclepicker"},
+                    "follow": {"url": ":socialhost:/:session_prefix:_/widget/render/follow?usegapi\u003d1"},
+                    "sharetoclassroom": {"url": "https://www.gstatic.com/classroom/sharewidget/widget_stable.html?usegapi\u003d1"},
+                    "ytshare": {
+                        "params": {"url": ""},
+                        "url": ":socialhost:/:session_prefix:_/widget/render/ytshare?usegapi\u003d1"
+                    },
+                    "family_creation": {
+                        "params": {"url": ""},
+                        "url": "https://families.google.com/webcreation?usegapi\u003d1\u0026usegapi\u003d1"
+                    },
+                    "configurator": {"url": ":socialhost:/:session_prefix:_/plusbuttonconfigurator?usegapi\u003d1"},
+                    "savetowallet": {"url": "https://androidpay.google.com/a/widget/save"}
+                }
+            },
+            "h": "m;/_/scs/apps-static/_/js/k\u003doz.gapi.zh_CN.MyLj-AHiKxc.O/m\u003d__features__/am\u003dAQ/rt\u003dj/d\u003d1/rs\u003dAGLTcCMOeRoMUfDV0R9rrCZ1WdwnQcKtLQ",
+            "u": "https://apis.google.com/js/plusone.js",
+            "hee": true,
+            "fp": "5cab64ae4eb029a46d17bbb5a06e9138018b88ca",
+            "dpo": false
+        },
+        "platform": ["additnow", "backdrop", "blogger", "comments", "commentcount", "community", "family_creation", "follow", "hangout", "page", "partnersbadge", "person", "playemm", "playreview", "plus", "plusone", "post", "savetoandroidpay", "savetodrive", "savetowallet", "shortlists", "signin2", "udc_webconsentflow", "visibility", "youtube", "ytsubscribe", "zoomableimage", "sharetoclassroom", "donation", "ratingbadge", "surveyoptin"],
+        "fp": "5cab64ae4eb029a46d17bbb5a06e9138018b88ca",
+        "annotation": ["interactivepost", "recobar", "signin2", "autocomplete", "profile"],
+        "bimodal": ["signin", "share"]
+    }
+});
 /*
  * JavaScript MD5 1.0.1
  * https://github.com/blueimp/JavaScript-MD5
@@ -13393,6 +18972,7884 @@ return jQuery;
         $.md5 = md5;
     }
 }(this));
+/* pako 1.0.5 nodeca/pako */(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.pako = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+'use strict';
+
+
+var zlib_deflate = require('./zlib/deflate');
+var utils        = require('./utils/common');
+var strings      = require('./utils/strings');
+var msg          = require('./zlib/messages');
+var ZStream      = require('./zlib/zstream');
+
+var toString = Object.prototype.toString;
+
+/* Public constants ==========================================================*/
+/* ===========================================================================*/
+
+var Z_NO_FLUSH      = 0;
+var Z_FINISH        = 4;
+
+var Z_OK            = 0;
+var Z_STREAM_END    = 1;
+var Z_SYNC_FLUSH    = 2;
+
+var Z_DEFAULT_COMPRESSION = -1;
+
+var Z_DEFAULT_STRATEGY    = 0;
+
+var Z_DEFLATED  = 8;
+
+/* ===========================================================================*/
+
+
+/**
+ * class Deflate
+ *
+ * Generic JS-style wrapper for zlib calls. If you don't need
+ * streaming behaviour - use more simple functions: [[deflate]],
+ * [[deflateRaw]] and [[gzip]].
+ **/
+
+/* internal
+ * Deflate.chunks -> Array
+ *
+ * Chunks of output data, if [[Deflate#onData]] not overriden.
+ **/
+
+/**
+ * Deflate.result -> Uint8Array|Array
+ *
+ * Compressed result, generated by default [[Deflate#onData]]
+ * and [[Deflate#onEnd]] handlers. Filled after you push last chunk
+ * (call [[Deflate#push]] with `Z_FINISH` / `true` param)  or if you
+ * push a chunk with explicit flush (call [[Deflate#push]] with
+ * `Z_SYNC_FLUSH` param).
+ **/
+
+/**
+ * Deflate.err -> Number
+ *
+ * Error code after deflate finished. 0 (Z_OK) on success.
+ * You will not need it in real life, because deflate errors
+ * are possible only on wrong options or bad `onData` / `onEnd`
+ * custom handlers.
+ **/
+
+/**
+ * Deflate.msg -> String
+ *
+ * Error message, if [[Deflate.err]] != 0
+ **/
+
+
+/**
+ * new Deflate(options)
+ * - options (Object): zlib deflate options.
+ *
+ * Creates new deflator instance with specified params. Throws exception
+ * on bad params. Supported options:
+ *
+ * - `level`
+ * - `windowBits`
+ * - `memLevel`
+ * - `strategy`
+ * - `dictionary`
+ *
+ * [http://zlib.net/manual.html#Advanced](http://zlib.net/manual.html#Advanced)
+ * for more information on these.
+ *
+ * Additional options, for internal needs:
+ *
+ * - `chunkSize` - size of generated data chunks (16K by default)
+ * - `raw` (Boolean) - do raw deflate
+ * - `gzip` (Boolean) - create gzip wrapper
+ * - `to` (String) - if equal to 'string', then result will be "binary string"
+ *    (each char code [0..255])
+ * - `header` (Object) - custom header for gzip
+ *   - `text` (Boolean) - true if compressed data believed to be text
+ *   - `time` (Number) - modification time, unix timestamp
+ *   - `os` (Number) - operation system code
+ *   - `extra` (Array) - array of bytes with extra data (max 65536)
+ *   - `name` (String) - file name (binary string)
+ *   - `comment` (String) - comment (binary string)
+ *   - `hcrc` (Boolean) - true if header crc should be added
+ *
+ * ##### Example:
+ *
+ * ```javascript
+ * var pako = require('pako')
+ *   , chunk1 = Uint8Array([1,2,3,4,5,6,7,8,9])
+ *   , chunk2 = Uint8Array([10,11,12,13,14,15,16,17,18,19]);
+ *
+ * var deflate = new pako.Deflate({ level: 3});
+ *
+ * deflate.push(chunk1, false);
+ * deflate.push(chunk2, true);  // true -> last chunk
+ *
+ * if (deflate.err) { throw new Error(deflate.err); }
+ *
+ * console.log(deflate.result);
+ * ```
+ **/
+function Deflate(options) {
+  if (!(this instanceof Deflate)) return new Deflate(options);
+
+  this.options = utils.assign({
+    level: Z_DEFAULT_COMPRESSION,
+    method: Z_DEFLATED,
+    chunkSize: 16384,
+    windowBits: 15,
+    memLevel: 8,
+    strategy: Z_DEFAULT_STRATEGY,
+    to: ''
+  }, options || {});
+
+  var opt = this.options;
+
+  if (opt.raw && (opt.windowBits > 0)) {
+    opt.windowBits = -opt.windowBits;
+  }
+
+  else if (opt.gzip && (opt.windowBits > 0) && (opt.windowBits < 16)) {
+    opt.windowBits += 16;
+  }
+
+  this.err    = 0;      // error code, if happens (0 = Z_OK)
+  this.msg    = '';     // error message
+  this.ended  = false;  // used to avoid multiple onEnd() calls
+  this.chunks = [];     // chunks of compressed data
+
+  this.strm = new ZStream();
+  this.strm.avail_out = 0;
+
+  var status = zlib_deflate.deflateInit2(
+    this.strm,
+    opt.level,
+    opt.method,
+    opt.windowBits,
+    opt.memLevel,
+    opt.strategy
+  );
+
+  if (status !== Z_OK) {
+    throw new Error(msg[status]);
+  }
+
+  if (opt.header) {
+    zlib_deflate.deflateSetHeader(this.strm, opt.header);
+  }
+
+  if (opt.dictionary) {
+    var dict;
+    // Convert data if needed
+    if (typeof opt.dictionary === 'string') {
+      // If we need to compress text, change encoding to utf8.
+      dict = strings.string2buf(opt.dictionary);
+    } else if (toString.call(opt.dictionary) === '[object ArrayBuffer]') {
+      dict = new Uint8Array(opt.dictionary);
+    } else {
+      dict = opt.dictionary;
+    }
+
+    status = zlib_deflate.deflateSetDictionary(this.strm, dict);
+
+    if (status !== Z_OK) {
+      throw new Error(msg[status]);
+    }
+
+    this._dict_set = true;
+  }
+}
+
+/**
+ * Deflate#push(data[, mode]) -> Boolean
+ * - data (Uint8Array|Array|ArrayBuffer|String): input data. Strings will be
+ *   converted to utf8 byte sequence.
+ * - mode (Number|Boolean): 0..6 for corresponding Z_NO_FLUSH..Z_TREE modes.
+ *   See constants. Skipped or `false` means Z_NO_FLUSH, `true` meansh Z_FINISH.
+ *
+ * Sends input data to deflate pipe, generating [[Deflate#onData]] calls with
+ * new compressed chunks. Returns `true` on success. The last data block must have
+ * mode Z_FINISH (or `true`). That will flush internal pending buffers and call
+ * [[Deflate#onEnd]]. For interim explicit flushes (without ending the stream) you
+ * can use mode Z_SYNC_FLUSH, keeping the compression context.
+ *
+ * On fail call [[Deflate#onEnd]] with error code and return false.
+ *
+ * We strongly recommend to use `Uint8Array` on input for best speed (output
+ * array format is detected automatically). Also, don't skip last param and always
+ * use the same type in your code (boolean or number). That will improve JS speed.
+ *
+ * For regular `Array`-s make sure all elements are [0..255].
+ *
+ * ##### Example
+ *
+ * ```javascript
+ * push(chunk, false); // push one of data chunks
+ * ...
+ * push(chunk, true);  // push last chunk
+ * ```
+ **/
+Deflate.prototype.push = function (data, mode) {
+  var strm = this.strm;
+  var chunkSize = this.options.chunkSize;
+  var status, _mode;
+
+  if (this.ended) { return false; }
+
+  _mode = (mode === ~~mode) ? mode : ((mode === true) ? Z_FINISH : Z_NO_FLUSH);
+
+  // Convert data if needed
+  if (typeof data === 'string') {
+    // If we need to compress text, change encoding to utf8.
+    strm.input = strings.string2buf(data);
+  } else if (toString.call(data) === '[object ArrayBuffer]') {
+    strm.input = new Uint8Array(data);
+  } else {
+    strm.input = data;
+  }
+
+  strm.next_in = 0;
+  strm.avail_in = strm.input.length;
+
+  do {
+    if (strm.avail_out === 0) {
+      strm.output = new utils.Buf8(chunkSize);
+      strm.next_out = 0;
+      strm.avail_out = chunkSize;
+    }
+    status = zlib_deflate.deflate(strm, _mode);    /* no bad return value */
+
+    if (status !== Z_STREAM_END && status !== Z_OK) {
+      this.onEnd(status);
+      this.ended = true;
+      return false;
+    }
+    if (strm.avail_out === 0 || (strm.avail_in === 0 && (_mode === Z_FINISH || _mode === Z_SYNC_FLUSH))) {
+      if (this.options.to === 'string') {
+        this.onData(strings.buf2binstring(utils.shrinkBuf(strm.output, strm.next_out)));
+      } else {
+        this.onData(utils.shrinkBuf(strm.output, strm.next_out));
+      }
+    }
+  } while ((strm.avail_in > 0 || strm.avail_out === 0) && status !== Z_STREAM_END);
+
+  // Finalize on the last chunk.
+  if (_mode === Z_FINISH) {
+    status = zlib_deflate.deflateEnd(this.strm);
+    this.onEnd(status);
+    this.ended = true;
+    return status === Z_OK;
+  }
+
+  // callback interim results if Z_SYNC_FLUSH.
+  if (_mode === Z_SYNC_FLUSH) {
+    this.onEnd(Z_OK);
+    strm.avail_out = 0;
+    return true;
+  }
+
+  return true;
+};
+
+
+/**
+ * Deflate#onData(chunk) -> Void
+ * - chunk (Uint8Array|Array|String): ouput data. Type of array depends
+ *   on js engine support. When string output requested, each chunk
+ *   will be string.
+ *
+ * By default, stores data blocks in `chunks[]` property and glue
+ * those in `onEnd`. Override this handler, if you need another behaviour.
+ **/
+Deflate.prototype.onData = function (chunk) {
+  this.chunks.push(chunk);
+};
+
+
+/**
+ * Deflate#onEnd(status) -> Void
+ * - status (Number): deflate status. 0 (Z_OK) on success,
+ *   other if not.
+ *
+ * Called once after you tell deflate that the input stream is
+ * complete (Z_FINISH) or should be flushed (Z_SYNC_FLUSH)
+ * or if an error happened. By default - join collected chunks,
+ * free memory and fill `results` / `err` properties.
+ **/
+Deflate.prototype.onEnd = function (status) {
+  // On success - join
+  if (status === Z_OK) {
+    if (this.options.to === 'string') {
+      this.result = this.chunks.join('');
+    } else {
+      this.result = utils.flattenChunks(this.chunks);
+    }
+  }
+  this.chunks = [];
+  this.err = status;
+  this.msg = this.strm.msg;
+};
+
+
+/**
+ * deflate(data[, options]) -> Uint8Array|Array|String
+ * - data (Uint8Array|Array|String): input data to compress.
+ * - options (Object): zlib deflate options.
+ *
+ * Compress `data` with deflate algorithm and `options`.
+ *
+ * Supported options are:
+ *
+ * - level
+ * - windowBits
+ * - memLevel
+ * - strategy
+ * - dictionary
+ *
+ * [http://zlib.net/manual.html#Advanced](http://zlib.net/manual.html#Advanced)
+ * for more information on these.
+ *
+ * Sugar (options):
+ *
+ * - `raw` (Boolean) - say that we work with raw stream, if you don't wish to specify
+ *   negative windowBits implicitly.
+ * - `to` (String) - if equal to 'string', then result will be "binary string"
+ *    (each char code [0..255])
+ *
+ * ##### Example:
+ *
+ * ```javascript
+ * var pako = require('pako')
+ *   , data = Uint8Array([1,2,3,4,5,6,7,8,9]);
+ *
+ * console.log(pako.deflate(data));
+ * ```
+ **/
+function deflate(input, options) {
+  var deflator = new Deflate(options);
+
+  deflator.push(input, true);
+
+  // That will never happens, if you don't cheat with options :)
+  if (deflator.err) { throw deflator.msg || msg[deflator.err]; }
+
+  return deflator.result;
+}
+
+
+/**
+ * deflateRaw(data[, options]) -> Uint8Array|Array|String
+ * - data (Uint8Array|Array|String): input data to compress.
+ * - options (Object): zlib deflate options.
+ *
+ * The same as [[deflate]], but creates raw data, without wrapper
+ * (header and adler32 crc).
+ **/
+function deflateRaw(input, options) {
+  options = options || {};
+  options.raw = true;
+  return deflate(input, options);
+}
+
+
+/**
+ * gzip(data[, options]) -> Uint8Array|Array|String
+ * - data (Uint8Array|Array|String): input data to compress.
+ * - options (Object): zlib deflate options.
+ *
+ * The same as [[deflate]], but create gzip wrapper instead of
+ * deflate one.
+ **/
+function gzip(input, options) {
+  options = options || {};
+  options.gzip = true;
+  return deflate(input, options);
+}
+
+
+exports.Deflate = Deflate;
+exports.deflate = deflate;
+exports.deflateRaw = deflateRaw;
+exports.gzip = gzip;
+
+},{"./utils/common":3,"./utils/strings":4,"./zlib/deflate":8,"./zlib/messages":13,"./zlib/zstream":15}],2:[function(require,module,exports){
+'use strict';
+
+
+var zlib_inflate = require('./zlib/inflate');
+var utils        = require('./utils/common');
+var strings      = require('./utils/strings');
+var c            = require('./zlib/constants');
+var msg          = require('./zlib/messages');
+var ZStream      = require('./zlib/zstream');
+var GZheader     = require('./zlib/gzheader');
+
+var toString = Object.prototype.toString;
+
+/**
+ * class Inflate
+ *
+ * Generic JS-style wrapper for zlib calls. If you don't need
+ * streaming behaviour - use more simple functions: [[inflate]]
+ * and [[inflateRaw]].
+ **/
+
+/* internal
+ * inflate.chunks -> Array
+ *
+ * Chunks of output data, if [[Inflate#onData]] not overriden.
+ **/
+
+/**
+ * Inflate.result -> Uint8Array|Array|String
+ *
+ * Uncompressed result, generated by default [[Inflate#onData]]
+ * and [[Inflate#onEnd]] handlers. Filled after you push last chunk
+ * (call [[Inflate#push]] with `Z_FINISH` / `true` param) or if you
+ * push a chunk with explicit flush (call [[Inflate#push]] with
+ * `Z_SYNC_FLUSH` param).
+ **/
+
+/**
+ * Inflate.err -> Number
+ *
+ * Error code after inflate finished. 0 (Z_OK) on success.
+ * Should be checked if broken data possible.
+ **/
+
+/**
+ * Inflate.msg -> String
+ *
+ * Error message, if [[Inflate.err]] != 0
+ **/
+
+
+/**
+ * new Inflate(options)
+ * - options (Object): zlib inflate options.
+ *
+ * Creates new inflator instance with specified params. Throws exception
+ * on bad params. Supported options:
+ *
+ * - `windowBits`
+ * - `dictionary`
+ *
+ * [http://zlib.net/manual.html#Advanced](http://zlib.net/manual.html#Advanced)
+ * for more information on these.
+ *
+ * Additional options, for internal needs:
+ *
+ * - `chunkSize` - size of generated data chunks (16K by default)
+ * - `raw` (Boolean) - do raw inflate
+ * - `to` (String) - if equal to 'string', then result will be converted
+ *   from utf8 to utf16 (javascript) string. When string output requested,
+ *   chunk length can differ from `chunkSize`, depending on content.
+ *
+ * By default, when no options set, autodetect deflate/gzip data format via
+ * wrapper header.
+ *
+ * ##### Example:
+ *
+ * ```javascript
+ * var pako = require('pako')
+ *   , chunk1 = Uint8Array([1,2,3,4,5,6,7,8,9])
+ *   , chunk2 = Uint8Array([10,11,12,13,14,15,16,17,18,19]);
+ *
+ * var inflate = new pako.Inflate({ level: 3});
+ *
+ * inflate.push(chunk1, false);
+ * inflate.push(chunk2, true);  // true -> last chunk
+ *
+ * if (inflate.err) { throw new Error(inflate.err); }
+ *
+ * console.log(inflate.result);
+ * ```
+ **/
+function Inflate(options) {
+  if (!(this instanceof Inflate)) return new Inflate(options);
+
+  this.options = utils.assign({
+    chunkSize: 16384,
+    windowBits: 0,
+    to: ''
+  }, options || {});
+
+  var opt = this.options;
+
+  // Force window size for `raw` data, if not set directly,
+  // because we have no header for autodetect.
+  if (opt.raw && (opt.windowBits >= 0) && (opt.windowBits < 16)) {
+    opt.windowBits = -opt.windowBits;
+    if (opt.windowBits === 0) { opt.windowBits = -15; }
+  }
+
+  // If `windowBits` not defined (and mode not raw) - set autodetect flag for gzip/deflate
+  if ((opt.windowBits >= 0) && (opt.windowBits < 16) &&
+      !(options && options.windowBits)) {
+    opt.windowBits += 32;
+  }
+
+  // Gzip header has no info about windows size, we can do autodetect only
+  // for deflate. So, if window size not set, force it to max when gzip possible
+  if ((opt.windowBits > 15) && (opt.windowBits < 48)) {
+    // bit 3 (16) -> gzipped data
+    // bit 4 (32) -> autodetect gzip/deflate
+    if ((opt.windowBits & 15) === 0) {
+      opt.windowBits |= 15;
+    }
+  }
+
+  this.err    = 0;      // error code, if happens (0 = Z_OK)
+  this.msg    = '';     // error message
+  this.ended  = false;  // used to avoid multiple onEnd() calls
+  this.chunks = [];     // chunks of compressed data
+
+  this.strm   = new ZStream();
+  this.strm.avail_out = 0;
+
+  var status  = zlib_inflate.inflateInit2(
+    this.strm,
+    opt.windowBits
+  );
+
+  if (status !== c.Z_OK) {
+    throw new Error(msg[status]);
+  }
+
+  this.header = new GZheader();
+
+  zlib_inflate.inflateGetHeader(this.strm, this.header);
+}
+
+/**
+ * Inflate#push(data[, mode]) -> Boolean
+ * - data (Uint8Array|Array|ArrayBuffer|String): input data
+ * - mode (Number|Boolean): 0..6 for corresponding Z_NO_FLUSH..Z_TREE modes.
+ *   See constants. Skipped or `false` means Z_NO_FLUSH, `true` meansh Z_FINISH.
+ *
+ * Sends input data to inflate pipe, generating [[Inflate#onData]] calls with
+ * new output chunks. Returns `true` on success. The last data block must have
+ * mode Z_FINISH (or `true`). That will flush internal pending buffers and call
+ * [[Inflate#onEnd]]. For interim explicit flushes (without ending the stream) you
+ * can use mode Z_SYNC_FLUSH, keeping the decompression context.
+ *
+ * On fail call [[Inflate#onEnd]] with error code and return false.
+ *
+ * We strongly recommend to use `Uint8Array` on input for best speed (output
+ * format is detected automatically). Also, don't skip last param and always
+ * use the same type in your code (boolean or number). That will improve JS speed.
+ *
+ * For regular `Array`-s make sure all elements are [0..255].
+ *
+ * ##### Example
+ *
+ * ```javascript
+ * push(chunk, false); // push one of data chunks
+ * ...
+ * push(chunk, true);  // push last chunk
+ * ```
+ **/
+Inflate.prototype.push = function (data, mode) {
+  var strm = this.strm;
+  var chunkSize = this.options.chunkSize;
+  var dictionary = this.options.dictionary;
+  var status, _mode;
+  var next_out_utf8, tail, utf8str;
+  var dict;
+
+  // Flag to properly process Z_BUF_ERROR on testing inflate call
+  // when we check that all output data was flushed.
+  var allowBufError = false;
+
+  if (this.ended) { return false; }
+  _mode = (mode === ~~mode) ? mode : ((mode === true) ? c.Z_FINISH : c.Z_NO_FLUSH);
+
+  // Convert data if needed
+  if (typeof data === 'string') {
+    // Only binary strings can be decompressed on practice
+    strm.input = strings.binstring2buf(data);
+  } else if (toString.call(data) === '[object ArrayBuffer]') {
+    strm.input = new Uint8Array(data);
+  } else {
+    strm.input = data;
+  }
+
+  strm.next_in = 0;
+  strm.avail_in = strm.input.length;
+
+  do {
+    if (strm.avail_out === 0) {
+      strm.output = new utils.Buf8(chunkSize);
+      strm.next_out = 0;
+      strm.avail_out = chunkSize;
+    }
+
+    status = zlib_inflate.inflate(strm, c.Z_NO_FLUSH);    /* no bad return value */
+
+    if (status === c.Z_NEED_DICT && dictionary) {
+      // Convert data if needed
+      if (typeof dictionary === 'string') {
+        dict = strings.string2buf(dictionary);
+      } else if (toString.call(dictionary) === '[object ArrayBuffer]') {
+        dict = new Uint8Array(dictionary);
+      } else {
+        dict = dictionary;
+      }
+
+      status = zlib_inflate.inflateSetDictionary(this.strm, dict);
+
+    }
+
+    if (status === c.Z_BUF_ERROR && allowBufError === true) {
+      status = c.Z_OK;
+      allowBufError = false;
+    }
+
+    if (status !== c.Z_STREAM_END && status !== c.Z_OK) {
+      this.onEnd(status);
+      this.ended = true;
+      return false;
+    }
+
+    if (strm.next_out) {
+      if (strm.avail_out === 0 || status === c.Z_STREAM_END || (strm.avail_in === 0 && (_mode === c.Z_FINISH || _mode === c.Z_SYNC_FLUSH))) {
+
+        if (this.options.to === 'string') {
+
+          next_out_utf8 = strings.utf8border(strm.output, strm.next_out);
+
+          tail = strm.next_out - next_out_utf8;
+          utf8str = strings.buf2string(strm.output, next_out_utf8);
+
+          // move tail
+          strm.next_out = tail;
+          strm.avail_out = chunkSize - tail;
+          if (tail) { utils.arraySet(strm.output, strm.output, next_out_utf8, tail, 0); }
+
+          this.onData(utf8str);
+
+        } else {
+          this.onData(utils.shrinkBuf(strm.output, strm.next_out));
+        }
+      }
+    }
+
+    // When no more input data, we should check that internal inflate buffers
+    // are flushed. The only way to do it when avail_out = 0 - run one more
+    // inflate pass. But if output data not exists, inflate return Z_BUF_ERROR.
+    // Here we set flag to process this error properly.
+    //
+    // NOTE. Deflate does not return error in this case and does not needs such
+    // logic.
+    if (strm.avail_in === 0 && strm.avail_out === 0) {
+      allowBufError = true;
+    }
+
+  } while ((strm.avail_in > 0 || strm.avail_out === 0) && status !== c.Z_STREAM_END);
+
+  if (status === c.Z_STREAM_END) {
+    _mode = c.Z_FINISH;
+  }
+
+  // Finalize on the last chunk.
+  if (_mode === c.Z_FINISH) {
+    status = zlib_inflate.inflateEnd(this.strm);
+    this.onEnd(status);
+    this.ended = true;
+    return status === c.Z_OK;
+  }
+
+  // callback interim results if Z_SYNC_FLUSH.
+  if (_mode === c.Z_SYNC_FLUSH) {
+    this.onEnd(c.Z_OK);
+    strm.avail_out = 0;
+    return true;
+  }
+
+  return true;
+};
+
+
+/**
+ * Inflate#onData(chunk) -> Void
+ * - chunk (Uint8Array|Array|String): ouput data. Type of array depends
+ *   on js engine support. When string output requested, each chunk
+ *   will be string.
+ *
+ * By default, stores data blocks in `chunks[]` property and glue
+ * those in `onEnd`. Override this handler, if you need another behaviour.
+ **/
+Inflate.prototype.onData = function (chunk) {
+  this.chunks.push(chunk);
+};
+
+
+/**
+ * Inflate#onEnd(status) -> Void
+ * - status (Number): inflate status. 0 (Z_OK) on success,
+ *   other if not.
+ *
+ * Called either after you tell inflate that the input stream is
+ * complete (Z_FINISH) or should be flushed (Z_SYNC_FLUSH)
+ * or if an error happened. By default - join collected chunks,
+ * free memory and fill `results` / `err` properties.
+ **/
+Inflate.prototype.onEnd = function (status) {
+  // On success - join
+  if (status === c.Z_OK) {
+    if (this.options.to === 'string') {
+      // Glue & convert here, until we teach pako to send
+      // utf8 alligned strings to onData
+      this.result = this.chunks.join('');
+    } else {
+      this.result = utils.flattenChunks(this.chunks);
+    }
+  }
+  this.chunks = [];
+  this.err = status;
+  this.msg = this.strm.msg;
+};
+
+
+/**
+ * inflate(data[, options]) -> Uint8Array|Array|String
+ * - data (Uint8Array|Array|String): input data to decompress.
+ * - options (Object): zlib inflate options.
+ *
+ * Decompress `data` with inflate/ungzip and `options`. Autodetect
+ * format via wrapper header by default. That's why we don't provide
+ * separate `ungzip` method.
+ *
+ * Supported options are:
+ *
+ * - windowBits
+ *
+ * [http://zlib.net/manual.html#Advanced](http://zlib.net/manual.html#Advanced)
+ * for more information.
+ *
+ * Sugar (options):
+ *
+ * - `raw` (Boolean) - say that we work with raw stream, if you don't wish to specify
+ *   negative windowBits implicitly.
+ * - `to` (String) - if equal to 'string', then result will be converted
+ *   from utf8 to utf16 (javascript) string. When string output requested,
+ *   chunk length can differ from `chunkSize`, depending on content.
+ *
+ *
+ * ##### Example:
+ *
+ * ```javascript
+ * var pako = require('pako')
+ *   , input = pako.deflate([1,2,3,4,5,6,7,8,9])
+ *   , output;
+ *
+ * try {
+ *   output = pako.inflate(input);
+ * } catch (err)
+ *   console.log(err);
+ * }
+ * ```
+ **/
+function inflate(input, options) {
+  var inflator = new Inflate(options);
+
+  inflator.push(input, true);
+
+  // That will never happens, if you don't cheat with options :)
+  if (inflator.err) { throw inflator.msg || msg[inflator.err]; }
+
+  return inflator.result;
+}
+
+
+/**
+ * inflateRaw(data[, options]) -> Uint8Array|Array|String
+ * - data (Uint8Array|Array|String): input data to decompress.
+ * - options (Object): zlib inflate options.
+ *
+ * The same as [[inflate]], but creates raw data, without wrapper
+ * (header and adler32 crc).
+ **/
+function inflateRaw(input, options) {
+  options = options || {};
+  options.raw = true;
+  return inflate(input, options);
+}
+
+
+/**
+ * ungzip(data[, options]) -> Uint8Array|Array|String
+ * - data (Uint8Array|Array|String): input data to decompress.
+ * - options (Object): zlib inflate options.
+ *
+ * Just shortcut to [[inflate]], because it autodetects format
+ * by header.content. Done for convenience.
+ **/
+
+
+exports.Inflate = Inflate;
+exports.inflate = inflate;
+exports.inflateRaw = inflateRaw;
+exports.ungzip  = inflate;
+
+},{"./utils/common":3,"./utils/strings":4,"./zlib/constants":6,"./zlib/gzheader":9,"./zlib/inflate":11,"./zlib/messages":13,"./zlib/zstream":15}],3:[function(require,module,exports){
+'use strict';
+
+
+var TYPED_OK =  (typeof Uint8Array !== 'undefined') &&
+                (typeof Uint16Array !== 'undefined') &&
+                (typeof Int32Array !== 'undefined');
+
+
+exports.assign = function (obj /*from1, from2, from3, ...*/) {
+  var sources = Array.prototype.slice.call(arguments, 1);
+  while (sources.length) {
+    var source = sources.shift();
+    if (!source) { continue; }
+
+    if (typeof source !== 'object') {
+      throw new TypeError(source + 'must be non-object');
+    }
+
+    for (var p in source) {
+      if (source.hasOwnProperty(p)) {
+        obj[p] = source[p];
+      }
+    }
+  }
+
+  return obj;
+};
+
+
+// reduce buffer size, avoiding mem copy
+exports.shrinkBuf = function (buf, size) {
+  if (buf.length === size) { return buf; }
+  if (buf.subarray) { return buf.subarray(0, size); }
+  buf.length = size;
+  return buf;
+};
+
+
+var fnTyped = {
+  arraySet: function (dest, src, src_offs, len, dest_offs) {
+    if (src.subarray && dest.subarray) {
+      dest.set(src.subarray(src_offs, src_offs + len), dest_offs);
+      return;
+    }
+    // Fallback to ordinary array
+    for (var i = 0; i < len; i++) {
+      dest[dest_offs + i] = src[src_offs + i];
+    }
+  },
+  // Join array of chunks to single array.
+  flattenChunks: function (chunks) {
+    var i, l, len, pos, chunk, result;
+
+    // calculate data length
+    len = 0;
+    for (i = 0, l = chunks.length; i < l; i++) {
+      len += chunks[i].length;
+    }
+
+    // join chunks
+    result = new Uint8Array(len);
+    pos = 0;
+    for (i = 0, l = chunks.length; i < l; i++) {
+      chunk = chunks[i];
+      result.set(chunk, pos);
+      pos += chunk.length;
+    }
+
+    return result;
+  }
+};
+
+var fnUntyped = {
+  arraySet: function (dest, src, src_offs, len, dest_offs) {
+    for (var i = 0; i < len; i++) {
+      dest[dest_offs + i] = src[src_offs + i];
+    }
+  },
+  // Join array of chunks to single array.
+  flattenChunks: function (chunks) {
+    return [].concat.apply([], chunks);
+  }
+};
+
+
+// Enable/Disable typed arrays use, for testing
+//
+exports.setTyped = function (on) {
+  if (on) {
+    exports.Buf8  = Uint8Array;
+    exports.Buf16 = Uint16Array;
+    exports.Buf32 = Int32Array;
+    exports.assign(exports, fnTyped);
+  } else {
+    exports.Buf8  = Array;
+    exports.Buf16 = Array;
+    exports.Buf32 = Array;
+    exports.assign(exports, fnUntyped);
+  }
+};
+
+exports.setTyped(TYPED_OK);
+
+},{}],4:[function(require,module,exports){
+// String encode/decode helpers
+'use strict';
+
+
+var utils = require('./common');
+
+
+// Quick check if we can use fast array to bin string conversion
+//
+// - apply(Array) can fail on Android 2.2
+// - apply(Uint8Array) can fail on iOS 5.1 Safary
+//
+var STR_APPLY_OK = true;
+var STR_APPLY_UIA_OK = true;
+
+try { String.fromCharCode.apply(null, [ 0 ]); } catch (__) { STR_APPLY_OK = false; }
+try { String.fromCharCode.apply(null, new Uint8Array(1)); } catch (__) { STR_APPLY_UIA_OK = false; }
+
+
+// Table with utf8 lengths (calculated by first byte of sequence)
+// Note, that 5 & 6-byte values and some 4-byte values can not be represented in JS,
+// because max possible codepoint is 0x10ffff
+var _utf8len = new utils.Buf8(256);
+for (var q = 0; q < 256; q++) {
+  _utf8len[q] = (q >= 252 ? 6 : q >= 248 ? 5 : q >= 240 ? 4 : q >= 224 ? 3 : q >= 192 ? 2 : 1);
+}
+_utf8len[254] = _utf8len[254] = 1; // Invalid sequence start
+
+
+// convert string to array (typed, when possible)
+exports.string2buf = function (str) {
+  var buf, c, c2, m_pos, i, str_len = str.length, buf_len = 0;
+
+  // count binary size
+  for (m_pos = 0; m_pos < str_len; m_pos++) {
+    c = str.charCodeAt(m_pos);
+    if ((c & 0xfc00) === 0xd800 && (m_pos + 1 < str_len)) {
+      c2 = str.charCodeAt(m_pos + 1);
+      if ((c2 & 0xfc00) === 0xdc00) {
+        c = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
+        m_pos++;
+      }
+    }
+    buf_len += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
+  }
+
+  // allocate buffer
+  buf = new utils.Buf8(buf_len);
+
+  // convert
+  for (i = 0, m_pos = 0; i < buf_len; m_pos++) {
+    c = str.charCodeAt(m_pos);
+    if ((c & 0xfc00) === 0xd800 && (m_pos + 1 < str_len)) {
+      c2 = str.charCodeAt(m_pos + 1);
+      if ((c2 & 0xfc00) === 0xdc00) {
+        c = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
+        m_pos++;
+      }
+    }
+    if (c < 0x80) {
+      /* one byte */
+      buf[i++] = c;
+    } else if (c < 0x800) {
+      /* two bytes */
+      buf[i++] = 0xC0 | (c >>> 6);
+      buf[i++] = 0x80 | (c & 0x3f);
+    } else if (c < 0x10000) {
+      /* three bytes */
+      buf[i++] = 0xE0 | (c >>> 12);
+      buf[i++] = 0x80 | (c >>> 6 & 0x3f);
+      buf[i++] = 0x80 | (c & 0x3f);
+    } else {
+      /* four bytes */
+      buf[i++] = 0xf0 | (c >>> 18);
+      buf[i++] = 0x80 | (c >>> 12 & 0x3f);
+      buf[i++] = 0x80 | (c >>> 6 & 0x3f);
+      buf[i++] = 0x80 | (c & 0x3f);
+    }
+  }
+
+  return buf;
+};
+
+// Helper (used in 2 places)
+function buf2binstring(buf, len) {
+  // use fallback for big arrays to avoid stack overflow
+  if (len < 65537) {
+    if ((buf.subarray && STR_APPLY_UIA_OK) || (!buf.subarray && STR_APPLY_OK)) {
+      return String.fromCharCode.apply(null, utils.shrinkBuf(buf, len));
+    }
+  }
+
+  var result = '';
+  for (var i = 0; i < len; i++) {
+    result += String.fromCharCode(buf[i]);
+  }
+  return result;
+}
+
+
+// Convert byte array to binary string
+exports.buf2binstring = function (buf) {
+  return buf2binstring(buf, buf.length);
+};
+
+
+// Convert binary string (typed, when possible)
+exports.binstring2buf = function (str) {
+  var buf = new utils.Buf8(str.length);
+  for (var i = 0, len = buf.length; i < len; i++) {
+    buf[i] = str.charCodeAt(i);
+  }
+  return buf;
+};
+
+
+// convert array to string
+exports.buf2string = function (buf, max) {
+  var i, out, c, c_len;
+  var len = max || buf.length;
+
+  // Reserve max possible length (2 words per char)
+  // NB: by unknown reasons, Array is significantly faster for
+  //     String.fromCharCode.apply than Uint16Array.
+  var utf16buf = new Array(len * 2);
+
+  for (out = 0, i = 0; i < len;) {
+    c = buf[i++];
+    // quick process ascii
+    if (c < 0x80) { utf16buf[out++] = c; continue; }
+
+    c_len = _utf8len[c];
+    // skip 5 & 6 byte codes
+    if (c_len > 4) { utf16buf[out++] = 0xfffd; i += c_len - 1; continue; }
+
+    // apply mask on first byte
+    c &= c_len === 2 ? 0x1f : c_len === 3 ? 0x0f : 0x07;
+    // join the rest
+    while (c_len > 1 && i < len) {
+      c = (c << 6) | (buf[i++] & 0x3f);
+      c_len--;
+    }
+
+    // terminated by end of string?
+    if (c_len > 1) { utf16buf[out++] = 0xfffd; continue; }
+
+    if (c < 0x10000) {
+      utf16buf[out++] = c;
+    } else {
+      c -= 0x10000;
+      utf16buf[out++] = 0xd800 | ((c >> 10) & 0x3ff);
+      utf16buf[out++] = 0xdc00 | (c & 0x3ff);
+    }
+  }
+
+  return buf2binstring(utf16buf, out);
+};
+
+
+// Calculate max possible position in utf8 buffer,
+// that will not break sequence. If that's not possible
+// - (very small limits) return max size as is.
+//
+// buf[] - utf8 bytes array
+// max   - length limit (mandatory);
+exports.utf8border = function (buf, max) {
+  var pos;
+
+  max = max || buf.length;
+  if (max > buf.length) { max = buf.length; }
+
+  // go back from last position, until start of sequence found
+  pos = max - 1;
+  while (pos >= 0 && (buf[pos] & 0xC0) === 0x80) { pos--; }
+
+  // Fuckup - very small and broken sequence,
+  // return max, because we should return something anyway.
+  if (pos < 0) { return max; }
+
+  // If we came to start of buffer - that means vuffer is too small,
+  // return max too.
+  if (pos === 0) { return max; }
+
+  return (pos + _utf8len[buf[pos]] > max) ? pos : max;
+};
+
+},{"./common":3}],5:[function(require,module,exports){
+'use strict';
+
+// Note: adler32 takes 12% for level 0 and 2% for level 6.
+// It doesn't worth to make additional optimizationa as in original.
+// Small size is preferable.
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+function adler32(adler, buf, len, pos) {
+  var s1 = (adler & 0xffff) |0,
+      s2 = ((adler >>> 16) & 0xffff) |0,
+      n = 0;
+
+  while (len !== 0) {
+    // Set limit ~ twice less than 5552, to keep
+    // s2 in 31-bits, because we force signed ints.
+    // in other case %= will fail.
+    n = len > 2000 ? 2000 : len;
+    len -= n;
+
+    do {
+      s1 = (s1 + buf[pos++]) |0;
+      s2 = (s2 + s1) |0;
+    } while (--n);
+
+    s1 %= 65521;
+    s2 %= 65521;
+  }
+
+  return (s1 | (s2 << 16)) |0;
+}
+
+
+module.exports = adler32;
+
+},{}],6:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+module.exports = {
+
+  /* Allowed flush values; see deflate() and inflate() below for details */
+  Z_NO_FLUSH:         0,
+  Z_PARTIAL_FLUSH:    1,
+  Z_SYNC_FLUSH:       2,
+  Z_FULL_FLUSH:       3,
+  Z_FINISH:           4,
+  Z_BLOCK:            5,
+  Z_TREES:            6,
+
+  /* Return codes for the compression/decompression functions. Negative values
+  * are errors, positive values are used for special but normal events.
+  */
+  Z_OK:               0,
+  Z_STREAM_END:       1,
+  Z_NEED_DICT:        2,
+  Z_ERRNO:           -1,
+  Z_STREAM_ERROR:    -2,
+  Z_DATA_ERROR:      -3,
+  //Z_MEM_ERROR:     -4,
+  Z_BUF_ERROR:       -5,
+  //Z_VERSION_ERROR: -6,
+
+  /* compression levels */
+  Z_NO_COMPRESSION:         0,
+  Z_BEST_SPEED:             1,
+  Z_BEST_COMPRESSION:       9,
+  Z_DEFAULT_COMPRESSION:   -1,
+
+
+  Z_FILTERED:               1,
+  Z_HUFFMAN_ONLY:           2,
+  Z_RLE:                    3,
+  Z_FIXED:                  4,
+  Z_DEFAULT_STRATEGY:       0,
+
+  /* Possible values of the data_type field (though see inflate()) */
+  Z_BINARY:                 0,
+  Z_TEXT:                   1,
+  //Z_ASCII:                1, // = Z_TEXT (deprecated)
+  Z_UNKNOWN:                2,
+
+  /* The deflate compression method */
+  Z_DEFLATED:               8
+  //Z_NULL:                 null // Use -1 or null inline, depending on var type
+};
+
+},{}],7:[function(require,module,exports){
+'use strict';
+
+// Note: we can't get significant speed boost here.
+// So write code to minimize size - no pregenerated tables
+// and array tools dependencies.
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+// Use ordinary array, since untyped makes no boost here
+function makeTable() {
+  var c, table = [];
+
+  for (var n = 0; n < 256; n++) {
+    c = n;
+    for (var k = 0; k < 8; k++) {
+      c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+    }
+    table[n] = c;
+  }
+
+  return table;
+}
+
+// Create table on load. Just 255 signed longs. Not a problem.
+var crcTable = makeTable();
+
+
+function crc32(crc, buf, len, pos) {
+  var t = crcTable,
+      end = pos + len;
+
+  crc ^= -1;
+
+  for (var i = pos; i < end; i++) {
+    crc = (crc >>> 8) ^ t[(crc ^ buf[i]) & 0xFF];
+  }
+
+  return (crc ^ (-1)); // >>> 0;
+}
+
+
+module.exports = crc32;
+
+},{}],8:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+var utils   = require('../utils/common');
+var trees   = require('./trees');
+var adler32 = require('./adler32');
+var crc32   = require('./crc32');
+var msg     = require('./messages');
+
+/* Public constants ==========================================================*/
+/* ===========================================================================*/
+
+
+/* Allowed flush values; see deflate() and inflate() below for details */
+var Z_NO_FLUSH      = 0;
+var Z_PARTIAL_FLUSH = 1;
+//var Z_SYNC_FLUSH    = 2;
+var Z_FULL_FLUSH    = 3;
+var Z_FINISH        = 4;
+var Z_BLOCK         = 5;
+//var Z_TREES         = 6;
+
+
+/* Return codes for the compression/decompression functions. Negative values
+ * are errors, positive values are used for special but normal events.
+ */
+var Z_OK            = 0;
+var Z_STREAM_END    = 1;
+//var Z_NEED_DICT     = 2;
+//var Z_ERRNO         = -1;
+var Z_STREAM_ERROR  = -2;
+var Z_DATA_ERROR    = -3;
+//var Z_MEM_ERROR     = -4;
+var Z_BUF_ERROR     = -5;
+//var Z_VERSION_ERROR = -6;
+
+
+/* compression levels */
+//var Z_NO_COMPRESSION      = 0;
+//var Z_BEST_SPEED          = 1;
+//var Z_BEST_COMPRESSION    = 9;
+var Z_DEFAULT_COMPRESSION = -1;
+
+
+var Z_FILTERED            = 1;
+var Z_HUFFMAN_ONLY        = 2;
+var Z_RLE                 = 3;
+var Z_FIXED               = 4;
+var Z_DEFAULT_STRATEGY    = 0;
+
+/* Possible values of the data_type field (though see inflate()) */
+//var Z_BINARY              = 0;
+//var Z_TEXT                = 1;
+//var Z_ASCII               = 1; // = Z_TEXT
+var Z_UNKNOWN             = 2;
+
+
+/* The deflate compression method */
+var Z_DEFLATED  = 8;
+
+/*============================================================================*/
+
+
+var MAX_MEM_LEVEL = 9;
+/* Maximum value for memLevel in deflateInit2 */
+var MAX_WBITS = 15;
+/* 32K LZ77 window */
+var DEF_MEM_LEVEL = 8;
+
+
+var LENGTH_CODES  = 29;
+/* number of length codes, not counting the special END_BLOCK code */
+var LITERALS      = 256;
+/* number of literal bytes 0..255 */
+var L_CODES       = LITERALS + 1 + LENGTH_CODES;
+/* number of Literal or Length codes, including the END_BLOCK code */
+var D_CODES       = 30;
+/* number of distance codes */
+var BL_CODES      = 19;
+/* number of codes used to transfer the bit lengths */
+var HEAP_SIZE     = 2 * L_CODES + 1;
+/* maximum heap size */
+var MAX_BITS  = 15;
+/* All codes must not exceed MAX_BITS bits */
+
+var MIN_MATCH = 3;
+var MAX_MATCH = 258;
+var MIN_LOOKAHEAD = (MAX_MATCH + MIN_MATCH + 1);
+
+var PRESET_DICT = 0x20;
+
+var INIT_STATE = 42;
+var EXTRA_STATE = 69;
+var NAME_STATE = 73;
+var COMMENT_STATE = 91;
+var HCRC_STATE = 103;
+var BUSY_STATE = 113;
+var FINISH_STATE = 666;
+
+var BS_NEED_MORE      = 1; /* block not completed, need more input or more output */
+var BS_BLOCK_DONE     = 2; /* block flush performed */
+var BS_FINISH_STARTED = 3; /* finish started, need only more output at next deflate */
+var BS_FINISH_DONE    = 4; /* finish done, accept no more input or output */
+
+var OS_CODE = 0x03; // Unix :) . Don't detect, use this default.
+
+function err(strm, errorCode) {
+  strm.msg = msg[errorCode];
+  return errorCode;
+}
+
+function rank(f) {
+  return ((f) << 1) - ((f) > 4 ? 9 : 0);
+}
+
+function zero(buf) { var len = buf.length; while (--len >= 0) { buf[len] = 0; } }
+
+
+/* =========================================================================
+ * Flush as much pending output as possible. All deflate() output goes
+ * through this function so some applications may wish to modify it
+ * to avoid allocating a large strm->output buffer and copying into it.
+ * (See also read_buf()).
+ */
+function flush_pending(strm) {
+  var s = strm.state;
+
+  //_tr_flush_bits(s);
+  var len = s.pending;
+  if (len > strm.avail_out) {
+    len = strm.avail_out;
+  }
+  if (len === 0) { return; }
+
+  utils.arraySet(strm.output, s.pending_buf, s.pending_out, len, strm.next_out);
+  strm.next_out += len;
+  s.pending_out += len;
+  strm.total_out += len;
+  strm.avail_out -= len;
+  s.pending -= len;
+  if (s.pending === 0) {
+    s.pending_out = 0;
+  }
+}
+
+
+function flush_block_only(s, last) {
+  trees._tr_flush_block(s, (s.block_start >= 0 ? s.block_start : -1), s.strstart - s.block_start, last);
+  s.block_start = s.strstart;
+  flush_pending(s.strm);
+}
+
+
+function put_byte(s, b) {
+  s.pending_buf[s.pending++] = b;
+}
+
+
+/* =========================================================================
+ * Put a short in the pending buffer. The 16-bit value is put in MSB order.
+ * IN assertion: the stream state is correct and there is enough room in
+ * pending_buf.
+ */
+function putShortMSB(s, b) {
+//  put_byte(s, (Byte)(b >> 8));
+//  put_byte(s, (Byte)(b & 0xff));
+  s.pending_buf[s.pending++] = (b >>> 8) & 0xff;
+  s.pending_buf[s.pending++] = b & 0xff;
+}
+
+
+/* ===========================================================================
+ * Read a new buffer from the current input stream, update the adler32
+ * and total number of bytes read.  All deflate() input goes through
+ * this function so some applications may wish to modify it to avoid
+ * allocating a large strm->input buffer and copying from it.
+ * (See also flush_pending()).
+ */
+function read_buf(strm, buf, start, size) {
+  var len = strm.avail_in;
+
+  if (len > size) { len = size; }
+  if (len === 0) { return 0; }
+
+  strm.avail_in -= len;
+
+  // zmemcpy(buf, strm->next_in, len);
+  utils.arraySet(buf, strm.input, strm.next_in, len, start);
+  if (strm.state.wrap === 1) {
+    strm.adler = adler32(strm.adler, buf, len, start);
+  }
+
+  else if (strm.state.wrap === 2) {
+    strm.adler = crc32(strm.adler, buf, len, start);
+  }
+
+  strm.next_in += len;
+  strm.total_in += len;
+
+  return len;
+}
+
+
+/* ===========================================================================
+ * Set match_start to the longest match starting at the given string and
+ * return its length. Matches shorter or equal to prev_length are discarded,
+ * in which case the result is equal to prev_length and match_start is
+ * garbage.
+ * IN assertions: cur_match is the head of the hash chain for the current
+ *   string (strstart) and its distance is <= MAX_DIST, and prev_length >= 1
+ * OUT assertion: the match length is not greater than s->lookahead.
+ */
+function longest_match(s, cur_match) {
+  var chain_length = s.max_chain_length;      /* max hash chain length */
+  var scan = s.strstart; /* current string */
+  var match;                       /* matched string */
+  var len;                           /* length of current match */
+  var best_len = s.prev_length;              /* best match length so far */
+  var nice_match = s.nice_match;             /* stop if match long enough */
+  var limit = (s.strstart > (s.w_size - MIN_LOOKAHEAD)) ?
+      s.strstart - (s.w_size - MIN_LOOKAHEAD) : 0/*NIL*/;
+
+  var _win = s.window; // shortcut
+
+  var wmask = s.w_mask;
+  var prev  = s.prev;
+
+  /* Stop when cur_match becomes <= limit. To simplify the code,
+   * we prevent matches with the string of window index 0.
+   */
+
+  var strend = s.strstart + MAX_MATCH;
+  var scan_end1  = _win[scan + best_len - 1];
+  var scan_end   = _win[scan + best_len];
+
+  /* The code is optimized for HASH_BITS >= 8 and MAX_MATCH-2 multiple of 16.
+   * It is easy to get rid of this optimization if necessary.
+   */
+  // Assert(s->hash_bits >= 8 && MAX_MATCH == 258, "Code too clever");
+
+  /* Do not waste too much time if we already have a good match: */
+  if (s.prev_length >= s.good_match) {
+    chain_length >>= 2;
+  }
+  /* Do not look for matches beyond the end of the input. This is necessary
+   * to make deflate deterministic.
+   */
+  if (nice_match > s.lookahead) { nice_match = s.lookahead; }
+
+  // Assert((ulg)s->strstart <= s->window_size-MIN_LOOKAHEAD, "need lookahead");
+
+  do {
+    // Assert(cur_match < s->strstart, "no future");
+    match = cur_match;
+
+    /* Skip to next match if the match length cannot increase
+     * or if the match length is less than 2.  Note that the checks below
+     * for insufficient lookahead only occur occasionally for performance
+     * reasons.  Therefore uninitialized memory will be accessed, and
+     * conditional jumps will be made that depend on those values.
+     * However the length of the match is limited to the lookahead, so
+     * the output of deflate is not affected by the uninitialized values.
+     */
+
+    if (_win[match + best_len]     !== scan_end  ||
+        _win[match + best_len - 1] !== scan_end1 ||
+        _win[match]                !== _win[scan] ||
+        _win[++match]              !== _win[scan + 1]) {
+      continue;
+    }
+
+    /* The check at best_len-1 can be removed because it will be made
+     * again later. (This heuristic is not always a win.)
+     * It is not necessary to compare scan[2] and match[2] since they
+     * are always equal when the other bytes match, given that
+     * the hash keys are equal and that HASH_BITS >= 8.
+     */
+    scan += 2;
+    match++;
+    // Assert(*scan == *match, "match[2]?");
+
+    /* We check for insufficient lookahead only every 8th comparison;
+     * the 256th check will be made at strstart+258.
+     */
+    do {
+      /*jshint noempty:false*/
+    } while (_win[++scan] === _win[++match] && _win[++scan] === _win[++match] &&
+             _win[++scan] === _win[++match] && _win[++scan] === _win[++match] &&
+             _win[++scan] === _win[++match] && _win[++scan] === _win[++match] &&
+             _win[++scan] === _win[++match] && _win[++scan] === _win[++match] &&
+             scan < strend);
+
+    // Assert(scan <= s->window+(unsigned)(s->window_size-1), "wild scan");
+
+    len = MAX_MATCH - (strend - scan);
+    scan = strend - MAX_MATCH;
+
+    if (len > best_len) {
+      s.match_start = cur_match;
+      best_len = len;
+      if (len >= nice_match) {
+        break;
+      }
+      scan_end1  = _win[scan + best_len - 1];
+      scan_end   = _win[scan + best_len];
+    }
+  } while ((cur_match = prev[cur_match & wmask]) > limit && --chain_length !== 0);
+
+  if (best_len <= s.lookahead) {
+    return best_len;
+  }
+  return s.lookahead;
+}
+
+
+/* ===========================================================================
+ * Fill the window when the lookahead becomes insufficient.
+ * Updates strstart and lookahead.
+ *
+ * IN assertion: lookahead < MIN_LOOKAHEAD
+ * OUT assertions: strstart <= window_size-MIN_LOOKAHEAD
+ *    At least one byte has been read, or avail_in == 0; reads are
+ *    performed for at least two bytes (required for the zip translate_eol
+ *    option -- not supported here).
+ */
+function fill_window(s) {
+  var _w_size = s.w_size;
+  var p, n, m, more, str;
+
+  //Assert(s->lookahead < MIN_LOOKAHEAD, "already enough lookahead");
+
+  do {
+    more = s.window_size - s.lookahead - s.strstart;
+
+    // JS ints have 32 bit, block below not needed
+    /* Deal with !@#$% 64K limit: */
+    //if (sizeof(int) <= 2) {
+    //    if (more == 0 && s->strstart == 0 && s->lookahead == 0) {
+    //        more = wsize;
+    //
+    //  } else if (more == (unsigned)(-1)) {
+    //        /* Very unlikely, but possible on 16 bit machine if
+    //         * strstart == 0 && lookahead == 1 (input done a byte at time)
+    //         */
+    //        more--;
+    //    }
+    //}
+
+
+    /* If the window is almost full and there is insufficient lookahead,
+     * move the upper half to the lower one to make room in the upper half.
+     */
+    if (s.strstart >= _w_size + (_w_size - MIN_LOOKAHEAD)) {
+
+      utils.arraySet(s.window, s.window, _w_size, _w_size, 0);
+      s.match_start -= _w_size;
+      s.strstart -= _w_size;
+      /* we now have strstart >= MAX_DIST */
+      s.block_start -= _w_size;
+
+      /* Slide the hash table (could be avoided with 32 bit values
+       at the expense of memory usage). We slide even when level == 0
+       to keep the hash table consistent if we switch back to level > 0
+       later. (Using level 0 permanently is not an optimal usage of
+       zlib, so we don't care about this pathological case.)
+       */
+
+      n = s.hash_size;
+      p = n;
+      do {
+        m = s.head[--p];
+        s.head[p] = (m >= _w_size ? m - _w_size : 0);
+      } while (--n);
+
+      n = _w_size;
+      p = n;
+      do {
+        m = s.prev[--p];
+        s.prev[p] = (m >= _w_size ? m - _w_size : 0);
+        /* If n is not on any hash chain, prev[n] is garbage but
+         * its value will never be used.
+         */
+      } while (--n);
+
+      more += _w_size;
+    }
+    if (s.strm.avail_in === 0) {
+      break;
+    }
+
+    /* If there was no sliding:
+     *    strstart <= WSIZE+MAX_DIST-1 && lookahead <= MIN_LOOKAHEAD - 1 &&
+     *    more == window_size - lookahead - strstart
+     * => more >= window_size - (MIN_LOOKAHEAD-1 + WSIZE + MAX_DIST-1)
+     * => more >= window_size - 2*WSIZE + 2
+     * In the BIG_MEM or MMAP case (not yet supported),
+     *   window_size == input_size + MIN_LOOKAHEAD  &&
+     *   strstart + s->lookahead <= input_size => more >= MIN_LOOKAHEAD.
+     * Otherwise, window_size == 2*WSIZE so more >= 2.
+     * If there was sliding, more >= WSIZE. So in all cases, more >= 2.
+     */
+    //Assert(more >= 2, "more < 2");
+    n = read_buf(s.strm, s.window, s.strstart + s.lookahead, more);
+    s.lookahead += n;
+
+    /* Initialize the hash value now that we have some input: */
+    if (s.lookahead + s.insert >= MIN_MATCH) {
+      str = s.strstart - s.insert;
+      s.ins_h = s.window[str];
+
+      /* UPDATE_HASH(s, s->ins_h, s->window[str + 1]); */
+      s.ins_h = ((s.ins_h << s.hash_shift) ^ s.window[str + 1]) & s.hash_mask;
+//#if MIN_MATCH != 3
+//        Call update_hash() MIN_MATCH-3 more times
+//#endif
+      while (s.insert) {
+        /* UPDATE_HASH(s, s->ins_h, s->window[str + MIN_MATCH-1]); */
+        s.ins_h = ((s.ins_h << s.hash_shift) ^ s.window[str + MIN_MATCH - 1]) & s.hash_mask;
+
+        s.prev[str & s.w_mask] = s.head[s.ins_h];
+        s.head[s.ins_h] = str;
+        str++;
+        s.insert--;
+        if (s.lookahead + s.insert < MIN_MATCH) {
+          break;
+        }
+      }
+    }
+    /* If the whole input has less than MIN_MATCH bytes, ins_h is garbage,
+     * but this is not important since only literal bytes will be emitted.
+     */
+
+  } while (s.lookahead < MIN_LOOKAHEAD && s.strm.avail_in !== 0);
+
+  /* If the WIN_INIT bytes after the end of the current data have never been
+   * written, then zero those bytes in order to avoid memory check reports of
+   * the use of uninitialized (or uninitialised as Julian writes) bytes by
+   * the longest match routines.  Update the high water mark for the next
+   * time through here.  WIN_INIT is set to MAX_MATCH since the longest match
+   * routines allow scanning to strstart + MAX_MATCH, ignoring lookahead.
+   */
+//  if (s.high_water < s.window_size) {
+//    var curr = s.strstart + s.lookahead;
+//    var init = 0;
+//
+//    if (s.high_water < curr) {
+//      /* Previous high water mark below current data -- zero WIN_INIT
+//       * bytes or up to end of window, whichever is less.
+//       */
+//      init = s.window_size - curr;
+//      if (init > WIN_INIT)
+//        init = WIN_INIT;
+//      zmemzero(s->window + curr, (unsigned)init);
+//      s->high_water = curr + init;
+//    }
+//    else if (s->high_water < (ulg)curr + WIN_INIT) {
+//      /* High water mark at or above current data, but below current data
+//       * plus WIN_INIT -- zero out to current data plus WIN_INIT, or up
+//       * to end of window, whichever is less.
+//       */
+//      init = (ulg)curr + WIN_INIT - s->high_water;
+//      if (init > s->window_size - s->high_water)
+//        init = s->window_size - s->high_water;
+//      zmemzero(s->window + s->high_water, (unsigned)init);
+//      s->high_water += init;
+//    }
+//  }
+//
+//  Assert((ulg)s->strstart <= s->window_size - MIN_LOOKAHEAD,
+//    "not enough room for search");
+}
+
+/* ===========================================================================
+ * Copy without compression as much as possible from the input stream, return
+ * the current block state.
+ * This function does not insert new strings in the dictionary since
+ * uncompressible data is probably not useful. This function is used
+ * only for the level=0 compression option.
+ * NOTE: this function should be optimized to avoid extra copying from
+ * window to pending_buf.
+ */
+function deflate_stored(s, flush) {
+  /* Stored blocks are limited to 0xffff bytes, pending_buf is limited
+   * to pending_buf_size, and each stored block has a 5 byte header:
+   */
+  var max_block_size = 0xffff;
+
+  if (max_block_size > s.pending_buf_size - 5) {
+    max_block_size = s.pending_buf_size - 5;
+  }
+
+  /* Copy as much as possible from input to output: */
+  for (;;) {
+    /* Fill the window as much as possible: */
+    if (s.lookahead <= 1) {
+
+      //Assert(s->strstart < s->w_size+MAX_DIST(s) ||
+      //  s->block_start >= (long)s->w_size, "slide too late");
+//      if (!(s.strstart < s.w_size + (s.w_size - MIN_LOOKAHEAD) ||
+//        s.block_start >= s.w_size)) {
+//        throw  new Error("slide too late");
+//      }
+
+      fill_window(s);
+      if (s.lookahead === 0 && flush === Z_NO_FLUSH) {
+        return BS_NEED_MORE;
+      }
+
+      if (s.lookahead === 0) {
+        break;
+      }
+      /* flush the current block */
+    }
+    //Assert(s->block_start >= 0L, "block gone");
+//    if (s.block_start < 0) throw new Error("block gone");
+
+    s.strstart += s.lookahead;
+    s.lookahead = 0;
+
+    /* Emit a stored block if pending_buf will be full: */
+    var max_start = s.block_start + max_block_size;
+
+    if (s.strstart === 0 || s.strstart >= max_start) {
+      /* strstart == 0 is possible when wraparound on 16-bit machine */
+      s.lookahead = s.strstart - max_start;
+      s.strstart = max_start;
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+
+
+    }
+    /* Flush if we may have to slide, otherwise block_start may become
+     * negative and the data will be gone:
+     */
+    if (s.strstart - s.block_start >= (s.w_size - MIN_LOOKAHEAD)) {
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+    }
+  }
+
+  s.insert = 0;
+
+  if (flush === Z_FINISH) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+    return BS_FINISH_DONE;
+  }
+
+  if (s.strstart > s.block_start) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+  }
+
+  return BS_NEED_MORE;
+}
+
+/* ===========================================================================
+ * Compress as much as possible from the input stream, return the current
+ * block state.
+ * This function does not perform lazy evaluation of matches and inserts
+ * new strings in the dictionary only for unmatched strings or for short
+ * matches. It is used only for the fast compression options.
+ */
+function deflate_fast(s, flush) {
+  var hash_head;        /* head of the hash chain */
+  var bflush;           /* set if current block must be flushed */
+
+  for (;;) {
+    /* Make sure that we always have enough lookahead, except
+     * at the end of the input file. We need MAX_MATCH bytes
+     * for the next match, plus MIN_MATCH bytes to insert the
+     * string following the next match.
+     */
+    if (s.lookahead < MIN_LOOKAHEAD) {
+      fill_window(s);
+      if (s.lookahead < MIN_LOOKAHEAD && flush === Z_NO_FLUSH) {
+        return BS_NEED_MORE;
+      }
+      if (s.lookahead === 0) {
+        break; /* flush the current block */
+      }
+    }
+
+    /* Insert the string window[strstart .. strstart+2] in the
+     * dictionary, and set hash_head to the head of the hash chain:
+     */
+    hash_head = 0/*NIL*/;
+    if (s.lookahead >= MIN_MATCH) {
+      /*** INSERT_STRING(s, s.strstart, hash_head); ***/
+      s.ins_h = ((s.ins_h << s.hash_shift) ^ s.window[s.strstart + MIN_MATCH - 1]) & s.hash_mask;
+      hash_head = s.prev[s.strstart & s.w_mask] = s.head[s.ins_h];
+      s.head[s.ins_h] = s.strstart;
+      /***/
+    }
+
+    /* Find the longest match, discarding those <= prev_length.
+     * At this point we have always match_length < MIN_MATCH
+     */
+    if (hash_head !== 0/*NIL*/ && ((s.strstart - hash_head) <= (s.w_size - MIN_LOOKAHEAD))) {
+      /* To simplify the code, we prevent matches with the string
+       * of window index 0 (in particular we have to avoid a match
+       * of the string with itself at the start of the input file).
+       */
+      s.match_length = longest_match(s, hash_head);
+      /* longest_match() sets match_start */
+    }
+    if (s.match_length >= MIN_MATCH) {
+      // check_match(s, s.strstart, s.match_start, s.match_length); // for debug only
+
+      /*** _tr_tally_dist(s, s.strstart - s.match_start,
+                     s.match_length - MIN_MATCH, bflush); ***/
+      bflush = trees._tr_tally(s, s.strstart - s.match_start, s.match_length - MIN_MATCH);
+
+      s.lookahead -= s.match_length;
+
+      /* Insert new strings in the hash table only if the match length
+       * is not too large. This saves time but degrades compression.
+       */
+      if (s.match_length <= s.max_lazy_match/*max_insert_length*/ && s.lookahead >= MIN_MATCH) {
+        s.match_length--; /* string at strstart already in table */
+        do {
+          s.strstart++;
+          /*** INSERT_STRING(s, s.strstart, hash_head); ***/
+          s.ins_h = ((s.ins_h << s.hash_shift) ^ s.window[s.strstart + MIN_MATCH - 1]) & s.hash_mask;
+          hash_head = s.prev[s.strstart & s.w_mask] = s.head[s.ins_h];
+          s.head[s.ins_h] = s.strstart;
+          /***/
+          /* strstart never exceeds WSIZE-MAX_MATCH, so there are
+           * always MIN_MATCH bytes ahead.
+           */
+        } while (--s.match_length !== 0);
+        s.strstart++;
+      } else
+      {
+        s.strstart += s.match_length;
+        s.match_length = 0;
+        s.ins_h = s.window[s.strstart];
+        /* UPDATE_HASH(s, s.ins_h, s.window[s.strstart+1]); */
+        s.ins_h = ((s.ins_h << s.hash_shift) ^ s.window[s.strstart + 1]) & s.hash_mask;
+
+//#if MIN_MATCH != 3
+//                Call UPDATE_HASH() MIN_MATCH-3 more times
+//#endif
+        /* If lookahead < MIN_MATCH, ins_h is garbage, but it does not
+         * matter since it will be recomputed at next deflate call.
+         */
+      }
+    } else {
+      /* No match, output a literal byte */
+      //Tracevv((stderr,"%c", s.window[s.strstart]));
+      /*** _tr_tally_lit(s, s.window[s.strstart], bflush); ***/
+      bflush = trees._tr_tally(s, 0, s.window[s.strstart]);
+
+      s.lookahead--;
+      s.strstart++;
+    }
+    if (bflush) {
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+    }
+  }
+  s.insert = ((s.strstart < (MIN_MATCH - 1)) ? s.strstart : MIN_MATCH - 1);
+  if (flush === Z_FINISH) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+    return BS_FINISH_DONE;
+  }
+  if (s.last_lit) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+  }
+  return BS_BLOCK_DONE;
+}
+
+/* ===========================================================================
+ * Same as above, but achieves better compression. We use a lazy
+ * evaluation for matches: a match is finally adopted only if there is
+ * no better match at the next window position.
+ */
+function deflate_slow(s, flush) {
+  var hash_head;          /* head of hash chain */
+  var bflush;              /* set if current block must be flushed */
+
+  var max_insert;
+
+  /* Process the input block. */
+  for (;;) {
+    /* Make sure that we always have enough lookahead, except
+     * at the end of the input file. We need MAX_MATCH bytes
+     * for the next match, plus MIN_MATCH bytes to insert the
+     * string following the next match.
+     */
+    if (s.lookahead < MIN_LOOKAHEAD) {
+      fill_window(s);
+      if (s.lookahead < MIN_LOOKAHEAD && flush === Z_NO_FLUSH) {
+        return BS_NEED_MORE;
+      }
+      if (s.lookahead === 0) { break; } /* flush the current block */
+    }
+
+    /* Insert the string window[strstart .. strstart+2] in the
+     * dictionary, and set hash_head to the head of the hash chain:
+     */
+    hash_head = 0/*NIL*/;
+    if (s.lookahead >= MIN_MATCH) {
+      /*** INSERT_STRING(s, s.strstart, hash_head); ***/
+      s.ins_h = ((s.ins_h << s.hash_shift) ^ s.window[s.strstart + MIN_MATCH - 1]) & s.hash_mask;
+      hash_head = s.prev[s.strstart & s.w_mask] = s.head[s.ins_h];
+      s.head[s.ins_h] = s.strstart;
+      /***/
+    }
+
+    /* Find the longest match, discarding those <= prev_length.
+     */
+    s.prev_length = s.match_length;
+    s.prev_match = s.match_start;
+    s.match_length = MIN_MATCH - 1;
+
+    if (hash_head !== 0/*NIL*/ && s.prev_length < s.max_lazy_match &&
+        s.strstart - hash_head <= (s.w_size - MIN_LOOKAHEAD)/*MAX_DIST(s)*/) {
+      /* To simplify the code, we prevent matches with the string
+       * of window index 0 (in particular we have to avoid a match
+       * of the string with itself at the start of the input file).
+       */
+      s.match_length = longest_match(s, hash_head);
+      /* longest_match() sets match_start */
+
+      if (s.match_length <= 5 &&
+         (s.strategy === Z_FILTERED || (s.match_length === MIN_MATCH && s.strstart - s.match_start > 4096/*TOO_FAR*/))) {
+
+        /* If prev_match is also MIN_MATCH, match_start is garbage
+         * but we will ignore the current match anyway.
+         */
+        s.match_length = MIN_MATCH - 1;
+      }
+    }
+    /* If there was a match at the previous step and the current
+     * match is not better, output the previous match:
+     */
+    if (s.prev_length >= MIN_MATCH && s.match_length <= s.prev_length) {
+      max_insert = s.strstart + s.lookahead - MIN_MATCH;
+      /* Do not insert strings in hash table beyond this. */
+
+      //check_match(s, s.strstart-1, s.prev_match, s.prev_length);
+
+      /***_tr_tally_dist(s, s.strstart - 1 - s.prev_match,
+                     s.prev_length - MIN_MATCH, bflush);***/
+      bflush = trees._tr_tally(s, s.strstart - 1 - s.prev_match, s.prev_length - MIN_MATCH);
+      /* Insert in hash table all strings up to the end of the match.
+       * strstart-1 and strstart are already inserted. If there is not
+       * enough lookahead, the last two strings are not inserted in
+       * the hash table.
+       */
+      s.lookahead -= s.prev_length - 1;
+      s.prev_length -= 2;
+      do {
+        if (++s.strstart <= max_insert) {
+          /*** INSERT_STRING(s, s.strstart, hash_head); ***/
+          s.ins_h = ((s.ins_h << s.hash_shift) ^ s.window[s.strstart + MIN_MATCH - 1]) & s.hash_mask;
+          hash_head = s.prev[s.strstart & s.w_mask] = s.head[s.ins_h];
+          s.head[s.ins_h] = s.strstart;
+          /***/
+        }
+      } while (--s.prev_length !== 0);
+      s.match_available = 0;
+      s.match_length = MIN_MATCH - 1;
+      s.strstart++;
+
+      if (bflush) {
+        /*** FLUSH_BLOCK(s, 0); ***/
+        flush_block_only(s, false);
+        if (s.strm.avail_out === 0) {
+          return BS_NEED_MORE;
+        }
+        /***/
+      }
+
+    } else if (s.match_available) {
+      /* If there was no match at the previous position, output a
+       * single literal. If there was a match but the current match
+       * is longer, truncate the previous match to a single literal.
+       */
+      //Tracevv((stderr,"%c", s->window[s->strstart-1]));
+      /*** _tr_tally_lit(s, s.window[s.strstart-1], bflush); ***/
+      bflush = trees._tr_tally(s, 0, s.window[s.strstart - 1]);
+
+      if (bflush) {
+        /*** FLUSH_BLOCK_ONLY(s, 0) ***/
+        flush_block_only(s, false);
+        /***/
+      }
+      s.strstart++;
+      s.lookahead--;
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+    } else {
+      /* There is no previous match to compare with, wait for
+       * the next step to decide.
+       */
+      s.match_available = 1;
+      s.strstart++;
+      s.lookahead--;
+    }
+  }
+  //Assert (flush != Z_NO_FLUSH, "no flush?");
+  if (s.match_available) {
+    //Tracevv((stderr,"%c", s->window[s->strstart-1]));
+    /*** _tr_tally_lit(s, s.window[s.strstart-1], bflush); ***/
+    bflush = trees._tr_tally(s, 0, s.window[s.strstart - 1]);
+
+    s.match_available = 0;
+  }
+  s.insert = s.strstart < MIN_MATCH - 1 ? s.strstart : MIN_MATCH - 1;
+  if (flush === Z_FINISH) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+    return BS_FINISH_DONE;
+  }
+  if (s.last_lit) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+  }
+
+  return BS_BLOCK_DONE;
+}
+
+
+/* ===========================================================================
+ * For Z_RLE, simply look for runs of bytes, generate matches only of distance
+ * one.  Do not maintain a hash table.  (It will be regenerated if this run of
+ * deflate switches away from Z_RLE.)
+ */
+function deflate_rle(s, flush) {
+  var bflush;            /* set if current block must be flushed */
+  var prev;              /* byte at distance one to match */
+  var scan, strend;      /* scan goes up to strend for length of run */
+
+  var _win = s.window;
+
+  for (;;) {
+    /* Make sure that we always have enough lookahead, except
+     * at the end of the input file. We need MAX_MATCH bytes
+     * for the longest run, plus one for the unrolled loop.
+     */
+    if (s.lookahead <= MAX_MATCH) {
+      fill_window(s);
+      if (s.lookahead <= MAX_MATCH && flush === Z_NO_FLUSH) {
+        return BS_NEED_MORE;
+      }
+      if (s.lookahead === 0) { break; } /* flush the current block */
+    }
+
+    /* See how many times the previous byte repeats */
+    s.match_length = 0;
+    if (s.lookahead >= MIN_MATCH && s.strstart > 0) {
+      scan = s.strstart - 1;
+      prev = _win[scan];
+      if (prev === _win[++scan] && prev === _win[++scan] && prev === _win[++scan]) {
+        strend = s.strstart + MAX_MATCH;
+        do {
+          /*jshint noempty:false*/
+        } while (prev === _win[++scan] && prev === _win[++scan] &&
+                 prev === _win[++scan] && prev === _win[++scan] &&
+                 prev === _win[++scan] && prev === _win[++scan] &&
+                 prev === _win[++scan] && prev === _win[++scan] &&
+                 scan < strend);
+        s.match_length = MAX_MATCH - (strend - scan);
+        if (s.match_length > s.lookahead) {
+          s.match_length = s.lookahead;
+        }
+      }
+      //Assert(scan <= s->window+(uInt)(s->window_size-1), "wild scan");
+    }
+
+    /* Emit match if have run of MIN_MATCH or longer, else emit literal */
+    if (s.match_length >= MIN_MATCH) {
+      //check_match(s, s.strstart, s.strstart - 1, s.match_length);
+
+      /*** _tr_tally_dist(s, 1, s.match_length - MIN_MATCH, bflush); ***/
+      bflush = trees._tr_tally(s, 1, s.match_length - MIN_MATCH);
+
+      s.lookahead -= s.match_length;
+      s.strstart += s.match_length;
+      s.match_length = 0;
+    } else {
+      /* No match, output a literal byte */
+      //Tracevv((stderr,"%c", s->window[s->strstart]));
+      /*** _tr_tally_lit(s, s.window[s.strstart], bflush); ***/
+      bflush = trees._tr_tally(s, 0, s.window[s.strstart]);
+
+      s.lookahead--;
+      s.strstart++;
+    }
+    if (bflush) {
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+    }
+  }
+  s.insert = 0;
+  if (flush === Z_FINISH) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+    return BS_FINISH_DONE;
+  }
+  if (s.last_lit) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+  }
+  return BS_BLOCK_DONE;
+}
+
+/* ===========================================================================
+ * For Z_HUFFMAN_ONLY, do not look for matches.  Do not maintain a hash table.
+ * (It will be regenerated if this run of deflate switches away from Huffman.)
+ */
+function deflate_huff(s, flush) {
+  var bflush;             /* set if current block must be flushed */
+
+  for (;;) {
+    /* Make sure that we have a literal to write. */
+    if (s.lookahead === 0) {
+      fill_window(s);
+      if (s.lookahead === 0) {
+        if (flush === Z_NO_FLUSH) {
+          return BS_NEED_MORE;
+        }
+        break;      /* flush the current block */
+      }
+    }
+
+    /* Output a literal byte */
+    s.match_length = 0;
+    //Tracevv((stderr,"%c", s->window[s->strstart]));
+    /*** _tr_tally_lit(s, s.window[s.strstart], bflush); ***/
+    bflush = trees._tr_tally(s, 0, s.window[s.strstart]);
+    s.lookahead--;
+    s.strstart++;
+    if (bflush) {
+      /*** FLUSH_BLOCK(s, 0); ***/
+      flush_block_only(s, false);
+      if (s.strm.avail_out === 0) {
+        return BS_NEED_MORE;
+      }
+      /***/
+    }
+  }
+  s.insert = 0;
+  if (flush === Z_FINISH) {
+    /*** FLUSH_BLOCK(s, 1); ***/
+    flush_block_only(s, true);
+    if (s.strm.avail_out === 0) {
+      return BS_FINISH_STARTED;
+    }
+    /***/
+    return BS_FINISH_DONE;
+  }
+  if (s.last_lit) {
+    /*** FLUSH_BLOCK(s, 0); ***/
+    flush_block_only(s, false);
+    if (s.strm.avail_out === 0) {
+      return BS_NEED_MORE;
+    }
+    /***/
+  }
+  return BS_BLOCK_DONE;
+}
+
+/* Values for max_lazy_match, good_match and max_chain_length, depending on
+ * the desired pack level (0..9). The values given below have been tuned to
+ * exclude worst case performance for pathological files. Better values may be
+ * found for specific files.
+ */
+function Config(good_length, max_lazy, nice_length, max_chain, func) {
+  this.good_length = good_length;
+  this.max_lazy = max_lazy;
+  this.nice_length = nice_length;
+  this.max_chain = max_chain;
+  this.func = func;
+}
+
+var configuration_table;
+
+configuration_table = [
+  /*      good lazy nice chain */
+  new Config(0, 0, 0, 0, deflate_stored),          /* 0 store only */
+  new Config(4, 4, 8, 4, deflate_fast),            /* 1 max speed, no lazy matches */
+  new Config(4, 5, 16, 8, deflate_fast),           /* 2 */
+  new Config(4, 6, 32, 32, deflate_fast),          /* 3 */
+
+  new Config(4, 4, 16, 16, deflate_slow),          /* 4 lazy matches */
+  new Config(8, 16, 32, 32, deflate_slow),         /* 5 */
+  new Config(8, 16, 128, 128, deflate_slow),       /* 6 */
+  new Config(8, 32, 128, 256, deflate_slow),       /* 7 */
+  new Config(32, 128, 258, 1024, deflate_slow),    /* 8 */
+  new Config(32, 258, 258, 4096, deflate_slow)     /* 9 max compression */
+];
+
+
+/* ===========================================================================
+ * Initialize the "longest match" routines for a new zlib stream
+ */
+function lm_init(s) {
+  s.window_size = 2 * s.w_size;
+
+  /*** CLEAR_HASH(s); ***/
+  zero(s.head); // Fill with NIL (= 0);
+
+  /* Set the default configuration parameters:
+   */
+  s.max_lazy_match = configuration_table[s.level].max_lazy;
+  s.good_match = configuration_table[s.level].good_length;
+  s.nice_match = configuration_table[s.level].nice_length;
+  s.max_chain_length = configuration_table[s.level].max_chain;
+
+  s.strstart = 0;
+  s.block_start = 0;
+  s.lookahead = 0;
+  s.insert = 0;
+  s.match_length = s.prev_length = MIN_MATCH - 1;
+  s.match_available = 0;
+  s.ins_h = 0;
+}
+
+
+function DeflateState() {
+  this.strm = null;            /* pointer back to this zlib stream */
+  this.status = 0;            /* as the name implies */
+  this.pending_buf = null;      /* output still pending */
+  this.pending_buf_size = 0;  /* size of pending_buf */
+  this.pending_out = 0;       /* next pending byte to output to the stream */
+  this.pending = 0;           /* nb of bytes in the pending buffer */
+  this.wrap = 0;              /* bit 0 true for zlib, bit 1 true for gzip */
+  this.gzhead = null;         /* gzip header information to write */
+  this.gzindex = 0;           /* where in extra, name, or comment */
+  this.method = Z_DEFLATED; /* can only be DEFLATED */
+  this.last_flush = -1;   /* value of flush param for previous deflate call */
+
+  this.w_size = 0;  /* LZ77 window size (32K by default) */
+  this.w_bits = 0;  /* log2(w_size)  (8..16) */
+  this.w_mask = 0;  /* w_size - 1 */
+
+  this.window = null;
+  /* Sliding window. Input bytes are read into the second half of the window,
+   * and move to the first half later to keep a dictionary of at least wSize
+   * bytes. With this organization, matches are limited to a distance of
+   * wSize-MAX_MATCH bytes, but this ensures that IO is always
+   * performed with a length multiple of the block size.
+   */
+
+  this.window_size = 0;
+  /* Actual size of window: 2*wSize, except when the user input buffer
+   * is directly used as sliding window.
+   */
+
+  this.prev = null;
+  /* Link to older string with same hash index. To limit the size of this
+   * array to 64K, this link is maintained only for the last 32K strings.
+   * An index in this array is thus a window index modulo 32K.
+   */
+
+  this.head = null;   /* Heads of the hash chains or NIL. */
+
+  this.ins_h = 0;       /* hash index of string to be inserted */
+  this.hash_size = 0;   /* number of elements in hash table */
+  this.hash_bits = 0;   /* log2(hash_size) */
+  this.hash_mask = 0;   /* hash_size-1 */
+
+  this.hash_shift = 0;
+  /* Number of bits by which ins_h must be shifted at each input
+   * step. It must be such that after MIN_MATCH steps, the oldest
+   * byte no longer takes part in the hash key, that is:
+   *   hash_shift * MIN_MATCH >= hash_bits
+   */
+
+  this.block_start = 0;
+  /* Window position at the beginning of the current output block. Gets
+   * negative when the window is moved backwards.
+   */
+
+  this.match_length = 0;      /* length of best match */
+  this.prev_match = 0;        /* previous match */
+  this.match_available = 0;   /* set if previous match exists */
+  this.strstart = 0;          /* start of string to insert */
+  this.match_start = 0;       /* start of matching string */
+  this.lookahead = 0;         /* number of valid bytes ahead in window */
+
+  this.prev_length = 0;
+  /* Length of the best match at previous step. Matches not greater than this
+   * are discarded. This is used in the lazy match evaluation.
+   */
+
+  this.max_chain_length = 0;
+  /* To speed up deflation, hash chains are never searched beyond this
+   * length.  A higher limit improves compression ratio but degrades the
+   * speed.
+   */
+
+  this.max_lazy_match = 0;
+  /* Attempt to find a better match only when the current match is strictly
+   * smaller than this value. This mechanism is used only for compression
+   * levels >= 4.
+   */
+  // That's alias to max_lazy_match, don't use directly
+  //this.max_insert_length = 0;
+  /* Insert new strings in the hash table only if the match length is not
+   * greater than this length. This saves time but degrades compression.
+   * max_insert_length is used only for compression levels <= 3.
+   */
+
+  this.level = 0;     /* compression level (1..9) */
+  this.strategy = 0;  /* favor or force Huffman coding*/
+
+  this.good_match = 0;
+  /* Use a faster search when the previous match is longer than this */
+
+  this.nice_match = 0; /* Stop searching when current match exceeds this */
+
+              /* used by trees.c: */
+
+  /* Didn't use ct_data typedef below to suppress compiler warning */
+
+  // struct ct_data_s dyn_ltree[HEAP_SIZE];   /* literal and length tree */
+  // struct ct_data_s dyn_dtree[2*D_CODES+1]; /* distance tree */
+  // struct ct_data_s bl_tree[2*BL_CODES+1];  /* Huffman tree for bit lengths */
+
+  // Use flat array of DOUBLE size, with interleaved fata,
+  // because JS does not support effective
+  this.dyn_ltree  = new utils.Buf16(HEAP_SIZE * 2);
+  this.dyn_dtree  = new utils.Buf16((2 * D_CODES + 1) * 2);
+  this.bl_tree    = new utils.Buf16((2 * BL_CODES + 1) * 2);
+  zero(this.dyn_ltree);
+  zero(this.dyn_dtree);
+  zero(this.bl_tree);
+
+  this.l_desc   = null;         /* desc. for literal tree */
+  this.d_desc   = null;         /* desc. for distance tree */
+  this.bl_desc  = null;         /* desc. for bit length tree */
+
+  //ush bl_count[MAX_BITS+1];
+  this.bl_count = new utils.Buf16(MAX_BITS + 1);
+  /* number of codes at each bit length for an optimal tree */
+
+  //int heap[2*L_CODES+1];      /* heap used to build the Huffman trees */
+  this.heap = new utils.Buf16(2 * L_CODES + 1);  /* heap used to build the Huffman trees */
+  zero(this.heap);
+
+  this.heap_len = 0;               /* number of elements in the heap */
+  this.heap_max = 0;               /* element of largest frequency */
+  /* The sons of heap[n] are heap[2*n] and heap[2*n+1]. heap[0] is not used.
+   * The same heap array is used to build all trees.
+   */
+
+  this.depth = new utils.Buf16(2 * L_CODES + 1); //uch depth[2*L_CODES+1];
+  zero(this.depth);
+  /* Depth of each subtree used as tie breaker for trees of equal frequency
+   */
+
+  this.l_buf = 0;          /* buffer index for literals or lengths */
+
+  this.lit_bufsize = 0;
+  /* Size of match buffer for literals/lengths.  There are 4 reasons for
+   * limiting lit_bufsize to 64K:
+   *   - frequencies can be kept in 16 bit counters
+   *   - if compression is not successful for the first block, all input
+   *     data is still in the window so we can still emit a stored block even
+   *     when input comes from standard input.  (This can also be done for
+   *     all blocks if lit_bufsize is not greater than 32K.)
+   *   - if compression is not successful for a file smaller than 64K, we can
+   *     even emit a stored file instead of a stored block (saving 5 bytes).
+   *     This is applicable only for zip (not gzip or zlib).
+   *   - creating new Huffman trees less frequently may not provide fast
+   *     adaptation to changes in the input data statistics. (Take for
+   *     example a binary file with poorly compressible code followed by
+   *     a highly compressible string table.) Smaller buffer sizes give
+   *     fast adaptation but have of course the overhead of transmitting
+   *     trees more frequently.
+   *   - I can't count above 4
+   */
+
+  this.last_lit = 0;      /* running index in l_buf */
+
+  this.d_buf = 0;
+  /* Buffer index for distances. To simplify the code, d_buf and l_buf have
+   * the same number of elements. To use different lengths, an extra flag
+   * array would be necessary.
+   */
+
+  this.opt_len = 0;       /* bit length of current block with optimal trees */
+  this.static_len = 0;    /* bit length of current block with static trees */
+  this.matches = 0;       /* number of string matches in current block */
+  this.insert = 0;        /* bytes at end of window left to insert */
+
+
+  this.bi_buf = 0;
+  /* Output buffer. bits are inserted starting at the bottom (least
+   * significant bits).
+   */
+  this.bi_valid = 0;
+  /* Number of valid bits in bi_buf.  All bits above the last valid bit
+   * are always zero.
+   */
+
+  // Used for window memory init. We safely ignore it for JS. That makes
+  // sense only for pointers and memory check tools.
+  //this.high_water = 0;
+  /* High water mark offset in window for initialized bytes -- bytes above
+   * this are set to zero in order to avoid memory check warnings when
+   * longest match routines access bytes past the input.  This is then
+   * updated to the new high water mark.
+   */
+}
+
+
+function deflateResetKeep(strm) {
+  var s;
+
+  if (!strm || !strm.state) {
+    return err(strm, Z_STREAM_ERROR);
+  }
+
+  strm.total_in = strm.total_out = 0;
+  strm.data_type = Z_UNKNOWN;
+
+  s = strm.state;
+  s.pending = 0;
+  s.pending_out = 0;
+
+  if (s.wrap < 0) {
+    s.wrap = -s.wrap;
+    /* was made negative by deflate(..., Z_FINISH); */
+  }
+  s.status = (s.wrap ? INIT_STATE : BUSY_STATE);
+  strm.adler = (s.wrap === 2) ?
+    0  // crc32(0, Z_NULL, 0)
+  :
+    1; // adler32(0, Z_NULL, 0)
+  s.last_flush = Z_NO_FLUSH;
+  trees._tr_init(s);
+  return Z_OK;
+}
+
+
+function deflateReset(strm) {
+  var ret = deflateResetKeep(strm);
+  if (ret === Z_OK) {
+    lm_init(strm.state);
+  }
+  return ret;
+}
+
+
+function deflateSetHeader(strm, head) {
+  if (!strm || !strm.state) { return Z_STREAM_ERROR; }
+  if (strm.state.wrap !== 2) { return Z_STREAM_ERROR; }
+  strm.state.gzhead = head;
+  return Z_OK;
+}
+
+
+function deflateInit2(strm, level, method, windowBits, memLevel, strategy) {
+  if (!strm) { // === Z_NULL
+    return Z_STREAM_ERROR;
+  }
+  var wrap = 1;
+
+  if (level === Z_DEFAULT_COMPRESSION) {
+    level = 6;
+  }
+
+  if (windowBits < 0) { /* suppress zlib wrapper */
+    wrap = 0;
+    windowBits = -windowBits;
+  }
+
+  else if (windowBits > 15) {
+    wrap = 2;           /* write gzip wrapper instead */
+    windowBits -= 16;
+  }
+
+
+  if (memLevel < 1 || memLevel > MAX_MEM_LEVEL || method !== Z_DEFLATED ||
+    windowBits < 8 || windowBits > 15 || level < 0 || level > 9 ||
+    strategy < 0 || strategy > Z_FIXED) {
+    return err(strm, Z_STREAM_ERROR);
+  }
+
+
+  if (windowBits === 8) {
+    windowBits = 9;
+  }
+  /* until 256-byte window bug fixed */
+
+  var s = new DeflateState();
+
+  strm.state = s;
+  s.strm = strm;
+
+  s.wrap = wrap;
+  s.gzhead = null;
+  s.w_bits = windowBits;
+  s.w_size = 1 << s.w_bits;
+  s.w_mask = s.w_size - 1;
+
+  s.hash_bits = memLevel + 7;
+  s.hash_size = 1 << s.hash_bits;
+  s.hash_mask = s.hash_size - 1;
+  s.hash_shift = ~~((s.hash_bits + MIN_MATCH - 1) / MIN_MATCH);
+
+  s.window = new utils.Buf8(s.w_size * 2);
+  s.head = new utils.Buf16(s.hash_size);
+  s.prev = new utils.Buf16(s.w_size);
+
+  // Don't need mem init magic for JS.
+  //s.high_water = 0;  /* nothing written to s->window yet */
+
+  s.lit_bufsize = 1 << (memLevel + 6); /* 16K elements by default */
+
+  s.pending_buf_size = s.lit_bufsize * 4;
+
+  //overlay = (ushf *) ZALLOC(strm, s->lit_bufsize, sizeof(ush)+2);
+  //s->pending_buf = (uchf *) overlay;
+  s.pending_buf = new utils.Buf8(s.pending_buf_size);
+
+  // It is offset from `s.pending_buf` (size is `s.lit_bufsize * 2`)
+  //s->d_buf = overlay + s->lit_bufsize/sizeof(ush);
+  s.d_buf = 1 * s.lit_bufsize;
+
+  //s->l_buf = s->pending_buf + (1+sizeof(ush))*s->lit_bufsize;
+  s.l_buf = (1 + 2) * s.lit_bufsize;
+
+  s.level = level;
+  s.strategy = strategy;
+  s.method = method;
+
+  return deflateReset(strm);
+}
+
+function deflateInit(strm, level) {
+  return deflateInit2(strm, level, Z_DEFLATED, MAX_WBITS, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+}
+
+
+function deflate(strm, flush) {
+  var old_flush, s;
+  var beg, val; // for gzip header write only
+
+  if (!strm || !strm.state ||
+    flush > Z_BLOCK || flush < 0) {
+    return strm ? err(strm, Z_STREAM_ERROR) : Z_STREAM_ERROR;
+  }
+
+  s = strm.state;
+
+  if (!strm.output ||
+      (!strm.input && strm.avail_in !== 0) ||
+      (s.status === FINISH_STATE && flush !== Z_FINISH)) {
+    return err(strm, (strm.avail_out === 0) ? Z_BUF_ERROR : Z_STREAM_ERROR);
+  }
+
+  s.strm = strm; /* just in case */
+  old_flush = s.last_flush;
+  s.last_flush = flush;
+
+  /* Write the header */
+  if (s.status === INIT_STATE) {
+
+    if (s.wrap === 2) { // GZIP header
+      strm.adler = 0;  //crc32(0L, Z_NULL, 0);
+      put_byte(s, 31);
+      put_byte(s, 139);
+      put_byte(s, 8);
+      if (!s.gzhead) { // s->gzhead == Z_NULL
+        put_byte(s, 0);
+        put_byte(s, 0);
+        put_byte(s, 0);
+        put_byte(s, 0);
+        put_byte(s, 0);
+        put_byte(s, s.level === 9 ? 2 :
+                    (s.strategy >= Z_HUFFMAN_ONLY || s.level < 2 ?
+                     4 : 0));
+        put_byte(s, OS_CODE);
+        s.status = BUSY_STATE;
+      }
+      else {
+        put_byte(s, (s.gzhead.text ? 1 : 0) +
+                    (s.gzhead.hcrc ? 2 : 0) +
+                    (!s.gzhead.extra ? 0 : 4) +
+                    (!s.gzhead.name ? 0 : 8) +
+                    (!s.gzhead.comment ? 0 : 16)
+                );
+        put_byte(s, s.gzhead.time & 0xff);
+        put_byte(s, (s.gzhead.time >> 8) & 0xff);
+        put_byte(s, (s.gzhead.time >> 16) & 0xff);
+        put_byte(s, (s.gzhead.time >> 24) & 0xff);
+        put_byte(s, s.level === 9 ? 2 :
+                    (s.strategy >= Z_HUFFMAN_ONLY || s.level < 2 ?
+                     4 : 0));
+        put_byte(s, s.gzhead.os & 0xff);
+        if (s.gzhead.extra && s.gzhead.extra.length) {
+          put_byte(s, s.gzhead.extra.length & 0xff);
+          put_byte(s, (s.gzhead.extra.length >> 8) & 0xff);
+        }
+        if (s.gzhead.hcrc) {
+          strm.adler = crc32(strm.adler, s.pending_buf, s.pending, 0);
+        }
+        s.gzindex = 0;
+        s.status = EXTRA_STATE;
+      }
+    }
+    else // DEFLATE header
+    {
+      var header = (Z_DEFLATED + ((s.w_bits - 8) << 4)) << 8;
+      var level_flags = -1;
+
+      if (s.strategy >= Z_HUFFMAN_ONLY || s.level < 2) {
+        level_flags = 0;
+      } else if (s.level < 6) {
+        level_flags = 1;
+      } else if (s.level === 6) {
+        level_flags = 2;
+      } else {
+        level_flags = 3;
+      }
+      header |= (level_flags << 6);
+      if (s.strstart !== 0) { header |= PRESET_DICT; }
+      header += 31 - (header % 31);
+
+      s.status = BUSY_STATE;
+      putShortMSB(s, header);
+
+      /* Save the adler32 of the preset dictionary: */
+      if (s.strstart !== 0) {
+        putShortMSB(s, strm.adler >>> 16);
+        putShortMSB(s, strm.adler & 0xffff);
+      }
+      strm.adler = 1; // adler32(0L, Z_NULL, 0);
+    }
+  }
+
+//#ifdef GZIP
+  if (s.status === EXTRA_STATE) {
+    if (s.gzhead.extra/* != Z_NULL*/) {
+      beg = s.pending;  /* start of bytes to update crc */
+
+      while (s.gzindex < (s.gzhead.extra.length & 0xffff)) {
+        if (s.pending === s.pending_buf_size) {
+          if (s.gzhead.hcrc && s.pending > beg) {
+            strm.adler = crc32(strm.adler, s.pending_buf, s.pending - beg, beg);
+          }
+          flush_pending(strm);
+          beg = s.pending;
+          if (s.pending === s.pending_buf_size) {
+            break;
+          }
+        }
+        put_byte(s, s.gzhead.extra[s.gzindex] & 0xff);
+        s.gzindex++;
+      }
+      if (s.gzhead.hcrc && s.pending > beg) {
+        strm.adler = crc32(strm.adler, s.pending_buf, s.pending - beg, beg);
+      }
+      if (s.gzindex === s.gzhead.extra.length) {
+        s.gzindex = 0;
+        s.status = NAME_STATE;
+      }
+    }
+    else {
+      s.status = NAME_STATE;
+    }
+  }
+  if (s.status === NAME_STATE) {
+    if (s.gzhead.name/* != Z_NULL*/) {
+      beg = s.pending;  /* start of bytes to update crc */
+      //int val;
+
+      do {
+        if (s.pending === s.pending_buf_size) {
+          if (s.gzhead.hcrc && s.pending > beg) {
+            strm.adler = crc32(strm.adler, s.pending_buf, s.pending - beg, beg);
+          }
+          flush_pending(strm);
+          beg = s.pending;
+          if (s.pending === s.pending_buf_size) {
+            val = 1;
+            break;
+          }
+        }
+        // JS specific: little magic to add zero terminator to end of string
+        if (s.gzindex < s.gzhead.name.length) {
+          val = s.gzhead.name.charCodeAt(s.gzindex++) & 0xff;
+        } else {
+          val = 0;
+        }
+        put_byte(s, val);
+      } while (val !== 0);
+
+      if (s.gzhead.hcrc && s.pending > beg) {
+        strm.adler = crc32(strm.adler, s.pending_buf, s.pending - beg, beg);
+      }
+      if (val === 0) {
+        s.gzindex = 0;
+        s.status = COMMENT_STATE;
+      }
+    }
+    else {
+      s.status = COMMENT_STATE;
+    }
+  }
+  if (s.status === COMMENT_STATE) {
+    if (s.gzhead.comment/* != Z_NULL*/) {
+      beg = s.pending;  /* start of bytes to update crc */
+      //int val;
+
+      do {
+        if (s.pending === s.pending_buf_size) {
+          if (s.gzhead.hcrc && s.pending > beg) {
+            strm.adler = crc32(strm.adler, s.pending_buf, s.pending - beg, beg);
+          }
+          flush_pending(strm);
+          beg = s.pending;
+          if (s.pending === s.pending_buf_size) {
+            val = 1;
+            break;
+          }
+        }
+        // JS specific: little magic to add zero terminator to end of string
+        if (s.gzindex < s.gzhead.comment.length) {
+          val = s.gzhead.comment.charCodeAt(s.gzindex++) & 0xff;
+        } else {
+          val = 0;
+        }
+        put_byte(s, val);
+      } while (val !== 0);
+
+      if (s.gzhead.hcrc && s.pending > beg) {
+        strm.adler = crc32(strm.adler, s.pending_buf, s.pending - beg, beg);
+      }
+      if (val === 0) {
+        s.status = HCRC_STATE;
+      }
+    }
+    else {
+      s.status = HCRC_STATE;
+    }
+  }
+  if (s.status === HCRC_STATE) {
+    if (s.gzhead.hcrc) {
+      if (s.pending + 2 > s.pending_buf_size) {
+        flush_pending(strm);
+      }
+      if (s.pending + 2 <= s.pending_buf_size) {
+        put_byte(s, strm.adler & 0xff);
+        put_byte(s, (strm.adler >> 8) & 0xff);
+        strm.adler = 0; //crc32(0L, Z_NULL, 0);
+        s.status = BUSY_STATE;
+      }
+    }
+    else {
+      s.status = BUSY_STATE;
+    }
+  }
+//#endif
+
+  /* Flush as much pending output as possible */
+  if (s.pending !== 0) {
+    flush_pending(strm);
+    if (strm.avail_out === 0) {
+      /* Since avail_out is 0, deflate will be called again with
+       * more output space, but possibly with both pending and
+       * avail_in equal to zero. There won't be anything to do,
+       * but this is not an error situation so make sure we
+       * return OK instead of BUF_ERROR at next call of deflate:
+       */
+      s.last_flush = -1;
+      return Z_OK;
+    }
+
+    /* Make sure there is something to do and avoid duplicate consecutive
+     * flushes. For repeated and useless calls with Z_FINISH, we keep
+     * returning Z_STREAM_END instead of Z_BUF_ERROR.
+     */
+  } else if (strm.avail_in === 0 && rank(flush) <= rank(old_flush) &&
+    flush !== Z_FINISH) {
+    return err(strm, Z_BUF_ERROR);
+  }
+
+  /* User must not provide more input after the first FINISH: */
+  if (s.status === FINISH_STATE && strm.avail_in !== 0) {
+    return err(strm, Z_BUF_ERROR);
+  }
+
+  /* Start a new block or continue the current one.
+   */
+  if (strm.avail_in !== 0 || s.lookahead !== 0 ||
+    (flush !== Z_NO_FLUSH && s.status !== FINISH_STATE)) {
+    var bstate = (s.strategy === Z_HUFFMAN_ONLY) ? deflate_huff(s, flush) :
+      (s.strategy === Z_RLE ? deflate_rle(s, flush) :
+        configuration_table[s.level].func(s, flush));
+
+    if (bstate === BS_FINISH_STARTED || bstate === BS_FINISH_DONE) {
+      s.status = FINISH_STATE;
+    }
+    if (bstate === BS_NEED_MORE || bstate === BS_FINISH_STARTED) {
+      if (strm.avail_out === 0) {
+        s.last_flush = -1;
+        /* avoid BUF_ERROR next call, see above */
+      }
+      return Z_OK;
+      /* If flush != Z_NO_FLUSH && avail_out == 0, the next call
+       * of deflate should use the same flush parameter to make sure
+       * that the flush is complete. So we don't have to output an
+       * empty block here, this will be done at next call. This also
+       * ensures that for a very small output buffer, we emit at most
+       * one empty block.
+       */
+    }
+    if (bstate === BS_BLOCK_DONE) {
+      if (flush === Z_PARTIAL_FLUSH) {
+        trees._tr_align(s);
+      }
+      else if (flush !== Z_BLOCK) { /* FULL_FLUSH or SYNC_FLUSH */
+
+        trees._tr_stored_block(s, 0, 0, false);
+        /* For a full flush, this empty block will be recognized
+         * as a special marker by inflate_sync().
+         */
+        if (flush === Z_FULL_FLUSH) {
+          /*** CLEAR_HASH(s); ***/             /* forget history */
+          zero(s.head); // Fill with NIL (= 0);
+
+          if (s.lookahead === 0) {
+            s.strstart = 0;
+            s.block_start = 0;
+            s.insert = 0;
+          }
+        }
+      }
+      flush_pending(strm);
+      if (strm.avail_out === 0) {
+        s.last_flush = -1; /* avoid BUF_ERROR at next call, see above */
+        return Z_OK;
+      }
+    }
+  }
+  //Assert(strm->avail_out > 0, "bug2");
+  //if (strm.avail_out <= 0) { throw new Error("bug2");}
+
+  if (flush !== Z_FINISH) { return Z_OK; }
+  if (s.wrap <= 0) { return Z_STREAM_END; }
+
+  /* Write the trailer */
+  if (s.wrap === 2) {
+    put_byte(s, strm.adler & 0xff);
+    put_byte(s, (strm.adler >> 8) & 0xff);
+    put_byte(s, (strm.adler >> 16) & 0xff);
+    put_byte(s, (strm.adler >> 24) & 0xff);
+    put_byte(s, strm.total_in & 0xff);
+    put_byte(s, (strm.total_in >> 8) & 0xff);
+    put_byte(s, (strm.total_in >> 16) & 0xff);
+    put_byte(s, (strm.total_in >> 24) & 0xff);
+  }
+  else
+  {
+    putShortMSB(s, strm.adler >>> 16);
+    putShortMSB(s, strm.adler & 0xffff);
+  }
+
+  flush_pending(strm);
+  /* If avail_out is zero, the application will call deflate again
+   * to flush the rest.
+   */
+  if (s.wrap > 0) { s.wrap = -s.wrap; }
+  /* write the trailer only once! */
+  return s.pending !== 0 ? Z_OK : Z_STREAM_END;
+}
+
+function deflateEnd(strm) {
+  var status;
+
+  if (!strm/*== Z_NULL*/ || !strm.state/*== Z_NULL*/) {
+    return Z_STREAM_ERROR;
+  }
+
+  status = strm.state.status;
+  if (status !== INIT_STATE &&
+    status !== EXTRA_STATE &&
+    status !== NAME_STATE &&
+    status !== COMMENT_STATE &&
+    status !== HCRC_STATE &&
+    status !== BUSY_STATE &&
+    status !== FINISH_STATE
+  ) {
+    return err(strm, Z_STREAM_ERROR);
+  }
+
+  strm.state = null;
+
+  return status === BUSY_STATE ? err(strm, Z_DATA_ERROR) : Z_OK;
+}
+
+
+/* =========================================================================
+ * Initializes the compression dictionary from the given byte
+ * sequence without producing any compressed output.
+ */
+function deflateSetDictionary(strm, dictionary) {
+  var dictLength = dictionary.length;
+
+  var s;
+  var str, n;
+  var wrap;
+  var avail;
+  var next;
+  var input;
+  var tmpDict;
+
+  if (!strm/*== Z_NULL*/ || !strm.state/*== Z_NULL*/) {
+    return Z_STREAM_ERROR;
+  }
+
+  s = strm.state;
+  wrap = s.wrap;
+
+  if (wrap === 2 || (wrap === 1 && s.status !== INIT_STATE) || s.lookahead) {
+    return Z_STREAM_ERROR;
+  }
+
+  /* when using zlib wrappers, compute Adler-32 for provided dictionary */
+  if (wrap === 1) {
+    /* adler32(strm->adler, dictionary, dictLength); */
+    strm.adler = adler32(strm.adler, dictionary, dictLength, 0);
+  }
+
+  s.wrap = 0;   /* avoid computing Adler-32 in read_buf */
+
+  /* if dictionary would fill window, just replace the history */
+  if (dictLength >= s.w_size) {
+    if (wrap === 0) {            /* already empty otherwise */
+      /*** CLEAR_HASH(s); ***/
+      zero(s.head); // Fill with NIL (= 0);
+      s.strstart = 0;
+      s.block_start = 0;
+      s.insert = 0;
+    }
+    /* use the tail */
+    // dictionary = dictionary.slice(dictLength - s.w_size);
+    tmpDict = new utils.Buf8(s.w_size);
+    utils.arraySet(tmpDict, dictionary, dictLength - s.w_size, s.w_size, 0);
+    dictionary = tmpDict;
+    dictLength = s.w_size;
+  }
+  /* insert dictionary into window and hash */
+  avail = strm.avail_in;
+  next = strm.next_in;
+  input = strm.input;
+  strm.avail_in = dictLength;
+  strm.next_in = 0;
+  strm.input = dictionary;
+  fill_window(s);
+  while (s.lookahead >= MIN_MATCH) {
+    str = s.strstart;
+    n = s.lookahead - (MIN_MATCH - 1);
+    do {
+      /* UPDATE_HASH(s, s->ins_h, s->window[str + MIN_MATCH-1]); */
+      s.ins_h = ((s.ins_h << s.hash_shift) ^ s.window[str + MIN_MATCH - 1]) & s.hash_mask;
+
+      s.prev[str & s.w_mask] = s.head[s.ins_h];
+
+      s.head[s.ins_h] = str;
+      str++;
+    } while (--n);
+    s.strstart = str;
+    s.lookahead = MIN_MATCH - 1;
+    fill_window(s);
+  }
+  s.strstart += s.lookahead;
+  s.block_start = s.strstart;
+  s.insert = s.lookahead;
+  s.lookahead = 0;
+  s.match_length = s.prev_length = MIN_MATCH - 1;
+  s.match_available = 0;
+  strm.next_in = next;
+  strm.input = input;
+  strm.avail_in = avail;
+  s.wrap = wrap;
+  return Z_OK;
+}
+
+
+exports.deflateInit = deflateInit;
+exports.deflateInit2 = deflateInit2;
+exports.deflateReset = deflateReset;
+exports.deflateResetKeep = deflateResetKeep;
+exports.deflateSetHeader = deflateSetHeader;
+exports.deflate = deflate;
+exports.deflateEnd = deflateEnd;
+exports.deflateSetDictionary = deflateSetDictionary;
+exports.deflateInfo = 'pako deflate (from Nodeca project)';
+
+/* Not implemented
+exports.deflateBound = deflateBound;
+exports.deflateCopy = deflateCopy;
+exports.deflateParams = deflateParams;
+exports.deflatePending = deflatePending;
+exports.deflatePrime = deflatePrime;
+exports.deflateTune = deflateTune;
+*/
+
+},{"../utils/common":3,"./adler32":5,"./crc32":7,"./messages":13,"./trees":14}],9:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+function GZheader() {
+  /* true if compressed data believed to be text */
+  this.text       = 0;
+  /* modification time */
+  this.time       = 0;
+  /* extra flags (not used when writing a gzip file) */
+  this.xflags     = 0;
+  /* operating system */
+  this.os         = 0;
+  /* pointer to extra field or Z_NULL if none */
+  this.extra      = null;
+  /* extra field length (valid if extra != Z_NULL) */
+  this.extra_len  = 0; // Actually, we don't need it in JS,
+                       // but leave for few code modifications
+
+  //
+  // Setup limits is not necessary because in js we should not preallocate memory
+  // for inflate use constant limit in 65536 bytes
+  //
+
+  /* space at extra (only when reading header) */
+  // this.extra_max  = 0;
+  /* pointer to zero-terminated file name or Z_NULL */
+  this.name       = '';
+  /* space at name (only when reading header) */
+  // this.name_max   = 0;
+  /* pointer to zero-terminated comment or Z_NULL */
+  this.comment    = '';
+  /* space at comment (only when reading header) */
+  // this.comm_max   = 0;
+  /* true if there was or will be a header crc */
+  this.hcrc       = 0;
+  /* true when done reading gzip header (not used when writing a gzip file) */
+  this.done       = false;
+}
+
+module.exports = GZheader;
+
+},{}],10:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+// See state defs from inflate.js
+var BAD = 30;       /* got a data error -- remain here until reset */
+var TYPE = 12;      /* i: waiting for type bits, including last-flag bit */
+
+/*
+   Decode literal, length, and distance codes and write out the resulting
+   literal and match bytes until either not enough input or output is
+   available, an end-of-block is encountered, or a data error is encountered.
+   When large enough input and output buffers are supplied to inflate(), for
+   example, a 16K input buffer and a 64K output buffer, more than 95% of the
+   inflate execution time is spent in this routine.
+
+   Entry assumptions:
+
+        state.mode === LEN
+        strm.avail_in >= 6
+        strm.avail_out >= 258
+        start >= strm.avail_out
+        state.bits < 8
+
+   On return, state.mode is one of:
+
+        LEN -- ran out of enough output space or enough available input
+        TYPE -- reached end of block code, inflate() to interpret next block
+        BAD -- error in block data
+
+   Notes:
+
+    - The maximum input bits used by a length/distance pair is 15 bits for the
+      length code, 5 bits for the length extra, 15 bits for the distance code,
+      and 13 bits for the distance extra.  This totals 48 bits, or six bytes.
+      Therefore if strm.avail_in >= 6, then there is enough input to avoid
+      checking for available input while decoding.
+
+    - The maximum bytes that a single length/distance pair can output is 258
+      bytes, which is the maximum length that can be coded.  inflate_fast()
+      requires strm.avail_out >= 258 for each loop to avoid checking for
+      output space.
+ */
+module.exports = function inflate_fast(strm, start) {
+  var state;
+  var _in;                    /* local strm.input */
+  var last;                   /* have enough input while in < last */
+  var _out;                   /* local strm.output */
+  var beg;                    /* inflate()'s initial strm.output */
+  var end;                    /* while out < end, enough space available */
+//#ifdef INFLATE_STRICT
+  var dmax;                   /* maximum distance from zlib header */
+//#endif
+  var wsize;                  /* window size or zero if not using window */
+  var whave;                  /* valid bytes in the window */
+  var wnext;                  /* window write index */
+  // Use `s_window` instead `window`, avoid conflict with instrumentation tools
+  var s_window;               /* allocated sliding window, if wsize != 0 */
+  var hold;                   /* local strm.hold */
+  var bits;                   /* local strm.bits */
+  var lcode;                  /* local strm.lencode */
+  var dcode;                  /* local strm.distcode */
+  var lmask;                  /* mask for first level of length codes */
+  var dmask;                  /* mask for first level of distance codes */
+  var here;                   /* retrieved table entry */
+  var op;                     /* code bits, operation, extra bits, or */
+                              /*  window position, window bytes to copy */
+  var len;                    /* match length, unused bytes */
+  var dist;                   /* match distance */
+  var from;                   /* where to copy match from */
+  var from_source;
+
+
+  var input, output; // JS specific, because we have no pointers
+
+  /* copy state to local variables */
+  state = strm.state;
+  //here = state.here;
+  _in = strm.next_in;
+  input = strm.input;
+  last = _in + (strm.avail_in - 5);
+  _out = strm.next_out;
+  output = strm.output;
+  beg = _out - (start - strm.avail_out);
+  end = _out + (strm.avail_out - 257);
+//#ifdef INFLATE_STRICT
+  dmax = state.dmax;
+//#endif
+  wsize = state.wsize;
+  whave = state.whave;
+  wnext = state.wnext;
+  s_window = state.window;
+  hold = state.hold;
+  bits = state.bits;
+  lcode = state.lencode;
+  dcode = state.distcode;
+  lmask = (1 << state.lenbits) - 1;
+  dmask = (1 << state.distbits) - 1;
+
+
+  /* decode literals and length/distances until end-of-block or not enough
+     input data or output space */
+
+  top:
+  do {
+    if (bits < 15) {
+      hold += input[_in++] << bits;
+      bits += 8;
+      hold += input[_in++] << bits;
+      bits += 8;
+    }
+
+    here = lcode[hold & lmask];
+
+    dolen:
+    for (;;) { // Goto emulation
+      op = here >>> 24/*here.bits*/;
+      hold >>>= op;
+      bits -= op;
+      op = (here >>> 16) & 0xff/*here.op*/;
+      if (op === 0) {                          /* literal */
+        //Tracevv((stderr, here.val >= 0x20 && here.val < 0x7f ?
+        //        "inflate:         literal '%c'\n" :
+        //        "inflate:         literal 0x%02x\n", here.val));
+        output[_out++] = here & 0xffff/*here.val*/;
+      }
+      else if (op & 16) {                     /* length base */
+        len = here & 0xffff/*here.val*/;
+        op &= 15;                           /* number of extra bits */
+        if (op) {
+          if (bits < op) {
+            hold += input[_in++] << bits;
+            bits += 8;
+          }
+          len += hold & ((1 << op) - 1);
+          hold >>>= op;
+          bits -= op;
+        }
+        //Tracevv((stderr, "inflate:         length %u\n", len));
+        if (bits < 15) {
+          hold += input[_in++] << bits;
+          bits += 8;
+          hold += input[_in++] << bits;
+          bits += 8;
+        }
+        here = dcode[hold & dmask];
+
+        dodist:
+        for (;;) { // goto emulation
+          op = here >>> 24/*here.bits*/;
+          hold >>>= op;
+          bits -= op;
+          op = (here >>> 16) & 0xff/*here.op*/;
+
+          if (op & 16) {                      /* distance base */
+            dist = here & 0xffff/*here.val*/;
+            op &= 15;                       /* number of extra bits */
+            if (bits < op) {
+              hold += input[_in++] << bits;
+              bits += 8;
+              if (bits < op) {
+                hold += input[_in++] << bits;
+                bits += 8;
+              }
+            }
+            dist += hold & ((1 << op) - 1);
+//#ifdef INFLATE_STRICT
+            if (dist > dmax) {
+              strm.msg = 'invalid distance too far back';
+              state.mode = BAD;
+              break top;
+            }
+//#endif
+            hold >>>= op;
+            bits -= op;
+            //Tracevv((stderr, "inflate:         distance %u\n", dist));
+            op = _out - beg;                /* max distance in output */
+            if (dist > op) {                /* see if copy from window */
+              op = dist - op;               /* distance back in window */
+              if (op > whave) {
+                if (state.sane) {
+                  strm.msg = 'invalid distance too far back';
+                  state.mode = BAD;
+                  break top;
+                }
+
+// (!) This block is disabled in zlib defailts,
+// don't enable it for binary compatibility
+//#ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
+//                if (len <= op - whave) {
+//                  do {
+//                    output[_out++] = 0;
+//                  } while (--len);
+//                  continue top;
+//                }
+//                len -= op - whave;
+//                do {
+//                  output[_out++] = 0;
+//                } while (--op > whave);
+//                if (op === 0) {
+//                  from = _out - dist;
+//                  do {
+//                    output[_out++] = output[from++];
+//                  } while (--len);
+//                  continue top;
+//                }
+//#endif
+              }
+              from = 0; // window index
+              from_source = s_window;
+              if (wnext === 0) {           /* very common case */
+                from += wsize - op;
+                if (op < len) {         /* some from window */
+                  len -= op;
+                  do {
+                    output[_out++] = s_window[from++];
+                  } while (--op);
+                  from = _out - dist;  /* rest from output */
+                  from_source = output;
+                }
+              }
+              else if (wnext < op) {      /* wrap around window */
+                from += wsize + wnext - op;
+                op -= wnext;
+                if (op < len) {         /* some from end of window */
+                  len -= op;
+                  do {
+                    output[_out++] = s_window[from++];
+                  } while (--op);
+                  from = 0;
+                  if (wnext < len) {  /* some from start of window */
+                    op = wnext;
+                    len -= op;
+                    do {
+                      output[_out++] = s_window[from++];
+                    } while (--op);
+                    from = _out - dist;      /* rest from output */
+                    from_source = output;
+                  }
+                }
+              }
+              else {                      /* contiguous in window */
+                from += wnext - op;
+                if (op < len) {         /* some from window */
+                  len -= op;
+                  do {
+                    output[_out++] = s_window[from++];
+                  } while (--op);
+                  from = _out - dist;  /* rest from output */
+                  from_source = output;
+                }
+              }
+              while (len > 2) {
+                output[_out++] = from_source[from++];
+                output[_out++] = from_source[from++];
+                output[_out++] = from_source[from++];
+                len -= 3;
+              }
+              if (len) {
+                output[_out++] = from_source[from++];
+                if (len > 1) {
+                  output[_out++] = from_source[from++];
+                }
+              }
+            }
+            else {
+              from = _out - dist;          /* copy direct from output */
+              do {                        /* minimum length is three */
+                output[_out++] = output[from++];
+                output[_out++] = output[from++];
+                output[_out++] = output[from++];
+                len -= 3;
+              } while (len > 2);
+              if (len) {
+                output[_out++] = output[from++];
+                if (len > 1) {
+                  output[_out++] = output[from++];
+                }
+              }
+            }
+          }
+          else if ((op & 64) === 0) {          /* 2nd level distance code */
+            here = dcode[(here & 0xffff)/*here.val*/ + (hold & ((1 << op) - 1))];
+            continue dodist;
+          }
+          else {
+            strm.msg = 'invalid distance code';
+            state.mode = BAD;
+            break top;
+          }
+
+          break; // need to emulate goto via "continue"
+        }
+      }
+      else if ((op & 64) === 0) {              /* 2nd level length code */
+        here = lcode[(here & 0xffff)/*here.val*/ + (hold & ((1 << op) - 1))];
+        continue dolen;
+      }
+      else if (op & 32) {                     /* end-of-block */
+        //Tracevv((stderr, "inflate:         end of block\n"));
+        state.mode = TYPE;
+        break top;
+      }
+      else {
+        strm.msg = 'invalid literal/length code';
+        state.mode = BAD;
+        break top;
+      }
+
+      break; // need to emulate goto via "continue"
+    }
+  } while (_in < last && _out < end);
+
+  /* return unused bytes (on entry, bits < 8, so in won't go too far back) */
+  len = bits >> 3;
+  _in -= len;
+  bits -= len << 3;
+  hold &= (1 << bits) - 1;
+
+  /* update state and return */
+  strm.next_in = _in;
+  strm.next_out = _out;
+  strm.avail_in = (_in < last ? 5 + (last - _in) : 5 - (_in - last));
+  strm.avail_out = (_out < end ? 257 + (end - _out) : 257 - (_out - end));
+  state.hold = hold;
+  state.bits = bits;
+  return;
+};
+
+},{}],11:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+var utils         = require('../utils/common');
+var adler32       = require('./adler32');
+var crc32         = require('./crc32');
+var inflate_fast  = require('./inffast');
+var inflate_table = require('./inftrees');
+
+var CODES = 0;
+var LENS = 1;
+var DISTS = 2;
+
+/* Public constants ==========================================================*/
+/* ===========================================================================*/
+
+
+/* Allowed flush values; see deflate() and inflate() below for details */
+//var Z_NO_FLUSH      = 0;
+//var Z_PARTIAL_FLUSH = 1;
+//var Z_SYNC_FLUSH    = 2;
+//var Z_FULL_FLUSH    = 3;
+var Z_FINISH        = 4;
+var Z_BLOCK         = 5;
+var Z_TREES         = 6;
+
+
+/* Return codes for the compression/decompression functions. Negative values
+ * are errors, positive values are used for special but normal events.
+ */
+var Z_OK            = 0;
+var Z_STREAM_END    = 1;
+var Z_NEED_DICT     = 2;
+//var Z_ERRNO         = -1;
+var Z_STREAM_ERROR  = -2;
+var Z_DATA_ERROR    = -3;
+var Z_MEM_ERROR     = -4;
+var Z_BUF_ERROR     = -5;
+//var Z_VERSION_ERROR = -6;
+
+/* The deflate compression method */
+var Z_DEFLATED  = 8;
+
+
+/* STATES ====================================================================*/
+/* ===========================================================================*/
+
+
+var    HEAD = 1;       /* i: waiting for magic header */
+var    FLAGS = 2;      /* i: waiting for method and flags (gzip) */
+var    TIME = 3;       /* i: waiting for modification time (gzip) */
+var    OS = 4;         /* i: waiting for extra flags and operating system (gzip) */
+var    EXLEN = 5;      /* i: waiting for extra length (gzip) */
+var    EXTRA = 6;      /* i: waiting for extra bytes (gzip) */
+var    NAME = 7;       /* i: waiting for end of file name (gzip) */
+var    COMMENT = 8;    /* i: waiting for end of comment (gzip) */
+var    HCRC = 9;       /* i: waiting for header crc (gzip) */
+var    DICTID = 10;    /* i: waiting for dictionary check value */
+var    DICT = 11;      /* waiting for inflateSetDictionary() call */
+var        TYPE = 12;      /* i: waiting for type bits, including last-flag bit */
+var        TYPEDO = 13;    /* i: same, but skip check to exit inflate on new block */
+var        STORED = 14;    /* i: waiting for stored size (length and complement) */
+var        COPY_ = 15;     /* i/o: same as COPY below, but only first time in */
+var        COPY = 16;      /* i/o: waiting for input or output to copy stored block */
+var        TABLE = 17;     /* i: waiting for dynamic block table lengths */
+var        LENLENS = 18;   /* i: waiting for code length code lengths */
+var        CODELENS = 19;  /* i: waiting for length/lit and distance code lengths */
+var            LEN_ = 20;      /* i: same as LEN below, but only first time in */
+var            LEN = 21;       /* i: waiting for length/lit/eob code */
+var            LENEXT = 22;    /* i: waiting for length extra bits */
+var            DIST = 23;      /* i: waiting for distance code */
+var            DISTEXT = 24;   /* i: waiting for distance extra bits */
+var            MATCH = 25;     /* o: waiting for output space to copy string */
+var            LIT = 26;       /* o: waiting for output space to write literal */
+var    CHECK = 27;     /* i: waiting for 32-bit check value */
+var    LENGTH = 28;    /* i: waiting for 32-bit length (gzip) */
+var    DONE = 29;      /* finished check, done -- remain here until reset */
+var    BAD = 30;       /* got a data error -- remain here until reset */
+var    MEM = 31;       /* got an inflate() memory error -- remain here until reset */
+var    SYNC = 32;      /* looking for synchronization bytes to restart inflate() */
+
+/* ===========================================================================*/
+
+
+
+var ENOUGH_LENS = 852;
+var ENOUGH_DISTS = 592;
+//var ENOUGH =  (ENOUGH_LENS+ENOUGH_DISTS);
+
+var MAX_WBITS = 15;
+/* 32K LZ77 window */
+var DEF_WBITS = MAX_WBITS;
+
+
+function zswap32(q) {
+  return  (((q >>> 24) & 0xff) +
+          ((q >>> 8) & 0xff00) +
+          ((q & 0xff00) << 8) +
+          ((q & 0xff) << 24));
+}
+
+
+function InflateState() {
+  this.mode = 0;             /* current inflate mode */
+  this.last = false;          /* true if processing last block */
+  this.wrap = 0;              /* bit 0 true for zlib, bit 1 true for gzip */
+  this.havedict = false;      /* true if dictionary provided */
+  this.flags = 0;             /* gzip header method and flags (0 if zlib) */
+  this.dmax = 0;              /* zlib header max distance (INFLATE_STRICT) */
+  this.check = 0;             /* protected copy of check value */
+  this.total = 0;             /* protected copy of output count */
+  // TODO: may be {}
+  this.head = null;           /* where to save gzip header information */
+
+  /* sliding window */
+  this.wbits = 0;             /* log base 2 of requested window size */
+  this.wsize = 0;             /* window size or zero if not using window */
+  this.whave = 0;             /* valid bytes in the window */
+  this.wnext = 0;             /* window write index */
+  this.window = null;         /* allocated sliding window, if needed */
+
+  /* bit accumulator */
+  this.hold = 0;              /* input bit accumulator */
+  this.bits = 0;              /* number of bits in "in" */
+
+  /* for string and stored block copying */
+  this.length = 0;            /* literal or length of data to copy */
+  this.offset = 0;            /* distance back to copy string from */
+
+  /* for table and code decoding */
+  this.extra = 0;             /* extra bits needed */
+
+  /* fixed and dynamic code tables */
+  this.lencode = null;          /* starting table for length/literal codes */
+  this.distcode = null;         /* starting table for distance codes */
+  this.lenbits = 0;           /* index bits for lencode */
+  this.distbits = 0;          /* index bits for distcode */
+
+  /* dynamic table building */
+  this.ncode = 0;             /* number of code length code lengths */
+  this.nlen = 0;              /* number of length code lengths */
+  this.ndist = 0;             /* number of distance code lengths */
+  this.have = 0;              /* number of code lengths in lens[] */
+  this.next = null;              /* next available space in codes[] */
+
+  this.lens = new utils.Buf16(320); /* temporary storage for code lengths */
+  this.work = new utils.Buf16(288); /* work area for code table building */
+
+  /*
+   because we don't have pointers in js, we use lencode and distcode directly
+   as buffers so we don't need codes
+  */
+  //this.codes = new utils.Buf32(ENOUGH);       /* space for code tables */
+  this.lendyn = null;              /* dynamic table for length/literal codes (JS specific) */
+  this.distdyn = null;             /* dynamic table for distance codes (JS specific) */
+  this.sane = 0;                   /* if false, allow invalid distance too far */
+  this.back = 0;                   /* bits back of last unprocessed length/lit */
+  this.was = 0;                    /* initial length of match */
+}
+
+function inflateResetKeep(strm) {
+  var state;
+
+  if (!strm || !strm.state) { return Z_STREAM_ERROR; }
+  state = strm.state;
+  strm.total_in = strm.total_out = state.total = 0;
+  strm.msg = ''; /*Z_NULL*/
+  if (state.wrap) {       /* to support ill-conceived Java test suite */
+    strm.adler = state.wrap & 1;
+  }
+  state.mode = HEAD;
+  state.last = 0;
+  state.havedict = 0;
+  state.dmax = 32768;
+  state.head = null/*Z_NULL*/;
+  state.hold = 0;
+  state.bits = 0;
+  //state.lencode = state.distcode = state.next = state.codes;
+  state.lencode = state.lendyn = new utils.Buf32(ENOUGH_LENS);
+  state.distcode = state.distdyn = new utils.Buf32(ENOUGH_DISTS);
+
+  state.sane = 1;
+  state.back = -1;
+  //Tracev((stderr, "inflate: reset\n"));
+  return Z_OK;
+}
+
+function inflateReset(strm) {
+  var state;
+
+  if (!strm || !strm.state) { return Z_STREAM_ERROR; }
+  state = strm.state;
+  state.wsize = 0;
+  state.whave = 0;
+  state.wnext = 0;
+  return inflateResetKeep(strm);
+
+}
+
+function inflateReset2(strm, windowBits) {
+  var wrap;
+  var state;
+
+  /* get the state */
+  if (!strm || !strm.state) { return Z_STREAM_ERROR; }
+  state = strm.state;
+
+  /* extract wrap request from windowBits parameter */
+  if (windowBits < 0) {
+    wrap = 0;
+    windowBits = -windowBits;
+  }
+  else {
+    wrap = (windowBits >> 4) + 1;
+    if (windowBits < 48) {
+      windowBits &= 15;
+    }
+  }
+
+  /* set number of window bits, free window if different */
+  if (windowBits && (windowBits < 8 || windowBits > 15)) {
+    return Z_STREAM_ERROR;
+  }
+  if (state.window !== null && state.wbits !== windowBits) {
+    state.window = null;
+  }
+
+  /* update state and reset the rest of it */
+  state.wrap = wrap;
+  state.wbits = windowBits;
+  return inflateReset(strm);
+}
+
+function inflateInit2(strm, windowBits) {
+  var ret;
+  var state;
+
+  if (!strm) { return Z_STREAM_ERROR; }
+  //strm.msg = Z_NULL;                 /* in case we return an error */
+
+  state = new InflateState();
+
+  //if (state === Z_NULL) return Z_MEM_ERROR;
+  //Tracev((stderr, "inflate: allocated\n"));
+  strm.state = state;
+  state.window = null/*Z_NULL*/;
+  ret = inflateReset2(strm, windowBits);
+  if (ret !== Z_OK) {
+    strm.state = null/*Z_NULL*/;
+  }
+  return ret;
+}
+
+function inflateInit(strm) {
+  return inflateInit2(strm, DEF_WBITS);
+}
+
+
+/*
+ Return state with length and distance decoding tables and index sizes set to
+ fixed code decoding.  Normally this returns fixed tables from inffixed.h.
+ If BUILDFIXED is defined, then instead this routine builds the tables the
+ first time it's called, and returns those tables the first time and
+ thereafter.  This reduces the size of the code by about 2K bytes, in
+ exchange for a little execution time.  However, BUILDFIXED should not be
+ used for threaded applications, since the rewriting of the tables and virgin
+ may not be thread-safe.
+ */
+var virgin = true;
+
+var lenfix, distfix; // We have no pointers in JS, so keep tables separate
+
+function fixedtables(state) {
+  /* build fixed huffman tables if first call (may not be thread safe) */
+  if (virgin) {
+    var sym;
+
+    lenfix = new utils.Buf32(512);
+    distfix = new utils.Buf32(32);
+
+    /* literal/length table */
+    sym = 0;
+    while (sym < 144) { state.lens[sym++] = 8; }
+    while (sym < 256) { state.lens[sym++] = 9; }
+    while (sym < 280) { state.lens[sym++] = 7; }
+    while (sym < 288) { state.lens[sym++] = 8; }
+
+    inflate_table(LENS,  state.lens, 0, 288, lenfix,   0, state.work, { bits: 9 });
+
+    /* distance table */
+    sym = 0;
+    while (sym < 32) { state.lens[sym++] = 5; }
+
+    inflate_table(DISTS, state.lens, 0, 32,   distfix, 0, state.work, { bits: 5 });
+
+    /* do this just once */
+    virgin = false;
+  }
+
+  state.lencode = lenfix;
+  state.lenbits = 9;
+  state.distcode = distfix;
+  state.distbits = 5;
+}
+
+
+/*
+ Update the window with the last wsize (normally 32K) bytes written before
+ returning.  If window does not exist yet, create it.  This is only called
+ when a window is already in use, or when output has been written during this
+ inflate call, but the end of the deflate stream has not been reached yet.
+ It is also called to create a window for dictionary data when a dictionary
+ is loaded.
+
+ Providing output buffers larger than 32K to inflate() should provide a speed
+ advantage, since only the last 32K of output is copied to the sliding window
+ upon return from inflate(), and since all distances after the first 32K of
+ output will fall in the output data, making match copies simpler and faster.
+ The advantage may be dependent on the size of the processor's data caches.
+ */
+function updatewindow(strm, src, end, copy) {
+  var dist;
+  var state = strm.state;
+
+  /* if it hasn't been done already, allocate space for the window */
+  if (state.window === null) {
+    state.wsize = 1 << state.wbits;
+    state.wnext = 0;
+    state.whave = 0;
+
+    state.window = new utils.Buf8(state.wsize);
+  }
+
+  /* copy state->wsize or less output bytes into the circular window */
+  if (copy >= state.wsize) {
+    utils.arraySet(state.window, src, end - state.wsize, state.wsize, 0);
+    state.wnext = 0;
+    state.whave = state.wsize;
+  }
+  else {
+    dist = state.wsize - state.wnext;
+    if (dist > copy) {
+      dist = copy;
+    }
+    //zmemcpy(state->window + state->wnext, end - copy, dist);
+    utils.arraySet(state.window, src, end - copy, dist, state.wnext);
+    copy -= dist;
+    if (copy) {
+      //zmemcpy(state->window, end - copy, copy);
+      utils.arraySet(state.window, src, end - copy, copy, 0);
+      state.wnext = copy;
+      state.whave = state.wsize;
+    }
+    else {
+      state.wnext += dist;
+      if (state.wnext === state.wsize) { state.wnext = 0; }
+      if (state.whave < state.wsize) { state.whave += dist; }
+    }
+  }
+  return 0;
+}
+
+function inflate(strm, flush) {
+  var state;
+  var input, output;          // input/output buffers
+  var next;                   /* next input INDEX */
+  var put;                    /* next output INDEX */
+  var have, left;             /* available input and output */
+  var hold;                   /* bit buffer */
+  var bits;                   /* bits in bit buffer */
+  var _in, _out;              /* save starting available input and output */
+  var copy;                   /* number of stored or match bytes to copy */
+  var from;                   /* where to copy match bytes from */
+  var from_source;
+  var here = 0;               /* current decoding table entry */
+  var here_bits, here_op, here_val; // paked "here" denormalized (JS specific)
+  //var last;                   /* parent table entry */
+  var last_bits, last_op, last_val; // paked "last" denormalized (JS specific)
+  var len;                    /* length to copy for repeats, bits to drop */
+  var ret;                    /* return code */
+  var hbuf = new utils.Buf8(4);    /* buffer for gzip header crc calculation */
+  var opts;
+
+  var n; // temporary var for NEED_BITS
+
+  var order = /* permutation of code lengths */
+    [ 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15 ];
+
+
+  if (!strm || !strm.state || !strm.output ||
+      (!strm.input && strm.avail_in !== 0)) {
+    return Z_STREAM_ERROR;
+  }
+
+  state = strm.state;
+  if (state.mode === TYPE) { state.mode = TYPEDO; }    /* skip check */
+
+
+  //--- LOAD() ---
+  put = strm.next_out;
+  output = strm.output;
+  left = strm.avail_out;
+  next = strm.next_in;
+  input = strm.input;
+  have = strm.avail_in;
+  hold = state.hold;
+  bits = state.bits;
+  //---
+
+  _in = have;
+  _out = left;
+  ret = Z_OK;
+
+  inf_leave: // goto emulation
+  for (;;) {
+    switch (state.mode) {
+    case HEAD:
+      if (state.wrap === 0) {
+        state.mode = TYPEDO;
+        break;
+      }
+      //=== NEEDBITS(16);
+      while (bits < 16) {
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+      }
+      //===//
+      if ((state.wrap & 2) && hold === 0x8b1f) {  /* gzip header */
+        state.check = 0/*crc32(0L, Z_NULL, 0)*/;
+        //=== CRC2(state.check, hold);
+        hbuf[0] = hold & 0xff;
+        hbuf[1] = (hold >>> 8) & 0xff;
+        state.check = crc32(state.check, hbuf, 2, 0);
+        //===//
+
+        //=== INITBITS();
+        hold = 0;
+        bits = 0;
+        //===//
+        state.mode = FLAGS;
+        break;
+      }
+      state.flags = 0;           /* expect zlib header */
+      if (state.head) {
+        state.head.done = false;
+      }
+      if (!(state.wrap & 1) ||   /* check if zlib header allowed */
+        (((hold & 0xff)/*BITS(8)*/ << 8) + (hold >> 8)) % 31) {
+        strm.msg = 'incorrect header check';
+        state.mode = BAD;
+        break;
+      }
+      if ((hold & 0x0f)/*BITS(4)*/ !== Z_DEFLATED) {
+        strm.msg = 'unknown compression method';
+        state.mode = BAD;
+        break;
+      }
+      //--- DROPBITS(4) ---//
+      hold >>>= 4;
+      bits -= 4;
+      //---//
+      len = (hold & 0x0f)/*BITS(4)*/ + 8;
+      if (state.wbits === 0) {
+        state.wbits = len;
+      }
+      else if (len > state.wbits) {
+        strm.msg = 'invalid window size';
+        state.mode = BAD;
+        break;
+      }
+      state.dmax = 1 << len;
+      //Tracev((stderr, "inflate:   zlib header ok\n"));
+      strm.adler = state.check = 1/*adler32(0L, Z_NULL, 0)*/;
+      state.mode = hold & 0x200 ? DICTID : TYPE;
+      //=== INITBITS();
+      hold = 0;
+      bits = 0;
+      //===//
+      break;
+    case FLAGS:
+      //=== NEEDBITS(16); */
+      while (bits < 16) {
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+      }
+      //===//
+      state.flags = hold;
+      if ((state.flags & 0xff) !== Z_DEFLATED) {
+        strm.msg = 'unknown compression method';
+        state.mode = BAD;
+        break;
+      }
+      if (state.flags & 0xe000) {
+        strm.msg = 'unknown header flags set';
+        state.mode = BAD;
+        break;
+      }
+      if (state.head) {
+        state.head.text = ((hold >> 8) & 1);
+      }
+      if (state.flags & 0x0200) {
+        //=== CRC2(state.check, hold);
+        hbuf[0] = hold & 0xff;
+        hbuf[1] = (hold >>> 8) & 0xff;
+        state.check = crc32(state.check, hbuf, 2, 0);
+        //===//
+      }
+      //=== INITBITS();
+      hold = 0;
+      bits = 0;
+      //===//
+      state.mode = TIME;
+      /* falls through */
+    case TIME:
+      //=== NEEDBITS(32); */
+      while (bits < 32) {
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+      }
+      //===//
+      if (state.head) {
+        state.head.time = hold;
+      }
+      if (state.flags & 0x0200) {
+        //=== CRC4(state.check, hold)
+        hbuf[0] = hold & 0xff;
+        hbuf[1] = (hold >>> 8) & 0xff;
+        hbuf[2] = (hold >>> 16) & 0xff;
+        hbuf[3] = (hold >>> 24) & 0xff;
+        state.check = crc32(state.check, hbuf, 4, 0);
+        //===
+      }
+      //=== INITBITS();
+      hold = 0;
+      bits = 0;
+      //===//
+      state.mode = OS;
+      /* falls through */
+    case OS:
+      //=== NEEDBITS(16); */
+      while (bits < 16) {
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+      }
+      //===//
+      if (state.head) {
+        state.head.xflags = (hold & 0xff);
+        state.head.os = (hold >> 8);
+      }
+      if (state.flags & 0x0200) {
+        //=== CRC2(state.check, hold);
+        hbuf[0] = hold & 0xff;
+        hbuf[1] = (hold >>> 8) & 0xff;
+        state.check = crc32(state.check, hbuf, 2, 0);
+        //===//
+      }
+      //=== INITBITS();
+      hold = 0;
+      bits = 0;
+      //===//
+      state.mode = EXLEN;
+      /* falls through */
+    case EXLEN:
+      if (state.flags & 0x0400) {
+        //=== NEEDBITS(16); */
+        while (bits < 16) {
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        }
+        //===//
+        state.length = hold;
+        if (state.head) {
+          state.head.extra_len = hold;
+        }
+        if (state.flags & 0x0200) {
+          //=== CRC2(state.check, hold);
+          hbuf[0] = hold & 0xff;
+          hbuf[1] = (hold >>> 8) & 0xff;
+          state.check = crc32(state.check, hbuf, 2, 0);
+          //===//
+        }
+        //=== INITBITS();
+        hold = 0;
+        bits = 0;
+        //===//
+      }
+      else if (state.head) {
+        state.head.extra = null/*Z_NULL*/;
+      }
+      state.mode = EXTRA;
+      /* falls through */
+    case EXTRA:
+      if (state.flags & 0x0400) {
+        copy = state.length;
+        if (copy > have) { copy = have; }
+        if (copy) {
+          if (state.head) {
+            len = state.head.extra_len - state.length;
+            if (!state.head.extra) {
+              // Use untyped array for more conveniend processing later
+              state.head.extra = new Array(state.head.extra_len);
+            }
+            utils.arraySet(
+              state.head.extra,
+              input,
+              next,
+              // extra field is limited to 65536 bytes
+              // - no need for additional size check
+              copy,
+              /*len + copy > state.head.extra_max - len ? state.head.extra_max : copy,*/
+              len
+            );
+            //zmemcpy(state.head.extra + len, next,
+            //        len + copy > state.head.extra_max ?
+            //        state.head.extra_max - len : copy);
+          }
+          if (state.flags & 0x0200) {
+            state.check = crc32(state.check, input, copy, next);
+          }
+          have -= copy;
+          next += copy;
+          state.length -= copy;
+        }
+        if (state.length) { break inf_leave; }
+      }
+      state.length = 0;
+      state.mode = NAME;
+      /* falls through */
+    case NAME:
+      if (state.flags & 0x0800) {
+        if (have === 0) { break inf_leave; }
+        copy = 0;
+        do {
+          // TODO: 2 or 1 bytes?
+          len = input[next + copy++];
+          /* use constant limit because in js we should not preallocate memory */
+          if (state.head && len &&
+              (state.length < 65536 /*state.head.name_max*/)) {
+            state.head.name += String.fromCharCode(len);
+          }
+        } while (len && copy < have);
+
+        if (state.flags & 0x0200) {
+          state.check = crc32(state.check, input, copy, next);
+        }
+        have -= copy;
+        next += copy;
+        if (len) { break inf_leave; }
+      }
+      else if (state.head) {
+        state.head.name = null;
+      }
+      state.length = 0;
+      state.mode = COMMENT;
+      /* falls through */
+    case COMMENT:
+      if (state.flags & 0x1000) {
+        if (have === 0) { break inf_leave; }
+        copy = 0;
+        do {
+          len = input[next + copy++];
+          /* use constant limit because in js we should not preallocate memory */
+          if (state.head && len &&
+              (state.length < 65536 /*state.head.comm_max*/)) {
+            state.head.comment += String.fromCharCode(len);
+          }
+        } while (len && copy < have);
+        if (state.flags & 0x0200) {
+          state.check = crc32(state.check, input, copy, next);
+        }
+        have -= copy;
+        next += copy;
+        if (len) { break inf_leave; }
+      }
+      else if (state.head) {
+        state.head.comment = null;
+      }
+      state.mode = HCRC;
+      /* falls through */
+    case HCRC:
+      if (state.flags & 0x0200) {
+        //=== NEEDBITS(16); */
+        while (bits < 16) {
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        }
+        //===//
+        if (hold !== (state.check & 0xffff)) {
+          strm.msg = 'header crc mismatch';
+          state.mode = BAD;
+          break;
+        }
+        //=== INITBITS();
+        hold = 0;
+        bits = 0;
+        //===//
+      }
+      if (state.head) {
+        state.head.hcrc = ((state.flags >> 9) & 1);
+        state.head.done = true;
+      }
+      strm.adler = state.check = 0;
+      state.mode = TYPE;
+      break;
+    case DICTID:
+      //=== NEEDBITS(32); */
+      while (bits < 32) {
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+      }
+      //===//
+      strm.adler = state.check = zswap32(hold);
+      //=== INITBITS();
+      hold = 0;
+      bits = 0;
+      //===//
+      state.mode = DICT;
+      /* falls through */
+    case DICT:
+      if (state.havedict === 0) {
+        //--- RESTORE() ---
+        strm.next_out = put;
+        strm.avail_out = left;
+        strm.next_in = next;
+        strm.avail_in = have;
+        state.hold = hold;
+        state.bits = bits;
+        //---
+        return Z_NEED_DICT;
+      }
+      strm.adler = state.check = 1/*adler32(0L, Z_NULL, 0)*/;
+      state.mode = TYPE;
+      /* falls through */
+    case TYPE:
+      if (flush === Z_BLOCK || flush === Z_TREES) { break inf_leave; }
+      /* falls through */
+    case TYPEDO:
+      if (state.last) {
+        //--- BYTEBITS() ---//
+        hold >>>= bits & 7;
+        bits -= bits & 7;
+        //---//
+        state.mode = CHECK;
+        break;
+      }
+      //=== NEEDBITS(3); */
+      while (bits < 3) {
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+      }
+      //===//
+      state.last = (hold & 0x01)/*BITS(1)*/;
+      //--- DROPBITS(1) ---//
+      hold >>>= 1;
+      bits -= 1;
+      //---//
+
+      switch ((hold & 0x03)/*BITS(2)*/) {
+      case 0:                             /* stored block */
+        //Tracev((stderr, "inflate:     stored block%s\n",
+        //        state.last ? " (last)" : ""));
+        state.mode = STORED;
+        break;
+      case 1:                             /* fixed block */
+        fixedtables(state);
+        //Tracev((stderr, "inflate:     fixed codes block%s\n",
+        //        state.last ? " (last)" : ""));
+        state.mode = LEN_;             /* decode codes */
+        if (flush === Z_TREES) {
+          //--- DROPBITS(2) ---//
+          hold >>>= 2;
+          bits -= 2;
+          //---//
+          break inf_leave;
+        }
+        break;
+      case 2:                             /* dynamic block */
+        //Tracev((stderr, "inflate:     dynamic codes block%s\n",
+        //        state.last ? " (last)" : ""));
+        state.mode = TABLE;
+        break;
+      case 3:
+        strm.msg = 'invalid block type';
+        state.mode = BAD;
+      }
+      //--- DROPBITS(2) ---//
+      hold >>>= 2;
+      bits -= 2;
+      //---//
+      break;
+    case STORED:
+      //--- BYTEBITS() ---// /* go to byte boundary */
+      hold >>>= bits & 7;
+      bits -= bits & 7;
+      //---//
+      //=== NEEDBITS(32); */
+      while (bits < 32) {
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+      }
+      //===//
+      if ((hold & 0xffff) !== ((hold >>> 16) ^ 0xffff)) {
+        strm.msg = 'invalid stored block lengths';
+        state.mode = BAD;
+        break;
+      }
+      state.length = hold & 0xffff;
+      //Tracev((stderr, "inflate:       stored length %u\n",
+      //        state.length));
+      //=== INITBITS();
+      hold = 0;
+      bits = 0;
+      //===//
+      state.mode = COPY_;
+      if (flush === Z_TREES) { break inf_leave; }
+      /* falls through */
+    case COPY_:
+      state.mode = COPY;
+      /* falls through */
+    case COPY:
+      copy = state.length;
+      if (copy) {
+        if (copy > have) { copy = have; }
+        if (copy > left) { copy = left; }
+        if (copy === 0) { break inf_leave; }
+        //--- zmemcpy(put, next, copy); ---
+        utils.arraySet(output, input, next, copy, put);
+        //---//
+        have -= copy;
+        next += copy;
+        left -= copy;
+        put += copy;
+        state.length -= copy;
+        break;
+      }
+      //Tracev((stderr, "inflate:       stored end\n"));
+      state.mode = TYPE;
+      break;
+    case TABLE:
+      //=== NEEDBITS(14); */
+      while (bits < 14) {
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+      }
+      //===//
+      state.nlen = (hold & 0x1f)/*BITS(5)*/ + 257;
+      //--- DROPBITS(5) ---//
+      hold >>>= 5;
+      bits -= 5;
+      //---//
+      state.ndist = (hold & 0x1f)/*BITS(5)*/ + 1;
+      //--- DROPBITS(5) ---//
+      hold >>>= 5;
+      bits -= 5;
+      //---//
+      state.ncode = (hold & 0x0f)/*BITS(4)*/ + 4;
+      //--- DROPBITS(4) ---//
+      hold >>>= 4;
+      bits -= 4;
+      //---//
+//#ifndef PKZIP_BUG_WORKAROUND
+      if (state.nlen > 286 || state.ndist > 30) {
+        strm.msg = 'too many length or distance symbols';
+        state.mode = BAD;
+        break;
+      }
+//#endif
+      //Tracev((stderr, "inflate:       table sizes ok\n"));
+      state.have = 0;
+      state.mode = LENLENS;
+      /* falls through */
+    case LENLENS:
+      while (state.have < state.ncode) {
+        //=== NEEDBITS(3);
+        while (bits < 3) {
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        }
+        //===//
+        state.lens[order[state.have++]] = (hold & 0x07);//BITS(3);
+        //--- DROPBITS(3) ---//
+        hold >>>= 3;
+        bits -= 3;
+        //---//
+      }
+      while (state.have < 19) {
+        state.lens[order[state.have++]] = 0;
+      }
+      // We have separate tables & no pointers. 2 commented lines below not needed.
+      //state.next = state.codes;
+      //state.lencode = state.next;
+      // Switch to use dynamic table
+      state.lencode = state.lendyn;
+      state.lenbits = 7;
+
+      opts = { bits: state.lenbits };
+      ret = inflate_table(CODES, state.lens, 0, 19, state.lencode, 0, state.work, opts);
+      state.lenbits = opts.bits;
+
+      if (ret) {
+        strm.msg = 'invalid code lengths set';
+        state.mode = BAD;
+        break;
+      }
+      //Tracev((stderr, "inflate:       code lengths ok\n"));
+      state.have = 0;
+      state.mode = CODELENS;
+      /* falls through */
+    case CODELENS:
+      while (state.have < state.nlen + state.ndist) {
+        for (;;) {
+          here = state.lencode[hold & ((1 << state.lenbits) - 1)];/*BITS(state.lenbits)*/
+          here_bits = here >>> 24;
+          here_op = (here >>> 16) & 0xff;
+          here_val = here & 0xffff;
+
+          if ((here_bits) <= bits) { break; }
+          //--- PULLBYTE() ---//
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+          //---//
+        }
+        if (here_val < 16) {
+          //--- DROPBITS(here.bits) ---//
+          hold >>>= here_bits;
+          bits -= here_bits;
+          //---//
+          state.lens[state.have++] = here_val;
+        }
+        else {
+          if (here_val === 16) {
+            //=== NEEDBITS(here.bits + 2);
+            n = here_bits + 2;
+            while (bits < n) {
+              if (have === 0) { break inf_leave; }
+              have--;
+              hold += input[next++] << bits;
+              bits += 8;
+            }
+            //===//
+            //--- DROPBITS(here.bits) ---//
+            hold >>>= here_bits;
+            bits -= here_bits;
+            //---//
+            if (state.have === 0) {
+              strm.msg = 'invalid bit length repeat';
+              state.mode = BAD;
+              break;
+            }
+            len = state.lens[state.have - 1];
+            copy = 3 + (hold & 0x03);//BITS(2);
+            //--- DROPBITS(2) ---//
+            hold >>>= 2;
+            bits -= 2;
+            //---//
+          }
+          else if (here_val === 17) {
+            //=== NEEDBITS(here.bits + 3);
+            n = here_bits + 3;
+            while (bits < n) {
+              if (have === 0) { break inf_leave; }
+              have--;
+              hold += input[next++] << bits;
+              bits += 8;
+            }
+            //===//
+            //--- DROPBITS(here.bits) ---//
+            hold >>>= here_bits;
+            bits -= here_bits;
+            //---//
+            len = 0;
+            copy = 3 + (hold & 0x07);//BITS(3);
+            //--- DROPBITS(3) ---//
+            hold >>>= 3;
+            bits -= 3;
+            //---//
+          }
+          else {
+            //=== NEEDBITS(here.bits + 7);
+            n = here_bits + 7;
+            while (bits < n) {
+              if (have === 0) { break inf_leave; }
+              have--;
+              hold += input[next++] << bits;
+              bits += 8;
+            }
+            //===//
+            //--- DROPBITS(here.bits) ---//
+            hold >>>= here_bits;
+            bits -= here_bits;
+            //---//
+            len = 0;
+            copy = 11 + (hold & 0x7f);//BITS(7);
+            //--- DROPBITS(7) ---//
+            hold >>>= 7;
+            bits -= 7;
+            //---//
+          }
+          if (state.have + copy > state.nlen + state.ndist) {
+            strm.msg = 'invalid bit length repeat';
+            state.mode = BAD;
+            break;
+          }
+          while (copy--) {
+            state.lens[state.have++] = len;
+          }
+        }
+      }
+
+      /* handle error breaks in while */
+      if (state.mode === BAD) { break; }
+
+      /* check for end-of-block code (better have one) */
+      if (state.lens[256] === 0) {
+        strm.msg = 'invalid code -- missing end-of-block';
+        state.mode = BAD;
+        break;
+      }
+
+      /* build code tables -- note: do not change the lenbits or distbits
+         values here (9 and 6) without reading the comments in inftrees.h
+         concerning the ENOUGH constants, which depend on those values */
+      state.lenbits = 9;
+
+      opts = { bits: state.lenbits };
+      ret = inflate_table(LENS, state.lens, 0, state.nlen, state.lencode, 0, state.work, opts);
+      // We have separate tables & no pointers. 2 commented lines below not needed.
+      // state.next_index = opts.table_index;
+      state.lenbits = opts.bits;
+      // state.lencode = state.next;
+
+      if (ret) {
+        strm.msg = 'invalid literal/lengths set';
+        state.mode = BAD;
+        break;
+      }
+
+      state.distbits = 6;
+      //state.distcode.copy(state.codes);
+      // Switch to use dynamic table
+      state.distcode = state.distdyn;
+      opts = { bits: state.distbits };
+      ret = inflate_table(DISTS, state.lens, state.nlen, state.ndist, state.distcode, 0, state.work, opts);
+      // We have separate tables & no pointers. 2 commented lines below not needed.
+      // state.next_index = opts.table_index;
+      state.distbits = opts.bits;
+      // state.distcode = state.next;
+
+      if (ret) {
+        strm.msg = 'invalid distances set';
+        state.mode = BAD;
+        break;
+      }
+      //Tracev((stderr, 'inflate:       codes ok\n'));
+      state.mode = LEN_;
+      if (flush === Z_TREES) { break inf_leave; }
+      /* falls through */
+    case LEN_:
+      state.mode = LEN;
+      /* falls through */
+    case LEN:
+      if (have >= 6 && left >= 258) {
+        //--- RESTORE() ---
+        strm.next_out = put;
+        strm.avail_out = left;
+        strm.next_in = next;
+        strm.avail_in = have;
+        state.hold = hold;
+        state.bits = bits;
+        //---
+        inflate_fast(strm, _out);
+        //--- LOAD() ---
+        put = strm.next_out;
+        output = strm.output;
+        left = strm.avail_out;
+        next = strm.next_in;
+        input = strm.input;
+        have = strm.avail_in;
+        hold = state.hold;
+        bits = state.bits;
+        //---
+
+        if (state.mode === TYPE) {
+          state.back = -1;
+        }
+        break;
+      }
+      state.back = 0;
+      for (;;) {
+        here = state.lencode[hold & ((1 << state.lenbits) - 1)];  /*BITS(state.lenbits)*/
+        here_bits = here >>> 24;
+        here_op = (here >>> 16) & 0xff;
+        here_val = here & 0xffff;
+
+        if (here_bits <= bits) { break; }
+        //--- PULLBYTE() ---//
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+        //---//
+      }
+      if (here_op && (here_op & 0xf0) === 0) {
+        last_bits = here_bits;
+        last_op = here_op;
+        last_val = here_val;
+        for (;;) {
+          here = state.lencode[last_val +
+                  ((hold & ((1 << (last_bits + last_op)) - 1))/*BITS(last.bits + last.op)*/ >> last_bits)];
+          here_bits = here >>> 24;
+          here_op = (here >>> 16) & 0xff;
+          here_val = here & 0xffff;
+
+          if ((last_bits + here_bits) <= bits) { break; }
+          //--- PULLBYTE() ---//
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+          //---//
+        }
+        //--- DROPBITS(last.bits) ---//
+        hold >>>= last_bits;
+        bits -= last_bits;
+        //---//
+        state.back += last_bits;
+      }
+      //--- DROPBITS(here.bits) ---//
+      hold >>>= here_bits;
+      bits -= here_bits;
+      //---//
+      state.back += here_bits;
+      state.length = here_val;
+      if (here_op === 0) {
+        //Tracevv((stderr, here.val >= 0x20 && here.val < 0x7f ?
+        //        "inflate:         literal '%c'\n" :
+        //        "inflate:         literal 0x%02x\n", here.val));
+        state.mode = LIT;
+        break;
+      }
+      if (here_op & 32) {
+        //Tracevv((stderr, "inflate:         end of block\n"));
+        state.back = -1;
+        state.mode = TYPE;
+        break;
+      }
+      if (here_op & 64) {
+        strm.msg = 'invalid literal/length code';
+        state.mode = BAD;
+        break;
+      }
+      state.extra = here_op & 15;
+      state.mode = LENEXT;
+      /* falls through */
+    case LENEXT:
+      if (state.extra) {
+        //=== NEEDBITS(state.extra);
+        n = state.extra;
+        while (bits < n) {
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        }
+        //===//
+        state.length += hold & ((1 << state.extra) - 1)/*BITS(state.extra)*/;
+        //--- DROPBITS(state.extra) ---//
+        hold >>>= state.extra;
+        bits -= state.extra;
+        //---//
+        state.back += state.extra;
+      }
+      //Tracevv((stderr, "inflate:         length %u\n", state.length));
+      state.was = state.length;
+      state.mode = DIST;
+      /* falls through */
+    case DIST:
+      for (;;) {
+        here = state.distcode[hold & ((1 << state.distbits) - 1)];/*BITS(state.distbits)*/
+        here_bits = here >>> 24;
+        here_op = (here >>> 16) & 0xff;
+        here_val = here & 0xffff;
+
+        if ((here_bits) <= bits) { break; }
+        //--- PULLBYTE() ---//
+        if (have === 0) { break inf_leave; }
+        have--;
+        hold += input[next++] << bits;
+        bits += 8;
+        //---//
+      }
+      if ((here_op & 0xf0) === 0) {
+        last_bits = here_bits;
+        last_op = here_op;
+        last_val = here_val;
+        for (;;) {
+          here = state.distcode[last_val +
+                  ((hold & ((1 << (last_bits + last_op)) - 1))/*BITS(last.bits + last.op)*/ >> last_bits)];
+          here_bits = here >>> 24;
+          here_op = (here >>> 16) & 0xff;
+          here_val = here & 0xffff;
+
+          if ((last_bits + here_bits) <= bits) { break; }
+          //--- PULLBYTE() ---//
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+          //---//
+        }
+        //--- DROPBITS(last.bits) ---//
+        hold >>>= last_bits;
+        bits -= last_bits;
+        //---//
+        state.back += last_bits;
+      }
+      //--- DROPBITS(here.bits) ---//
+      hold >>>= here_bits;
+      bits -= here_bits;
+      //---//
+      state.back += here_bits;
+      if (here_op & 64) {
+        strm.msg = 'invalid distance code';
+        state.mode = BAD;
+        break;
+      }
+      state.offset = here_val;
+      state.extra = (here_op) & 15;
+      state.mode = DISTEXT;
+      /* falls through */
+    case DISTEXT:
+      if (state.extra) {
+        //=== NEEDBITS(state.extra);
+        n = state.extra;
+        while (bits < n) {
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        }
+        //===//
+        state.offset += hold & ((1 << state.extra) - 1)/*BITS(state.extra)*/;
+        //--- DROPBITS(state.extra) ---//
+        hold >>>= state.extra;
+        bits -= state.extra;
+        //---//
+        state.back += state.extra;
+      }
+//#ifdef INFLATE_STRICT
+      if (state.offset > state.dmax) {
+        strm.msg = 'invalid distance too far back';
+        state.mode = BAD;
+        break;
+      }
+//#endif
+      //Tracevv((stderr, "inflate:         distance %u\n", state.offset));
+      state.mode = MATCH;
+      /* falls through */
+    case MATCH:
+      if (left === 0) { break inf_leave; }
+      copy = _out - left;
+      if (state.offset > copy) {         /* copy from window */
+        copy = state.offset - copy;
+        if (copy > state.whave) {
+          if (state.sane) {
+            strm.msg = 'invalid distance too far back';
+            state.mode = BAD;
+            break;
+          }
+// (!) This block is disabled in zlib defailts,
+// don't enable it for binary compatibility
+//#ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
+//          Trace((stderr, "inflate.c too far\n"));
+//          copy -= state.whave;
+//          if (copy > state.length) { copy = state.length; }
+//          if (copy > left) { copy = left; }
+//          left -= copy;
+//          state.length -= copy;
+//          do {
+//            output[put++] = 0;
+//          } while (--copy);
+//          if (state.length === 0) { state.mode = LEN; }
+//          break;
+//#endif
+        }
+        if (copy > state.wnext) {
+          copy -= state.wnext;
+          from = state.wsize - copy;
+        }
+        else {
+          from = state.wnext - copy;
+        }
+        if (copy > state.length) { copy = state.length; }
+        from_source = state.window;
+      }
+      else {                              /* copy from output */
+        from_source = output;
+        from = put - state.offset;
+        copy = state.length;
+      }
+      if (copy > left) { copy = left; }
+      left -= copy;
+      state.length -= copy;
+      do {
+        output[put++] = from_source[from++];
+      } while (--copy);
+      if (state.length === 0) { state.mode = LEN; }
+      break;
+    case LIT:
+      if (left === 0) { break inf_leave; }
+      output[put++] = state.length;
+      left--;
+      state.mode = LEN;
+      break;
+    case CHECK:
+      if (state.wrap) {
+        //=== NEEDBITS(32);
+        while (bits < 32) {
+          if (have === 0) { break inf_leave; }
+          have--;
+          // Use '|' insdead of '+' to make sure that result is signed
+          hold |= input[next++] << bits;
+          bits += 8;
+        }
+        //===//
+        _out -= left;
+        strm.total_out += _out;
+        state.total += _out;
+        if (_out) {
+          strm.adler = state.check =
+              /*UPDATE(state.check, put - _out, _out);*/
+              (state.flags ? crc32(state.check, output, _out, put - _out) : adler32(state.check, output, _out, put - _out));
+
+        }
+        _out = left;
+        // NB: crc32 stored as signed 32-bit int, zswap32 returns signed too
+        if ((state.flags ? hold : zswap32(hold)) !== state.check) {
+          strm.msg = 'incorrect data check';
+          state.mode = BAD;
+          break;
+        }
+        //=== INITBITS();
+        hold = 0;
+        bits = 0;
+        //===//
+        //Tracev((stderr, "inflate:   check matches trailer\n"));
+      }
+      state.mode = LENGTH;
+      /* falls through */
+    case LENGTH:
+      if (state.wrap && state.flags) {
+        //=== NEEDBITS(32);
+        while (bits < 32) {
+          if (have === 0) { break inf_leave; }
+          have--;
+          hold += input[next++] << bits;
+          bits += 8;
+        }
+        //===//
+        if (hold !== (state.total & 0xffffffff)) {
+          strm.msg = 'incorrect length check';
+          state.mode = BAD;
+          break;
+        }
+        //=== INITBITS();
+        hold = 0;
+        bits = 0;
+        //===//
+        //Tracev((stderr, "inflate:   length matches trailer\n"));
+      }
+      state.mode = DONE;
+      /* falls through */
+    case DONE:
+      ret = Z_STREAM_END;
+      break inf_leave;
+    case BAD:
+      ret = Z_DATA_ERROR;
+      break inf_leave;
+    case MEM:
+      return Z_MEM_ERROR;
+    case SYNC:
+      /* falls through */
+    default:
+      return Z_STREAM_ERROR;
+    }
+  }
+
+  // inf_leave <- here is real place for "goto inf_leave", emulated via "break inf_leave"
+
+  /*
+     Return from inflate(), updating the total counts and the check value.
+     If there was no progress during the inflate() call, return a buffer
+     error.  Call updatewindow() to create and/or update the window state.
+     Note: a memory error from inflate() is non-recoverable.
+   */
+
+  //--- RESTORE() ---
+  strm.next_out = put;
+  strm.avail_out = left;
+  strm.next_in = next;
+  strm.avail_in = have;
+  state.hold = hold;
+  state.bits = bits;
+  //---
+
+  if (state.wsize || (_out !== strm.avail_out && state.mode < BAD &&
+                      (state.mode < CHECK || flush !== Z_FINISH))) {
+    if (updatewindow(strm, strm.output, strm.next_out, _out - strm.avail_out)) {
+      state.mode = MEM;
+      return Z_MEM_ERROR;
+    }
+  }
+  _in -= strm.avail_in;
+  _out -= strm.avail_out;
+  strm.total_in += _in;
+  strm.total_out += _out;
+  state.total += _out;
+  if (state.wrap && _out) {
+    strm.adler = state.check = /*UPDATE(state.check, strm.next_out - _out, _out);*/
+      (state.flags ? crc32(state.check, output, _out, strm.next_out - _out) : adler32(state.check, output, _out, strm.next_out - _out));
+  }
+  strm.data_type = state.bits + (state.last ? 64 : 0) +
+                    (state.mode === TYPE ? 128 : 0) +
+                    (state.mode === LEN_ || state.mode === COPY_ ? 256 : 0);
+  if (((_in === 0 && _out === 0) || flush === Z_FINISH) && ret === Z_OK) {
+    ret = Z_BUF_ERROR;
+  }
+  return ret;
+}
+
+function inflateEnd(strm) {
+
+  if (!strm || !strm.state /*|| strm->zfree == (free_func)0*/) {
+    return Z_STREAM_ERROR;
+  }
+
+  var state = strm.state;
+  if (state.window) {
+    state.window = null;
+  }
+  strm.state = null;
+  return Z_OK;
+}
+
+function inflateGetHeader(strm, head) {
+  var state;
+
+  /* check state */
+  if (!strm || !strm.state) { return Z_STREAM_ERROR; }
+  state = strm.state;
+  if ((state.wrap & 2) === 0) { return Z_STREAM_ERROR; }
+
+  /* save header structure */
+  state.head = head;
+  head.done = false;
+  return Z_OK;
+}
+
+function inflateSetDictionary(strm, dictionary) {
+  var dictLength = dictionary.length;
+
+  var state;
+  var dictid;
+  var ret;
+
+  /* check state */
+  if (!strm /* == Z_NULL */ || !strm.state /* == Z_NULL */) { return Z_STREAM_ERROR; }
+  state = strm.state;
+
+  if (state.wrap !== 0 && state.mode !== DICT) {
+    return Z_STREAM_ERROR;
+  }
+
+  /* check for correct dictionary identifier */
+  if (state.mode === DICT) {
+    dictid = 1; /* adler32(0, null, 0)*/
+    /* dictid = adler32(dictid, dictionary, dictLength); */
+    dictid = adler32(dictid, dictionary, dictLength, 0);
+    if (dictid !== state.check) {
+      return Z_DATA_ERROR;
+    }
+  }
+  /* copy dictionary to window using updatewindow(), which will amend the
+   existing dictionary if appropriate */
+  ret = updatewindow(strm, dictionary, dictLength, dictLength);
+  if (ret) {
+    state.mode = MEM;
+    return Z_MEM_ERROR;
+  }
+  state.havedict = 1;
+  // Tracev((stderr, "inflate:   dictionary set\n"));
+  return Z_OK;
+}
+
+exports.inflateReset = inflateReset;
+exports.inflateReset2 = inflateReset2;
+exports.inflateResetKeep = inflateResetKeep;
+exports.inflateInit = inflateInit;
+exports.inflateInit2 = inflateInit2;
+exports.inflate = inflate;
+exports.inflateEnd = inflateEnd;
+exports.inflateGetHeader = inflateGetHeader;
+exports.inflateSetDictionary = inflateSetDictionary;
+exports.inflateInfo = 'pako inflate (from Nodeca project)';
+
+/* Not implemented
+exports.inflateCopy = inflateCopy;
+exports.inflateGetDictionary = inflateGetDictionary;
+exports.inflateMark = inflateMark;
+exports.inflatePrime = inflatePrime;
+exports.inflateSync = inflateSync;
+exports.inflateSyncPoint = inflateSyncPoint;
+exports.inflateUndermine = inflateUndermine;
+*/
+
+},{"../utils/common":3,"./adler32":5,"./crc32":7,"./inffast":10,"./inftrees":12}],12:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+var utils = require('../utils/common');
+
+var MAXBITS = 15;
+var ENOUGH_LENS = 852;
+var ENOUGH_DISTS = 592;
+//var ENOUGH = (ENOUGH_LENS+ENOUGH_DISTS);
+
+var CODES = 0;
+var LENS = 1;
+var DISTS = 2;
+
+var lbase = [ /* Length codes 257..285 base */
+  3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
+  35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0
+];
+
+var lext = [ /* Length codes 257..285 extra */
+  16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18,
+  19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 16, 72, 78
+];
+
+var dbase = [ /* Distance codes 0..29 base */
+  1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
+  257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
+  8193, 12289, 16385, 24577, 0, 0
+];
+
+var dext = [ /* Distance codes 0..29 extra */
+  16, 16, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22,
+  23, 23, 24, 24, 25, 25, 26, 26, 27, 27,
+  28, 28, 29, 29, 64, 64
+];
+
+module.exports = function inflate_table(type, lens, lens_index, codes, table, table_index, work, opts)
+{
+  var bits = opts.bits;
+      //here = opts.here; /* table entry for duplication */
+
+  var len = 0;               /* a code's length in bits */
+  var sym = 0;               /* index of code symbols */
+  var min = 0, max = 0;          /* minimum and maximum code lengths */
+  var root = 0;              /* number of index bits for root table */
+  var curr = 0;              /* number of index bits for current table */
+  var drop = 0;              /* code bits to drop for sub-table */
+  var left = 0;                   /* number of prefix codes available */
+  var used = 0;              /* code entries in table used */
+  var huff = 0;              /* Huffman code */
+  var incr;              /* for incrementing code, index */
+  var fill;              /* index for replicating entries */
+  var low;               /* low bits for current root entry */
+  var mask;              /* mask for low root bits */
+  var next;             /* next available space in table */
+  var base = null;     /* base value table to use */
+  var base_index = 0;
+//  var shoextra;    /* extra bits table to use */
+  var end;                    /* use base and extra for symbol > end */
+  var count = new utils.Buf16(MAXBITS + 1); //[MAXBITS+1];    /* number of codes of each length */
+  var offs = new utils.Buf16(MAXBITS + 1); //[MAXBITS+1];     /* offsets in table for each length */
+  var extra = null;
+  var extra_index = 0;
+
+  var here_bits, here_op, here_val;
+
+  /*
+   Process a set of code lengths to create a canonical Huffman code.  The
+   code lengths are lens[0..codes-1].  Each length corresponds to the
+   symbols 0..codes-1.  The Huffman code is generated by first sorting the
+   symbols by length from short to long, and retaining the symbol order
+   for codes with equal lengths.  Then the code starts with all zero bits
+   for the first code of the shortest length, and the codes are integer
+   increments for the same length, and zeros are appended as the length
+   increases.  For the deflate format, these bits are stored backwards
+   from their more natural integer increment ordering, and so when the
+   decoding tables are built in the large loop below, the integer codes
+   are incremented backwards.
+
+   This routine assumes, but does not check, that all of the entries in
+   lens[] are in the range 0..MAXBITS.  The caller must assure this.
+   1..MAXBITS is interpreted as that code length.  zero means that that
+   symbol does not occur in this code.
+
+   The codes are sorted by computing a count of codes for each length,
+   creating from that a table of starting indices for each length in the
+   sorted table, and then entering the symbols in order in the sorted
+   table.  The sorted table is work[], with that space being provided by
+   the caller.
+
+   The length counts are used for other purposes as well, i.e. finding
+   the minimum and maximum length codes, determining if there are any
+   codes at all, checking for a valid set of lengths, and looking ahead
+   at length counts to determine sub-table sizes when building the
+   decoding tables.
+   */
+
+  /* accumulate lengths for codes (assumes lens[] all in 0..MAXBITS) */
+  for (len = 0; len <= MAXBITS; len++) {
+    count[len] = 0;
+  }
+  for (sym = 0; sym < codes; sym++) {
+    count[lens[lens_index + sym]]++;
+  }
+
+  /* bound code lengths, force root to be within code lengths */
+  root = bits;
+  for (max = MAXBITS; max >= 1; max--) {
+    if (count[max] !== 0) { break; }
+  }
+  if (root > max) {
+    root = max;
+  }
+  if (max === 0) {                     /* no symbols to code at all */
+    //table.op[opts.table_index] = 64;  //here.op = (var char)64;    /* invalid code marker */
+    //table.bits[opts.table_index] = 1;   //here.bits = (var char)1;
+    //table.val[opts.table_index++] = 0;   //here.val = (var short)0;
+    table[table_index++] = (1 << 24) | (64 << 16) | 0;
+
+
+    //table.op[opts.table_index] = 64;
+    //table.bits[opts.table_index] = 1;
+    //table.val[opts.table_index++] = 0;
+    table[table_index++] = (1 << 24) | (64 << 16) | 0;
+
+    opts.bits = 1;
+    return 0;     /* no symbols, but wait for decoding to report error */
+  }
+  for (min = 1; min < max; min++) {
+    if (count[min] !== 0) { break; }
+  }
+  if (root < min) {
+    root = min;
+  }
+
+  /* check for an over-subscribed or incomplete set of lengths */
+  left = 1;
+  for (len = 1; len <= MAXBITS; len++) {
+    left <<= 1;
+    left -= count[len];
+    if (left < 0) {
+      return -1;
+    }        /* over-subscribed */
+  }
+  if (left > 0 && (type === CODES || max !== 1)) {
+    return -1;                      /* incomplete set */
+  }
+
+  /* generate offsets into symbol table for each length for sorting */
+  offs[1] = 0;
+  for (len = 1; len < MAXBITS; len++) {
+    offs[len + 1] = offs[len] + count[len];
+  }
+
+  /* sort symbols by length, by symbol order within each length */
+  for (sym = 0; sym < codes; sym++) {
+    if (lens[lens_index + sym] !== 0) {
+      work[offs[lens[lens_index + sym]]++] = sym;
+    }
+  }
+
+  /*
+   Create and fill in decoding tables.  In this loop, the table being
+   filled is at next and has curr index bits.  The code being used is huff
+   with length len.  That code is converted to an index by dropping drop
+   bits off of the bottom.  For codes where len is less than drop + curr,
+   those top drop + curr - len bits are incremented through all values to
+   fill the table with replicated entries.
+
+   root is the number of index bits for the root table.  When len exceeds
+   root, sub-tables are created pointed to by the root entry with an index
+   of the low root bits of huff.  This is saved in low to check for when a
+   new sub-table should be started.  drop is zero when the root table is
+   being filled, and drop is root when sub-tables are being filled.
+
+   When a new sub-table is needed, it is necessary to look ahead in the
+   code lengths to determine what size sub-table is needed.  The length
+   counts are used for this, and so count[] is decremented as codes are
+   entered in the tables.
+
+   used keeps track of how many table entries have been allocated from the
+   provided *table space.  It is checked for LENS and DIST tables against
+   the constants ENOUGH_LENS and ENOUGH_DISTS to guard against changes in
+   the initial root table size constants.  See the comments in inftrees.h
+   for more information.
+
+   sym increments through all symbols, and the loop terminates when
+   all codes of length max, i.e. all codes, have been processed.  This
+   routine permits incomplete codes, so another loop after this one fills
+   in the rest of the decoding tables with invalid code markers.
+   */
+
+  /* set up for code type */
+  // poor man optimization - use if-else instead of switch,
+  // to avoid deopts in old v8
+  if (type === CODES) {
+    base = extra = work;    /* dummy value--not used */
+    end = 19;
+
+  } else if (type === LENS) {
+    base = lbase;
+    base_index -= 257;
+    extra = lext;
+    extra_index -= 257;
+    end = 256;
+
+  } else {                    /* DISTS */
+    base = dbase;
+    extra = dext;
+    end = -1;
+  }
+
+  /* initialize opts for loop */
+  huff = 0;                   /* starting code */
+  sym = 0;                    /* starting code symbol */
+  len = min;                  /* starting code length */
+  next = table_index;              /* current table to fill in */
+  curr = root;                /* current table index bits */
+  drop = 0;                   /* current bits to drop from code for index */
+  low = -1;                   /* trigger new sub-table when len > root */
+  used = 1 << root;          /* use root table entries */
+  mask = used - 1;            /* mask for comparing low */
+
+  /* check available table space */
+  if ((type === LENS && used > ENOUGH_LENS) ||
+    (type === DISTS && used > ENOUGH_DISTS)) {
+    return 1;
+  }
+
+  /* process all codes and make table entries */
+  for (;;) {
+    /* create table entry */
+    here_bits = len - drop;
+    if (work[sym] < end) {
+      here_op = 0;
+      here_val = work[sym];
+    }
+    else if (work[sym] > end) {
+      here_op = extra[extra_index + work[sym]];
+      here_val = base[base_index + work[sym]];
+    }
+    else {
+      here_op = 32 + 64;         /* end of block */
+      here_val = 0;
+    }
+
+    /* replicate for those indices with low len bits equal to huff */
+    incr = 1 << (len - drop);
+    fill = 1 << curr;
+    min = fill;                 /* save offset to next table */
+    do {
+      fill -= incr;
+      table[next + (huff >> drop) + fill] = (here_bits << 24) | (here_op << 16) | here_val |0;
+    } while (fill !== 0);
+
+    /* backwards increment the len-bit code huff */
+    incr = 1 << (len - 1);
+    while (huff & incr) {
+      incr >>= 1;
+    }
+    if (incr !== 0) {
+      huff &= incr - 1;
+      huff += incr;
+    } else {
+      huff = 0;
+    }
+
+    /* go to next symbol, update count, len */
+    sym++;
+    if (--count[len] === 0) {
+      if (len === max) { break; }
+      len = lens[lens_index + work[sym]];
+    }
+
+    /* create new sub-table if needed */
+    if (len > root && (huff & mask) !== low) {
+      /* if first time, transition to sub-tables */
+      if (drop === 0) {
+        drop = root;
+      }
+
+      /* increment past last table */
+      next += min;            /* here min is 1 << curr */
+
+      /* determine length of next table */
+      curr = len - drop;
+      left = 1 << curr;
+      while (curr + drop < max) {
+        left -= count[curr + drop];
+        if (left <= 0) { break; }
+        curr++;
+        left <<= 1;
+      }
+
+      /* check for enough space */
+      used += 1 << curr;
+      if ((type === LENS && used > ENOUGH_LENS) ||
+        (type === DISTS && used > ENOUGH_DISTS)) {
+        return 1;
+      }
+
+      /* point entry in root table to sub-table */
+      low = huff & mask;
+      /*table.op[low] = curr;
+      table.bits[low] = root;
+      table.val[low] = next - opts.table_index;*/
+      table[low] = (root << 24) | (curr << 16) | (next - table_index) |0;
+    }
+  }
+
+  /* fill in remaining table entry if code is incomplete (guaranteed to have
+   at most one remaining entry, since if the code is incomplete, the
+   maximum code length that was allowed to get this far is one bit) */
+  if (huff !== 0) {
+    //table.op[next + huff] = 64;            /* invalid code marker */
+    //table.bits[next + huff] = len - drop;
+    //table.val[next + huff] = 0;
+    table[next + huff] = ((len - drop) << 24) | (64 << 16) |0;
+  }
+
+  /* set return parameters */
+  //opts.table_index += used;
+  opts.bits = root;
+  return 0;
+};
+
+},{"../utils/common":3}],13:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+module.exports = {
+  2:      'need dictionary',     /* Z_NEED_DICT       2  */
+  1:      'stream end',          /* Z_STREAM_END      1  */
+  0:      '',                    /* Z_OK              0  */
+  '-1':   'file error',          /* Z_ERRNO         (-1) */
+  '-2':   'stream error',        /* Z_STREAM_ERROR  (-2) */
+  '-3':   'data error',          /* Z_DATA_ERROR    (-3) */
+  '-4':   'insufficient memory', /* Z_MEM_ERROR     (-4) */
+  '-5':   'buffer error',        /* Z_BUF_ERROR     (-5) */
+  '-6':   'incompatible version' /* Z_VERSION_ERROR (-6) */
+};
+
+},{}],14:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+var utils = require('../utils/common');
+
+/* Public constants ==========================================================*/
+/* ===========================================================================*/
+
+
+//var Z_FILTERED          = 1;
+//var Z_HUFFMAN_ONLY      = 2;
+//var Z_RLE               = 3;
+var Z_FIXED               = 4;
+//var Z_DEFAULT_STRATEGY  = 0;
+
+/* Possible values of the data_type field (though see inflate()) */
+var Z_BINARY              = 0;
+var Z_TEXT                = 1;
+//var Z_ASCII             = 1; // = Z_TEXT
+var Z_UNKNOWN             = 2;
+
+/*============================================================================*/
+
+
+function zero(buf) { var len = buf.length; while (--len >= 0) { buf[len] = 0; } }
+
+// From zutil.h
+
+var STORED_BLOCK = 0;
+var STATIC_TREES = 1;
+var DYN_TREES    = 2;
+/* The three kinds of block type */
+
+var MIN_MATCH    = 3;
+var MAX_MATCH    = 258;
+/* The minimum and maximum match lengths */
+
+// From deflate.h
+/* ===========================================================================
+ * Internal compression state.
+ */
+
+var LENGTH_CODES  = 29;
+/* number of length codes, not counting the special END_BLOCK code */
+
+var LITERALS      = 256;
+/* number of literal bytes 0..255 */
+
+var L_CODES       = LITERALS + 1 + LENGTH_CODES;
+/* number of Literal or Length codes, including the END_BLOCK code */
+
+var D_CODES       = 30;
+/* number of distance codes */
+
+var BL_CODES      = 19;
+/* number of codes used to transfer the bit lengths */
+
+var HEAP_SIZE     = 2 * L_CODES + 1;
+/* maximum heap size */
+
+var MAX_BITS      = 15;
+/* All codes must not exceed MAX_BITS bits */
+
+var Buf_size      = 16;
+/* size of bit buffer in bi_buf */
+
+
+/* ===========================================================================
+ * Constants
+ */
+
+var MAX_BL_BITS = 7;
+/* Bit length codes must not exceed MAX_BL_BITS bits */
+
+var END_BLOCK   = 256;
+/* end of block literal code */
+
+var REP_3_6     = 16;
+/* repeat previous bit length 3-6 times (2 bits of repeat count) */
+
+var REPZ_3_10   = 17;
+/* repeat a zero length 3-10 times  (3 bits of repeat count) */
+
+var REPZ_11_138 = 18;
+/* repeat a zero length 11-138 times  (7 bits of repeat count) */
+
+/* eslint-disable comma-spacing,array-bracket-spacing */
+var extra_lbits =   /* extra bits for each length code */
+  [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+
+var extra_dbits =   /* extra bits for each distance code */
+  [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+
+var extra_blbits =  /* extra bits for each bit length code */
+  [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7];
+
+var bl_order =
+  [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+/* eslint-enable comma-spacing,array-bracket-spacing */
+
+/* The lengths of the bit length codes are sent in order of decreasing
+ * probability, to avoid transmitting the lengths for unused bit length codes.
+ */
+
+/* ===========================================================================
+ * Local data. These are initialized only once.
+ */
+
+// We pre-fill arrays with 0 to avoid uninitialized gaps
+
+var DIST_CODE_LEN = 512; /* see definition of array dist_code below */
+
+// !!!! Use flat array insdead of structure, Freq = i*2, Len = i*2+1
+var static_ltree  = new Array((L_CODES + 2) * 2);
+zero(static_ltree);
+/* The static literal tree. Since the bit lengths are imposed, there is no
+ * need for the L_CODES extra codes used during heap construction. However
+ * The codes 286 and 287 are needed to build a canonical tree (see _tr_init
+ * below).
+ */
+
+var static_dtree  = new Array(D_CODES * 2);
+zero(static_dtree);
+/* The static distance tree. (Actually a trivial tree since all codes use
+ * 5 bits.)
+ */
+
+var _dist_code    = new Array(DIST_CODE_LEN);
+zero(_dist_code);
+/* Distance codes. The first 256 values correspond to the distances
+ * 3 .. 258, the last 256 values correspond to the top 8 bits of
+ * the 15 bit distances.
+ */
+
+var _length_code  = new Array(MAX_MATCH - MIN_MATCH + 1);
+zero(_length_code);
+/* length code for each normalized match length (0 == MIN_MATCH) */
+
+var base_length   = new Array(LENGTH_CODES);
+zero(base_length);
+/* First normalized length for each code (0 = MIN_MATCH) */
+
+var base_dist     = new Array(D_CODES);
+zero(base_dist);
+/* First normalized distance for each code (0 = distance of 1) */
+
+
+function StaticTreeDesc(static_tree, extra_bits, extra_base, elems, max_length) {
+
+  this.static_tree  = static_tree;  /* static tree or NULL */
+  this.extra_bits   = extra_bits;   /* extra bits for each code or NULL */
+  this.extra_base   = extra_base;   /* base index for extra_bits */
+  this.elems        = elems;        /* max number of elements in the tree */
+  this.max_length   = max_length;   /* max bit length for the codes */
+
+  // show if `static_tree` has data or dummy - needed for monomorphic objects
+  this.has_stree    = static_tree && static_tree.length;
+}
+
+
+var static_l_desc;
+var static_d_desc;
+var static_bl_desc;
+
+
+function TreeDesc(dyn_tree, stat_desc) {
+  this.dyn_tree = dyn_tree;     /* the dynamic tree */
+  this.max_code = 0;            /* largest code with non zero frequency */
+  this.stat_desc = stat_desc;   /* the corresponding static tree */
+}
+
+
+
+function d_code(dist) {
+  return dist < 256 ? _dist_code[dist] : _dist_code[256 + (dist >>> 7)];
+}
+
+
+/* ===========================================================================
+ * Output a short LSB first on the stream.
+ * IN assertion: there is enough room in pendingBuf.
+ */
+function put_short(s, w) {
+//    put_byte(s, (uch)((w) & 0xff));
+//    put_byte(s, (uch)((ush)(w) >> 8));
+  s.pending_buf[s.pending++] = (w) & 0xff;
+  s.pending_buf[s.pending++] = (w >>> 8) & 0xff;
+}
+
+
+/* ===========================================================================
+ * Send a value on a given number of bits.
+ * IN assertion: length <= 16 and value fits in length bits.
+ */
+function send_bits(s, value, length) {
+  if (s.bi_valid > (Buf_size - length)) {
+    s.bi_buf |= (value << s.bi_valid) & 0xffff;
+    put_short(s, s.bi_buf);
+    s.bi_buf = value >> (Buf_size - s.bi_valid);
+    s.bi_valid += length - Buf_size;
+  } else {
+    s.bi_buf |= (value << s.bi_valid) & 0xffff;
+    s.bi_valid += length;
+  }
+}
+
+
+function send_code(s, c, tree) {
+  send_bits(s, tree[c * 2]/*.Code*/, tree[c * 2 + 1]/*.Len*/);
+}
+
+
+/* ===========================================================================
+ * Reverse the first len bits of a code, using straightforward code (a faster
+ * method would use a table)
+ * IN assertion: 1 <= len <= 15
+ */
+function bi_reverse(code, len) {
+  var res = 0;
+  do {
+    res |= code & 1;
+    code >>>= 1;
+    res <<= 1;
+  } while (--len > 0);
+  return res >>> 1;
+}
+
+
+/* ===========================================================================
+ * Flush the bit buffer, keeping at most 7 bits in it.
+ */
+function bi_flush(s) {
+  if (s.bi_valid === 16) {
+    put_short(s, s.bi_buf);
+    s.bi_buf = 0;
+    s.bi_valid = 0;
+
+  } else if (s.bi_valid >= 8) {
+    s.pending_buf[s.pending++] = s.bi_buf & 0xff;
+    s.bi_buf >>= 8;
+    s.bi_valid -= 8;
+  }
+}
+
+
+/* ===========================================================================
+ * Compute the optimal bit lengths for a tree and update the total bit length
+ * for the current block.
+ * IN assertion: the fields freq and dad are set, heap[heap_max] and
+ *    above are the tree nodes sorted by increasing frequency.
+ * OUT assertions: the field len is set to the optimal bit length, the
+ *     array bl_count contains the frequencies for each bit length.
+ *     The length opt_len is updated; static_len is also updated if stree is
+ *     not null.
+ */
+function gen_bitlen(s, desc)
+//    deflate_state *s;
+//    tree_desc *desc;    /* the tree descriptor */
+{
+  var tree            = desc.dyn_tree;
+  var max_code        = desc.max_code;
+  var stree           = desc.stat_desc.static_tree;
+  var has_stree       = desc.stat_desc.has_stree;
+  var extra           = desc.stat_desc.extra_bits;
+  var base            = desc.stat_desc.extra_base;
+  var max_length      = desc.stat_desc.max_length;
+  var h;              /* heap index */
+  var n, m;           /* iterate over the tree elements */
+  var bits;           /* bit length */
+  var xbits;          /* extra bits */
+  var f;              /* frequency */
+  var overflow = 0;   /* number of elements with bit length too large */
+
+  for (bits = 0; bits <= MAX_BITS; bits++) {
+    s.bl_count[bits] = 0;
+  }
+
+  /* In a first pass, compute the optimal bit lengths (which may
+   * overflow in the case of the bit length tree).
+   */
+  tree[s.heap[s.heap_max] * 2 + 1]/*.Len*/ = 0; /* root of the heap */
+
+  for (h = s.heap_max + 1; h < HEAP_SIZE; h++) {
+    n = s.heap[h];
+    bits = tree[tree[n * 2 + 1]/*.Dad*/ * 2 + 1]/*.Len*/ + 1;
+    if (bits > max_length) {
+      bits = max_length;
+      overflow++;
+    }
+    tree[n * 2 + 1]/*.Len*/ = bits;
+    /* We overwrite tree[n].Dad which is no longer needed */
+
+    if (n > max_code) { continue; } /* not a leaf node */
+
+    s.bl_count[bits]++;
+    xbits = 0;
+    if (n >= base) {
+      xbits = extra[n - base];
+    }
+    f = tree[n * 2]/*.Freq*/;
+    s.opt_len += f * (bits + xbits);
+    if (has_stree) {
+      s.static_len += f * (stree[n * 2 + 1]/*.Len*/ + xbits);
+    }
+  }
+  if (overflow === 0) { return; }
+
+  // Trace((stderr,"\nbit length overflow\n"));
+  /* This happens for example on obj2 and pic of the Calgary corpus */
+
+  /* Find the first bit length which could increase: */
+  do {
+    bits = max_length - 1;
+    while (s.bl_count[bits] === 0) { bits--; }
+    s.bl_count[bits]--;      /* move one leaf down the tree */
+    s.bl_count[bits + 1] += 2; /* move one overflow item as its brother */
+    s.bl_count[max_length]--;
+    /* The brother of the overflow item also moves one step up,
+     * but this does not affect bl_count[max_length]
+     */
+    overflow -= 2;
+  } while (overflow > 0);
+
+  /* Now recompute all bit lengths, scanning in increasing frequency.
+   * h is still equal to HEAP_SIZE. (It is simpler to reconstruct all
+   * lengths instead of fixing only the wrong ones. This idea is taken
+   * from 'ar' written by Haruhiko Okumura.)
+   */
+  for (bits = max_length; bits !== 0; bits--) {
+    n = s.bl_count[bits];
+    while (n !== 0) {
+      m = s.heap[--h];
+      if (m > max_code) { continue; }
+      if (tree[m * 2 + 1]/*.Len*/ !== bits) {
+        // Trace((stderr,"code %d bits %d->%d\n", m, tree[m].Len, bits));
+        s.opt_len += (bits - tree[m * 2 + 1]/*.Len*/) * tree[m * 2]/*.Freq*/;
+        tree[m * 2 + 1]/*.Len*/ = bits;
+      }
+      n--;
+    }
+  }
+}
+
+
+/* ===========================================================================
+ * Generate the codes for a given tree and bit counts (which need not be
+ * optimal).
+ * IN assertion: the array bl_count contains the bit length statistics for
+ * the given tree and the field len is set for all tree elements.
+ * OUT assertion: the field code is set for all tree elements of non
+ *     zero code length.
+ */
+function gen_codes(tree, max_code, bl_count)
+//    ct_data *tree;             /* the tree to decorate */
+//    int max_code;              /* largest code with non zero frequency */
+//    ushf *bl_count;            /* number of codes at each bit length */
+{
+  var next_code = new Array(MAX_BITS + 1); /* next code value for each bit length */
+  var code = 0;              /* running code value */
+  var bits;                  /* bit index */
+  var n;                     /* code index */
+
+  /* The distribution counts are first used to generate the code values
+   * without bit reversal.
+   */
+  for (bits = 1; bits <= MAX_BITS; bits++) {
+    next_code[bits] = code = (code + bl_count[bits - 1]) << 1;
+  }
+  /* Check that the bit counts in bl_count are consistent. The last code
+   * must be all ones.
+   */
+  //Assert (code + bl_count[MAX_BITS]-1 == (1<<MAX_BITS)-1,
+  //        "inconsistent bit counts");
+  //Tracev((stderr,"\ngen_codes: max_code %d ", max_code));
+
+  for (n = 0;  n <= max_code; n++) {
+    var len = tree[n * 2 + 1]/*.Len*/;
+    if (len === 0) { continue; }
+    /* Now reverse the bits */
+    tree[n * 2]/*.Code*/ = bi_reverse(next_code[len]++, len);
+
+    //Tracecv(tree != static_ltree, (stderr,"\nn %3d %c l %2d c %4x (%x) ",
+    //     n, (isgraph(n) ? n : ' '), len, tree[n].Code, next_code[len]-1));
+  }
+}
+
+
+/* ===========================================================================
+ * Initialize the various 'constant' tables.
+ */
+function tr_static_init() {
+  var n;        /* iterates over tree elements */
+  var bits;     /* bit counter */
+  var length;   /* length value */
+  var code;     /* code value */
+  var dist;     /* distance index */
+  var bl_count = new Array(MAX_BITS + 1);
+  /* number of codes at each bit length for an optimal tree */
+
+  // do check in _tr_init()
+  //if (static_init_done) return;
+
+  /* For some embedded targets, global variables are not initialized: */
+/*#ifdef NO_INIT_GLOBAL_POINTERS
+  static_l_desc.static_tree = static_ltree;
+  static_l_desc.extra_bits = extra_lbits;
+  static_d_desc.static_tree = static_dtree;
+  static_d_desc.extra_bits = extra_dbits;
+  static_bl_desc.extra_bits = extra_blbits;
+#endif*/
+
+  /* Initialize the mapping length (0..255) -> length code (0..28) */
+  length = 0;
+  for (code = 0; code < LENGTH_CODES - 1; code++) {
+    base_length[code] = length;
+    for (n = 0; n < (1 << extra_lbits[code]); n++) {
+      _length_code[length++] = code;
+    }
+  }
+  //Assert (length == 256, "tr_static_init: length != 256");
+  /* Note that the length 255 (match length 258) can be represented
+   * in two different ways: code 284 + 5 bits or code 285, so we
+   * overwrite length_code[255] to use the best encoding:
+   */
+  _length_code[length - 1] = code;
+
+  /* Initialize the mapping dist (0..32K) -> dist code (0..29) */
+  dist = 0;
+  for (code = 0; code < 16; code++) {
+    base_dist[code] = dist;
+    for (n = 0; n < (1 << extra_dbits[code]); n++) {
+      _dist_code[dist++] = code;
+    }
+  }
+  //Assert (dist == 256, "tr_static_init: dist != 256");
+  dist >>= 7; /* from now on, all distances are divided by 128 */
+  for (; code < D_CODES; code++) {
+    base_dist[code] = dist << 7;
+    for (n = 0; n < (1 << (extra_dbits[code] - 7)); n++) {
+      _dist_code[256 + dist++] = code;
+    }
+  }
+  //Assert (dist == 256, "tr_static_init: 256+dist != 512");
+
+  /* Construct the codes of the static literal tree */
+  for (bits = 0; bits <= MAX_BITS; bits++) {
+    bl_count[bits] = 0;
+  }
+
+  n = 0;
+  while (n <= 143) {
+    static_ltree[n * 2 + 1]/*.Len*/ = 8;
+    n++;
+    bl_count[8]++;
+  }
+  while (n <= 255) {
+    static_ltree[n * 2 + 1]/*.Len*/ = 9;
+    n++;
+    bl_count[9]++;
+  }
+  while (n <= 279) {
+    static_ltree[n * 2 + 1]/*.Len*/ = 7;
+    n++;
+    bl_count[7]++;
+  }
+  while (n <= 287) {
+    static_ltree[n * 2 + 1]/*.Len*/ = 8;
+    n++;
+    bl_count[8]++;
+  }
+  /* Codes 286 and 287 do not exist, but we must include them in the
+   * tree construction to get a canonical Huffman tree (longest code
+   * all ones)
+   */
+  gen_codes(static_ltree, L_CODES + 1, bl_count);
+
+  /* The static distance tree is trivial: */
+  for (n = 0; n < D_CODES; n++) {
+    static_dtree[n * 2 + 1]/*.Len*/ = 5;
+    static_dtree[n * 2]/*.Code*/ = bi_reverse(n, 5);
+  }
+
+  // Now data ready and we can init static trees
+  static_l_desc = new StaticTreeDesc(static_ltree, extra_lbits, LITERALS + 1, L_CODES, MAX_BITS);
+  static_d_desc = new StaticTreeDesc(static_dtree, extra_dbits, 0,          D_CODES, MAX_BITS);
+  static_bl_desc = new StaticTreeDesc(new Array(0), extra_blbits, 0,         BL_CODES, MAX_BL_BITS);
+
+  //static_init_done = true;
+}
+
+
+/* ===========================================================================
+ * Initialize a new block.
+ */
+function init_block(s) {
+  var n; /* iterates over tree elements */
+
+  /* Initialize the trees. */
+  for (n = 0; n < L_CODES;  n++) { s.dyn_ltree[n * 2]/*.Freq*/ = 0; }
+  for (n = 0; n < D_CODES;  n++) { s.dyn_dtree[n * 2]/*.Freq*/ = 0; }
+  for (n = 0; n < BL_CODES; n++) { s.bl_tree[n * 2]/*.Freq*/ = 0; }
+
+  s.dyn_ltree[END_BLOCK * 2]/*.Freq*/ = 1;
+  s.opt_len = s.static_len = 0;
+  s.last_lit = s.matches = 0;
+}
+
+
+/* ===========================================================================
+ * Flush the bit buffer and align the output on a byte boundary
+ */
+function bi_windup(s)
+{
+  if (s.bi_valid > 8) {
+    put_short(s, s.bi_buf);
+  } else if (s.bi_valid > 0) {
+    //put_byte(s, (Byte)s->bi_buf);
+    s.pending_buf[s.pending++] = s.bi_buf;
+  }
+  s.bi_buf = 0;
+  s.bi_valid = 0;
+}
+
+/* ===========================================================================
+ * Copy a stored block, storing first the length and its
+ * one's complement if requested.
+ */
+function copy_block(s, buf, len, header)
+//DeflateState *s;
+//charf    *buf;    /* the input data */
+//unsigned len;     /* its length */
+//int      header;  /* true if block header must be written */
+{
+  bi_windup(s);        /* align on byte boundary */
+
+  if (header) {
+    put_short(s, len);
+    put_short(s, ~len);
+  }
+//  while (len--) {
+//    put_byte(s, *buf++);
+//  }
+  utils.arraySet(s.pending_buf, s.window, buf, len, s.pending);
+  s.pending += len;
+}
+
+/* ===========================================================================
+ * Compares to subtrees, using the tree depth as tie breaker when
+ * the subtrees have equal frequency. This minimizes the worst case length.
+ */
+function smaller(tree, n, m, depth) {
+  var _n2 = n * 2;
+  var _m2 = m * 2;
+  return (tree[_n2]/*.Freq*/ < tree[_m2]/*.Freq*/ ||
+         (tree[_n2]/*.Freq*/ === tree[_m2]/*.Freq*/ && depth[n] <= depth[m]));
+}
+
+/* ===========================================================================
+ * Restore the heap property by moving down the tree starting at node k,
+ * exchanging a node with the smallest of its two sons if necessary, stopping
+ * when the heap property is re-established (each father smaller than its
+ * two sons).
+ */
+function pqdownheap(s, tree, k)
+//    deflate_state *s;
+//    ct_data *tree;  /* the tree to restore */
+//    int k;               /* node to move down */
+{
+  var v = s.heap[k];
+  var j = k << 1;  /* left son of k */
+  while (j <= s.heap_len) {
+    /* Set j to the smallest of the two sons: */
+    if (j < s.heap_len &&
+      smaller(tree, s.heap[j + 1], s.heap[j], s.depth)) {
+      j++;
+    }
+    /* Exit if v is smaller than both sons */
+    if (smaller(tree, v, s.heap[j], s.depth)) { break; }
+
+    /* Exchange v with the smallest son */
+    s.heap[k] = s.heap[j];
+    k = j;
+
+    /* And continue down the tree, setting j to the left son of k */
+    j <<= 1;
+  }
+  s.heap[k] = v;
+}
+
+
+// inlined manually
+// var SMALLEST = 1;
+
+/* ===========================================================================
+ * Send the block data compressed using the given Huffman trees
+ */
+function compress_block(s, ltree, dtree)
+//    deflate_state *s;
+//    const ct_data *ltree; /* literal tree */
+//    const ct_data *dtree; /* distance tree */
+{
+  var dist;           /* distance of matched string */
+  var lc;             /* match length or unmatched char (if dist == 0) */
+  var lx = 0;         /* running index in l_buf */
+  var code;           /* the code to send */
+  var extra;          /* number of extra bits to send */
+
+  if (s.last_lit !== 0) {
+    do {
+      dist = (s.pending_buf[s.d_buf + lx * 2] << 8) | (s.pending_buf[s.d_buf + lx * 2 + 1]);
+      lc = s.pending_buf[s.l_buf + lx];
+      lx++;
+
+      if (dist === 0) {
+        send_code(s, lc, ltree); /* send a literal byte */
+        //Tracecv(isgraph(lc), (stderr," '%c' ", lc));
+      } else {
+        /* Here, lc is the match length - MIN_MATCH */
+        code = _length_code[lc];
+        send_code(s, code + LITERALS + 1, ltree); /* send the length code */
+        extra = extra_lbits[code];
+        if (extra !== 0) {
+          lc -= base_length[code];
+          send_bits(s, lc, extra);       /* send the extra length bits */
+        }
+        dist--; /* dist is now the match distance - 1 */
+        code = d_code(dist);
+        //Assert (code < D_CODES, "bad d_code");
+
+        send_code(s, code, dtree);       /* send the distance code */
+        extra = extra_dbits[code];
+        if (extra !== 0) {
+          dist -= base_dist[code];
+          send_bits(s, dist, extra);   /* send the extra distance bits */
+        }
+      } /* literal or match pair ? */
+
+      /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
+      //Assert((uInt)(s->pending) < s->lit_bufsize + 2*lx,
+      //       "pendingBuf overflow");
+
+    } while (lx < s.last_lit);
+  }
+
+  send_code(s, END_BLOCK, ltree);
+}
+
+
+/* ===========================================================================
+ * Construct one Huffman tree and assigns the code bit strings and lengths.
+ * Update the total bit length for the current block.
+ * IN assertion: the field freq is set for all tree elements.
+ * OUT assertions: the fields len and code are set to the optimal bit length
+ *     and corresponding code. The length opt_len is updated; static_len is
+ *     also updated if stree is not null. The field max_code is set.
+ */
+function build_tree(s, desc)
+//    deflate_state *s;
+//    tree_desc *desc; /* the tree descriptor */
+{
+  var tree     = desc.dyn_tree;
+  var stree    = desc.stat_desc.static_tree;
+  var has_stree = desc.stat_desc.has_stree;
+  var elems    = desc.stat_desc.elems;
+  var n, m;          /* iterate over heap elements */
+  var max_code = -1; /* largest code with non zero frequency */
+  var node;          /* new node being created */
+
+  /* Construct the initial heap, with least frequent element in
+   * heap[SMALLEST]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
+   * heap[0] is not used.
+   */
+  s.heap_len = 0;
+  s.heap_max = HEAP_SIZE;
+
+  for (n = 0; n < elems; n++) {
+    if (tree[n * 2]/*.Freq*/ !== 0) {
+      s.heap[++s.heap_len] = max_code = n;
+      s.depth[n] = 0;
+
+    } else {
+      tree[n * 2 + 1]/*.Len*/ = 0;
+    }
+  }
+
+  /* The pkzip format requires that at least one distance code exists,
+   * and that at least one bit should be sent even if there is only one
+   * possible code. So to avoid special checks later on we force at least
+   * two codes of non zero frequency.
+   */
+  while (s.heap_len < 2) {
+    node = s.heap[++s.heap_len] = (max_code < 2 ? ++max_code : 0);
+    tree[node * 2]/*.Freq*/ = 1;
+    s.depth[node] = 0;
+    s.opt_len--;
+
+    if (has_stree) {
+      s.static_len -= stree[node * 2 + 1]/*.Len*/;
+    }
+    /* node is 0 or 1 so it does not have extra bits */
+  }
+  desc.max_code = max_code;
+
+  /* The elements heap[heap_len/2+1 .. heap_len] are leaves of the tree,
+   * establish sub-heaps of increasing lengths:
+   */
+  for (n = (s.heap_len >> 1/*int /2*/); n >= 1; n--) { pqdownheap(s, tree, n); }
+
+  /* Construct the Huffman tree by repeatedly combining the least two
+   * frequent nodes.
+   */
+  node = elems;              /* next internal node of the tree */
+  do {
+    //pqremove(s, tree, n);  /* n = node of least frequency */
+    /*** pqremove ***/
+    n = s.heap[1/*SMALLEST*/];
+    s.heap[1/*SMALLEST*/] = s.heap[s.heap_len--];
+    pqdownheap(s, tree, 1/*SMALLEST*/);
+    /***/
+
+    m = s.heap[1/*SMALLEST*/]; /* m = node of next least frequency */
+
+    s.heap[--s.heap_max] = n; /* keep the nodes sorted by frequency */
+    s.heap[--s.heap_max] = m;
+
+    /* Create a new node father of n and m */
+    tree[node * 2]/*.Freq*/ = tree[n * 2]/*.Freq*/ + tree[m * 2]/*.Freq*/;
+    s.depth[node] = (s.depth[n] >= s.depth[m] ? s.depth[n] : s.depth[m]) + 1;
+    tree[n * 2 + 1]/*.Dad*/ = tree[m * 2 + 1]/*.Dad*/ = node;
+
+    /* and insert the new node in the heap */
+    s.heap[1/*SMALLEST*/] = node++;
+    pqdownheap(s, tree, 1/*SMALLEST*/);
+
+  } while (s.heap_len >= 2);
+
+  s.heap[--s.heap_max] = s.heap[1/*SMALLEST*/];
+
+  /* At this point, the fields freq and dad are set. We can now
+   * generate the bit lengths.
+   */
+  gen_bitlen(s, desc);
+
+  /* The field len is now set, we can generate the bit codes */
+  gen_codes(tree, max_code, s.bl_count);
+}
+
+
+/* ===========================================================================
+ * Scan a literal or distance tree to determine the frequencies of the codes
+ * in the bit length tree.
+ */
+function scan_tree(s, tree, max_code)
+//    deflate_state *s;
+//    ct_data *tree;   /* the tree to be scanned */
+//    int max_code;    /* and its largest code of non zero frequency */
+{
+  var n;                     /* iterates over all tree elements */
+  var prevlen = -1;          /* last emitted length */
+  var curlen;                /* length of current code */
+
+  var nextlen = tree[0 * 2 + 1]/*.Len*/; /* length of next code */
+
+  var count = 0;             /* repeat count of the current code */
+  var max_count = 7;         /* max repeat count */
+  var min_count = 4;         /* min repeat count */
+
+  if (nextlen === 0) {
+    max_count = 138;
+    min_count = 3;
+  }
+  tree[(max_code + 1) * 2 + 1]/*.Len*/ = 0xffff; /* guard */
+
+  for (n = 0; n <= max_code; n++) {
+    curlen = nextlen;
+    nextlen = tree[(n + 1) * 2 + 1]/*.Len*/;
+
+    if (++count < max_count && curlen === nextlen) {
+      continue;
+
+    } else if (count < min_count) {
+      s.bl_tree[curlen * 2]/*.Freq*/ += count;
+
+    } else if (curlen !== 0) {
+
+      if (curlen !== prevlen) { s.bl_tree[curlen * 2]/*.Freq*/++; }
+      s.bl_tree[REP_3_6 * 2]/*.Freq*/++;
+
+    } else if (count <= 10) {
+      s.bl_tree[REPZ_3_10 * 2]/*.Freq*/++;
+
+    } else {
+      s.bl_tree[REPZ_11_138 * 2]/*.Freq*/++;
+    }
+
+    count = 0;
+    prevlen = curlen;
+
+    if (nextlen === 0) {
+      max_count = 138;
+      min_count = 3;
+
+    } else if (curlen === nextlen) {
+      max_count = 6;
+      min_count = 3;
+
+    } else {
+      max_count = 7;
+      min_count = 4;
+    }
+  }
+}
+
+
+/* ===========================================================================
+ * Send a literal or distance tree in compressed form, using the codes in
+ * bl_tree.
+ */
+function send_tree(s, tree, max_code)
+//    deflate_state *s;
+//    ct_data *tree; /* the tree to be scanned */
+//    int max_code;       /* and its largest code of non zero frequency */
+{
+  var n;                     /* iterates over all tree elements */
+  var prevlen = -1;          /* last emitted length */
+  var curlen;                /* length of current code */
+
+  var nextlen = tree[0 * 2 + 1]/*.Len*/; /* length of next code */
+
+  var count = 0;             /* repeat count of the current code */
+  var max_count = 7;         /* max repeat count */
+  var min_count = 4;         /* min repeat count */
+
+  /* tree[max_code+1].Len = -1; */  /* guard already set */
+  if (nextlen === 0) {
+    max_count = 138;
+    min_count = 3;
+  }
+
+  for (n = 0; n <= max_code; n++) {
+    curlen = nextlen;
+    nextlen = tree[(n + 1) * 2 + 1]/*.Len*/;
+
+    if (++count < max_count && curlen === nextlen) {
+      continue;
+
+    } else if (count < min_count) {
+      do { send_code(s, curlen, s.bl_tree); } while (--count !== 0);
+
+    } else if (curlen !== 0) {
+      if (curlen !== prevlen) {
+        send_code(s, curlen, s.bl_tree);
+        count--;
+      }
+      //Assert(count >= 3 && count <= 6, " 3_6?");
+      send_code(s, REP_3_6, s.bl_tree);
+      send_bits(s, count - 3, 2);
+
+    } else if (count <= 10) {
+      send_code(s, REPZ_3_10, s.bl_tree);
+      send_bits(s, count - 3, 3);
+
+    } else {
+      send_code(s, REPZ_11_138, s.bl_tree);
+      send_bits(s, count - 11, 7);
+    }
+
+    count = 0;
+    prevlen = curlen;
+    if (nextlen === 0) {
+      max_count = 138;
+      min_count = 3;
+
+    } else if (curlen === nextlen) {
+      max_count = 6;
+      min_count = 3;
+
+    } else {
+      max_count = 7;
+      min_count = 4;
+    }
+  }
+}
+
+
+/* ===========================================================================
+ * Construct the Huffman tree for the bit lengths and return the index in
+ * bl_order of the last bit length code to send.
+ */
+function build_bl_tree(s) {
+  var max_blindex;  /* index of last bit length code of non zero freq */
+
+  /* Determine the bit length frequencies for literal and distance trees */
+  scan_tree(s, s.dyn_ltree, s.l_desc.max_code);
+  scan_tree(s, s.dyn_dtree, s.d_desc.max_code);
+
+  /* Build the bit length tree: */
+  build_tree(s, s.bl_desc);
+  /* opt_len now includes the length of the tree representations, except
+   * the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
+   */
+
+  /* Determine the number of bit length codes to send. The pkzip format
+   * requires that at least 4 bit length codes be sent. (appnote.txt says
+   * 3 but the actual value used is 4.)
+   */
+  for (max_blindex = BL_CODES - 1; max_blindex >= 3; max_blindex--) {
+    if (s.bl_tree[bl_order[max_blindex] * 2 + 1]/*.Len*/ !== 0) {
+      break;
+    }
+  }
+  /* Update opt_len to include the bit length tree and counts */
+  s.opt_len += 3 * (max_blindex + 1) + 5 + 5 + 4;
+  //Tracev((stderr, "\ndyn trees: dyn %ld, stat %ld",
+  //        s->opt_len, s->static_len));
+
+  return max_blindex;
+}
+
+
+/* ===========================================================================
+ * Send the header for a block using dynamic Huffman trees: the counts, the
+ * lengths of the bit length codes, the literal tree and the distance tree.
+ * IN assertion: lcodes >= 257, dcodes >= 1, blcodes >= 4.
+ */
+function send_all_trees(s, lcodes, dcodes, blcodes)
+//    deflate_state *s;
+//    int lcodes, dcodes, blcodes; /* number of codes for each tree */
+{
+  var rank;                    /* index in bl_order */
+
+  //Assert (lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
+  //Assert (lcodes <= L_CODES && dcodes <= D_CODES && blcodes <= BL_CODES,
+  //        "too many codes");
+  //Tracev((stderr, "\nbl counts: "));
+  send_bits(s, lcodes - 257, 5); /* not +255 as stated in appnote.txt */
+  send_bits(s, dcodes - 1,   5);
+  send_bits(s, blcodes - 4,  4); /* not -3 as stated in appnote.txt */
+  for (rank = 0; rank < blcodes; rank++) {
+    //Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
+    send_bits(s, s.bl_tree[bl_order[rank] * 2 + 1]/*.Len*/, 3);
+  }
+  //Tracev((stderr, "\nbl tree: sent %ld", s->bits_sent));
+
+  send_tree(s, s.dyn_ltree, lcodes - 1); /* literal tree */
+  //Tracev((stderr, "\nlit tree: sent %ld", s->bits_sent));
+
+  send_tree(s, s.dyn_dtree, dcodes - 1); /* distance tree */
+  //Tracev((stderr, "\ndist tree: sent %ld", s->bits_sent));
+}
+
+
+/* ===========================================================================
+ * Check if the data type is TEXT or BINARY, using the following algorithm:
+ * - TEXT if the two conditions below are satisfied:
+ *    a) There are no non-portable control characters belonging to the
+ *       "black list" (0..6, 14..25, 28..31).
+ *    b) There is at least one printable character belonging to the
+ *       "white list" (9 {TAB}, 10 {LF}, 13 {CR}, 32..255).
+ * - BINARY otherwise.
+ * - The following partially-portable control characters form a
+ *   "gray list" that is ignored in this detection algorithm:
+ *   (7 {BEL}, 8 {BS}, 11 {VT}, 12 {FF}, 26 {SUB}, 27 {ESC}).
+ * IN assertion: the fields Freq of dyn_ltree are set.
+ */
+function detect_data_type(s) {
+  /* black_mask is the bit mask of black-listed bytes
+   * set bits 0..6, 14..25, and 28..31
+   * 0xf3ffc07f = binary 11110011111111111100000001111111
+   */
+  var black_mask = 0xf3ffc07f;
+  var n;
+
+  /* Check for non-textual ("black-listed") bytes. */
+  for (n = 0; n <= 31; n++, black_mask >>>= 1) {
+    if ((black_mask & 1) && (s.dyn_ltree[n * 2]/*.Freq*/ !== 0)) {
+      return Z_BINARY;
+    }
+  }
+
+  /* Check for textual ("white-listed") bytes. */
+  if (s.dyn_ltree[9 * 2]/*.Freq*/ !== 0 || s.dyn_ltree[10 * 2]/*.Freq*/ !== 0 ||
+      s.dyn_ltree[13 * 2]/*.Freq*/ !== 0) {
+    return Z_TEXT;
+  }
+  for (n = 32; n < LITERALS; n++) {
+    if (s.dyn_ltree[n * 2]/*.Freq*/ !== 0) {
+      return Z_TEXT;
+    }
+  }
+
+  /* There are no "black-listed" or "white-listed" bytes:
+   * this stream either is empty or has tolerated ("gray-listed") bytes only.
+   */
+  return Z_BINARY;
+}
+
+
+var static_init_done = false;
+
+/* ===========================================================================
+ * Initialize the tree data structures for a new zlib stream.
+ */
+function _tr_init(s)
+{
+
+  if (!static_init_done) {
+    tr_static_init();
+    static_init_done = true;
+  }
+
+  s.l_desc  = new TreeDesc(s.dyn_ltree, static_l_desc);
+  s.d_desc  = new TreeDesc(s.dyn_dtree, static_d_desc);
+  s.bl_desc = new TreeDesc(s.bl_tree, static_bl_desc);
+
+  s.bi_buf = 0;
+  s.bi_valid = 0;
+
+  /* Initialize the first block of the first file: */
+  init_block(s);
+}
+
+
+/* ===========================================================================
+ * Send a stored block
+ */
+function _tr_stored_block(s, buf, stored_len, last)
+//DeflateState *s;
+//charf *buf;       /* input block */
+//ulg stored_len;   /* length of input block */
+//int last;         /* one if this is the last block for a file */
+{
+  send_bits(s, (STORED_BLOCK << 1) + (last ? 1 : 0), 3);    /* send block type */
+  copy_block(s, buf, stored_len, true); /* with header */
+}
+
+
+/* ===========================================================================
+ * Send one empty static block to give enough lookahead for inflate.
+ * This takes 10 bits, of which 7 may remain in the bit buffer.
+ */
+function _tr_align(s) {
+  send_bits(s, STATIC_TREES << 1, 3);
+  send_code(s, END_BLOCK, static_ltree);
+  bi_flush(s);
+}
+
+
+/* ===========================================================================
+ * Determine the best encoding for the current block: dynamic trees, static
+ * trees or store, and output the encoded block to the zip file.
+ */
+function _tr_flush_block(s, buf, stored_len, last)
+//DeflateState *s;
+//charf *buf;       /* input block, or NULL if too old */
+//ulg stored_len;   /* length of input block */
+//int last;         /* one if this is the last block for a file */
+{
+  var opt_lenb, static_lenb;  /* opt_len and static_len in bytes */
+  var max_blindex = 0;        /* index of last bit length code of non zero freq */
+
+  /* Build the Huffman trees unless a stored block is forced */
+  if (s.level > 0) {
+
+    /* Check if the file is binary or text */
+    if (s.strm.data_type === Z_UNKNOWN) {
+      s.strm.data_type = detect_data_type(s);
+    }
+
+    /* Construct the literal and distance trees */
+    build_tree(s, s.l_desc);
+    // Tracev((stderr, "\nlit data: dyn %ld, stat %ld", s->opt_len,
+    //        s->static_len));
+
+    build_tree(s, s.d_desc);
+    // Tracev((stderr, "\ndist data: dyn %ld, stat %ld", s->opt_len,
+    //        s->static_len));
+    /* At this point, opt_len and static_len are the total bit lengths of
+     * the compressed block data, excluding the tree representations.
+     */
+
+    /* Build the bit length tree for the above two trees, and get the index
+     * in bl_order of the last bit length code to send.
+     */
+    max_blindex = build_bl_tree(s);
+
+    /* Determine the best encoding. Compute the block lengths in bytes. */
+    opt_lenb = (s.opt_len + 3 + 7) >>> 3;
+    static_lenb = (s.static_len + 3 + 7) >>> 3;
+
+    // Tracev((stderr, "\nopt %lu(%lu) stat %lu(%lu) stored %lu lit %u ",
+    //        opt_lenb, s->opt_len, static_lenb, s->static_len, stored_len,
+    //        s->last_lit));
+
+    if (static_lenb <= opt_lenb) { opt_lenb = static_lenb; }
+
+  } else {
+    // Assert(buf != (char*)0, "lost buf");
+    opt_lenb = static_lenb = stored_len + 5; /* force a stored block */
+  }
+
+  if ((stored_len + 4 <= opt_lenb) && (buf !== -1)) {
+    /* 4: two words for the lengths */
+
+    /* The test buf != NULL is only necessary if LIT_BUFSIZE > WSIZE.
+     * Otherwise we can't have processed more than WSIZE input bytes since
+     * the last block flush, because compression would have been
+     * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
+     * transform a block into a stored block.
+     */
+    _tr_stored_block(s, buf, stored_len, last);
+
+  } else if (s.strategy === Z_FIXED || static_lenb === opt_lenb) {
+
+    send_bits(s, (STATIC_TREES << 1) + (last ? 1 : 0), 3);
+    compress_block(s, static_ltree, static_dtree);
+
+  } else {
+    send_bits(s, (DYN_TREES << 1) + (last ? 1 : 0), 3);
+    send_all_trees(s, s.l_desc.max_code + 1, s.d_desc.max_code + 1, max_blindex + 1);
+    compress_block(s, s.dyn_ltree, s.dyn_dtree);
+  }
+  // Assert (s->compressed_len == s->bits_sent, "bad compressed size");
+  /* The above check is made mod 2^32, for files larger than 512 MB
+   * and uLong implemented on 32 bits.
+   */
+  init_block(s);
+
+  if (last) {
+    bi_windup(s);
+  }
+  // Tracev((stderr,"\ncomprlen %lu(%lu) ", s->compressed_len>>3,
+  //       s->compressed_len-7*last));
+}
+
+/* ===========================================================================
+ * Save the match info and tally the frequency counts. Return true if
+ * the current block must be flushed.
+ */
+function _tr_tally(s, dist, lc)
+//    deflate_state *s;
+//    unsigned dist;  /* distance of matched string */
+//    unsigned lc;    /* match length-MIN_MATCH or unmatched char (if dist==0) */
+{
+  //var out_length, in_length, dcode;
+
+  s.pending_buf[s.d_buf + s.last_lit * 2]     = (dist >>> 8) & 0xff;
+  s.pending_buf[s.d_buf + s.last_lit * 2 + 1] = dist & 0xff;
+
+  s.pending_buf[s.l_buf + s.last_lit] = lc & 0xff;
+  s.last_lit++;
+
+  if (dist === 0) {
+    /* lc is the unmatched char */
+    s.dyn_ltree[lc * 2]/*.Freq*/++;
+  } else {
+    s.matches++;
+    /* Here, lc is the match length - MIN_MATCH */
+    dist--;             /* dist = match distance - 1 */
+    //Assert((ush)dist < (ush)MAX_DIST(s) &&
+    //       (ush)lc <= (ush)(MAX_MATCH-MIN_MATCH) &&
+    //       (ush)d_code(dist) < (ush)D_CODES,  "_tr_tally: bad match");
+
+    s.dyn_ltree[(_length_code[lc] + LITERALS + 1) * 2]/*.Freq*/++;
+    s.dyn_dtree[d_code(dist) * 2]/*.Freq*/++;
+  }
+
+// (!) This block is disabled in zlib defailts,
+// don't enable it for binary compatibility
+
+//#ifdef TRUNCATE_BLOCK
+//  /* Try to guess if it is profitable to stop the current block here */
+//  if ((s.last_lit & 0x1fff) === 0 && s.level > 2) {
+//    /* Compute an upper bound for the compressed length */
+//    out_length = s.last_lit*8;
+//    in_length = s.strstart - s.block_start;
+//
+//    for (dcode = 0; dcode < D_CODES; dcode++) {
+//      out_length += s.dyn_dtree[dcode*2]/*.Freq*/ * (5 + extra_dbits[dcode]);
+//    }
+//    out_length >>>= 3;
+//    //Tracev((stderr,"\nlast_lit %u, in %ld, out ~%ld(%ld%%) ",
+//    //       s->last_lit, in_length, out_length,
+//    //       100L - out_length*100L/in_length));
+//    if (s.matches < (s.last_lit>>1)/*int /2*/ && out_length < (in_length>>1)/*int /2*/) {
+//      return true;
+//    }
+//  }
+//#endif
+
+  return (s.last_lit === s.lit_bufsize - 1);
+  /* We avoid equality with lit_bufsize because of wraparound at 64K
+   * on 16 bit machines and because stored blocks are restricted to
+   * 64K-1 bytes.
+   */
+}
+
+exports._tr_init  = _tr_init;
+exports._tr_stored_block = _tr_stored_block;
+exports._tr_flush_block  = _tr_flush_block;
+exports._tr_tally = _tr_tally;
+exports._tr_align = _tr_align;
+
+},{"../utils/common":3}],15:[function(require,module,exports){
+'use strict';
+
+// (C) 1995-2013 Jean-loup Gailly and Mark Adler
+// (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//   claim that you wrote the original software. If you use this software
+//   in a product, an acknowledgment in the product documentation would be
+//   appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//   misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+
+function ZStream() {
+  /* next input byte */
+  this.input = null; // JS specific, because we have no pointers
+  this.next_in = 0;
+  /* number of bytes available at input */
+  this.avail_in = 0;
+  /* total number of input bytes read so far */
+  this.total_in = 0;
+  /* next output byte should be put there */
+  this.output = null; // JS specific, because we have no pointers
+  this.next_out = 0;
+  /* remaining free space at output */
+  this.avail_out = 0;
+  /* total number of bytes output so far */
+  this.total_out = 0;
+  /* last error message, NULL if no error */
+  this.msg = ''/*Z_NULL*/;
+  /* not visible by applications */
+  this.state = null;
+  /* best guess about the data type: binary or text */
+  this.data_type = 2/*Z_UNKNOWN*/;
+  /* adler32 value of the uncompressed data */
+  this.adler = 0;
+}
+
+module.exports = ZStream;
+
+},{}],"/":[function(require,module,exports){
+// Top level file is just a mixin of submodules & constants
+'use strict';
+
+var assign    = require('./lib/utils/common').assign;
+
+var deflate   = require('./lib/deflate');
+var inflate   = require('./lib/inflate');
+var constants = require('./lib/zlib/constants');
+
+var pako = {};
+
+assign(pako, deflate, inflate, constants);
+
+module.exports = pako;
+
+},{"./lib/deflate":1,"./lib/inflate":2,"./lib/utils/common":3,"./lib/zlib/constants":6}]},{},[])("/")
+});
+"use strict";
+
+(function(root) {
+    var MAX_VALUE = 0x7fffffff;
+
+    // The SHA256 and PBKDF2 implementation are from scrypt-async-js:
+    // See: https://github.com/dchest/scrypt-async-js
+    function SHA256(m) {
+        var K = [
+           0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b,
+           0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01,
+           0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7,
+           0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+           0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152,
+           0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+           0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc,
+           0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+           0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819,
+           0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08,
+           0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f,
+           0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+           0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+       ];
+
+        var h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+        var h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+        var w = new Array(64);
+
+        function blocks(p) {
+            var off = 0, len = p.length;
+            while (len >= 64) {
+                var a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7, u, i, j, t1, t2;
+
+                for (i = 0; i < 16; i++) {
+                    j = off + i*4;
+                    w[i] = ((p[j] & 0xff)<<24) | ((p[j+1] & 0xff)<<16) |
+                    ((p[j+2] & 0xff)<<8) | (p[j+3] & 0xff);
+                }
+
+                for (i = 16; i < 64; i++) {
+                    u = w[i-2];
+                    t1 = ((u>>>17) | (u<<(32-17))) ^ ((u>>>19) | (u<<(32-19))) ^ (u>>>10);
+
+                    u = w[i-15];
+                    t2 = ((u>>>7) | (u<<(32-7))) ^ ((u>>>18) | (u<<(32-18))) ^ (u>>>3);
+
+                    w[i] = (((t1 + w[i-7]) | 0) + ((t2 + w[i-16]) | 0)) | 0;
+                }
+
+                for (i = 0; i < 64; i++) {
+                    t1 = ((((((e>>>6) | (e<<(32-6))) ^ ((e>>>11) | (e<<(32-11))) ^
+                             ((e>>>25) | (e<<(32-25)))) + ((e & f) ^ (~e & g))) | 0) +
+                          ((h + ((K[i] + w[i]) | 0)) | 0)) | 0;
+
+                    t2 = ((((a>>>2) | (a<<(32-2))) ^ ((a>>>13) | (a<<(32-13))) ^
+                           ((a>>>22) | (a<<(32-22)))) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+
+                    h = g;
+                    g = f;
+                    f = e;
+                    e = (d + t1) | 0;
+                    d = c;
+                    c = b;
+                    b = a;
+                    a = (t1 + t2) | 0;
+                }
+
+                h0 = (h0 + a) | 0;
+                h1 = (h1 + b) | 0;
+                h2 = (h2 + c) | 0;
+                h3 = (h3 + d) | 0;
+                h4 = (h4 + e) | 0;
+                h5 = (h5 + f) | 0;
+                h6 = (h6 + g) | 0;
+                h7 = (h7 + h) | 0;
+
+                off += 64;
+                len -= 64;
+            }
+        }
+
+        blocks(m);
+
+        var i, bytesLeft = m.length % 64,
+        bitLenHi = (m.length / 0x20000000) | 0,
+        bitLenLo = m.length << 3,
+        numZeros = (bytesLeft < 56) ? 56 : 120,
+        p = m.slice(m.length - bytesLeft, m.length);
+
+        p.push(0x80);
+        for (i = bytesLeft + 1; i < numZeros; i++) { p.push(0); }
+        p.push((bitLenHi>>>24) & 0xff);
+        p.push((bitLenHi>>>16) & 0xff);
+        p.push((bitLenHi>>>8)  & 0xff);
+        p.push((bitLenHi>>>0)  & 0xff);
+        p.push((bitLenLo>>>24) & 0xff);
+        p.push((bitLenLo>>>16) & 0xff);
+        p.push((bitLenLo>>>8)  & 0xff);
+        p.push((bitLenLo>>>0)  & 0xff);
+
+        blocks(p);
+
+        return [
+            (h0>>>24) & 0xff, (h0>>>16) & 0xff, (h0>>>8) & 0xff, (h0>>>0) & 0xff,
+            (h1>>>24) & 0xff, (h1>>>16) & 0xff, (h1>>>8) & 0xff, (h1>>>0) & 0xff,
+            (h2>>>24) & 0xff, (h2>>>16) & 0xff, (h2>>>8) & 0xff, (h2>>>0) & 0xff,
+            (h3>>>24) & 0xff, (h3>>>16) & 0xff, (h3>>>8) & 0xff, (h3>>>0) & 0xff,
+            (h4>>>24) & 0xff, (h4>>>16) & 0xff, (h4>>>8) & 0xff, (h4>>>0) & 0xff,
+            (h5>>>24) & 0xff, (h5>>>16) & 0xff, (h5>>>8) & 0xff, (h5>>>0) & 0xff,
+            (h6>>>24) & 0xff, (h6>>>16) & 0xff, (h6>>>8) & 0xff, (h6>>>0) & 0xff,
+            (h7>>>24) & 0xff, (h7>>>16) & 0xff, (h7>>>8) & 0xff, (h7>>>0) & 0xff
+        ];
+    }
+
+    function PBKDF2_HMAC_SHA256_OneIter(password, salt, dkLen) {
+        // compress password if it's longer than hash block length
+        password = password.length <= 64 ? password : SHA256(password);
+
+        var i;
+        var innerLen = 64 + salt.length + 4;
+        var inner = new Array(innerLen);
+        var outerKey = new Array(64);
+        var dk = [];
+
+        // inner = (password ^ ipad) || salt || counter
+        for (i = 0; i < 64; i++) inner[i] = 0x36;
+        for (i = 0; i < password.length; i++) inner[i] ^= password[i];
+        for (i = 0; i < salt.length; i++) inner[64+i] = salt[i];
+        for (i = innerLen - 4; i < innerLen; i++) inner[i] = 0;
+
+        // outerKey = password ^ opad
+        for (i = 0; i < 64; i++) outerKey[i] = 0x5c;
+        for (i = 0; i < password.length; i++) outerKey[i] ^= password[i];
+
+        // increments counter inside inner
+        function incrementCounter() {
+            for (var i = innerLen-1; i >= innerLen-4; i--) {
+                inner[i]++;
+                if (inner[i] <= 0xff) return;
+                inner[i] = 0;
+            }
+        }
+
+        // output blocks = SHA256(outerKey || SHA256(inner)) ...
+        while (dkLen >= 32) {
+            incrementCounter();
+            dk = dk.concat(SHA256(outerKey.concat(SHA256(inner))));
+            dkLen -= 32;
+        }
+        if (dkLen > 0) {
+            incrementCounter();
+            dk = dk.concat(SHA256(outerKey.concat(SHA256(inner))).slice(0, dkLen));
+        }
+
+        return dk;
+    }
+
+    // The following is an adaptation of scryptsy
+    // See: https://www.npmjs.com/package/scryptsy
+    function blockmix_salsa8(BY, Yi, r, x, _X) {
+        var i;
+
+        arraycopy(BY, (2 * r - 1) * 16, _X, 0, 16);
+        for (i = 0; i < 2 * r; i++) {
+            blockxor(BY, i * 16, _X, 16);
+            salsa20_8(_X, x);
+            arraycopy(_X, 0, BY, Yi + (i * 16), 16);
+        }
+
+        for (i = 0; i < r; i++) {
+            arraycopy(BY, Yi + (i * 2) * 16, BY, (i * 16), 16);
+        }
+
+        for (i = 0; i < r; i++) {
+            arraycopy(BY, Yi + (i * 2 + 1) * 16, BY, (i + r) * 16, 16);
+        }
+    }
+
+    function R(a, b) {
+        return (a << b) | (a >>> (32 - b));
+    }
+
+    function salsa20_8(B, x) {
+        arraycopy(B, 0, x, 0, 16);
+
+        for (var i = 8; i > 0; i -= 2) {
+            x[ 4] ^= R(x[ 0] + x[12], 7);
+            x[ 8] ^= R(x[ 4] + x[ 0], 9);
+            x[12] ^= R(x[ 8] + x[ 4], 13);
+            x[ 0] ^= R(x[12] + x[ 8], 18);
+            x[ 9] ^= R(x[ 5] + x[ 1], 7);
+            x[13] ^= R(x[ 9] + x[ 5], 9);
+            x[ 1] ^= R(x[13] + x[ 9], 13);
+            x[ 5] ^= R(x[ 1] + x[13], 18);
+            x[14] ^= R(x[10] + x[ 6], 7);
+            x[ 2] ^= R(x[14] + x[10], 9);
+            x[ 6] ^= R(x[ 2] + x[14], 13);
+            x[10] ^= R(x[ 6] + x[ 2], 18);
+            x[ 3] ^= R(x[15] + x[11], 7);
+            x[ 7] ^= R(x[ 3] + x[15], 9);
+            x[11] ^= R(x[ 7] + x[ 3], 13);
+            x[15] ^= R(x[11] + x[ 7], 18);
+            x[ 1] ^= R(x[ 0] + x[ 3], 7);
+            x[ 2] ^= R(x[ 1] + x[ 0], 9);
+            x[ 3] ^= R(x[ 2] + x[ 1], 13);
+            x[ 0] ^= R(x[ 3] + x[ 2], 18);
+            x[ 6] ^= R(x[ 5] + x[ 4], 7);
+            x[ 7] ^= R(x[ 6] + x[ 5], 9);
+            x[ 4] ^= R(x[ 7] + x[ 6], 13);
+            x[ 5] ^= R(x[ 4] + x[ 7], 18);
+            x[11] ^= R(x[10] + x[ 9], 7);
+            x[ 8] ^= R(x[11] + x[10], 9);
+            x[ 9] ^= R(x[ 8] + x[11], 13);
+            x[10] ^= R(x[ 9] + x[ 8], 18);
+            x[12] ^= R(x[15] + x[14], 7);
+            x[13] ^= R(x[12] + x[15], 9);
+            x[14] ^= R(x[13] + x[12], 13);
+            x[15] ^= R(x[14] + x[13], 18);
+        }
+
+        for (i = 0; i < 16; ++i) {
+            B[i] += x[i];
+        }
+    }
+
+    // naive approach... going back to loop unrolling may yield additional performance
+    function blockxor(S, Si, D, len) {
+        for (var i = 0; i < len; i++) {
+            D[i] ^= S[Si + i]
+        }
+    }
+
+    function arraycopy(src, srcPos, dest, destPos, length) {
+        while (length--) {
+            dest[destPos++] = src[srcPos++];
+        }
+    }
+
+    function checkBufferish(o) {
+        if (!o || typeof(o.length) !== 'number') {
+            return false;
+        }
+        for (var i = 0; i < o.length; i++) {
+            if (typeof(o[i]) !== 'number') { return false; }
+
+            var v = parseInt(o[i]);
+            if (v != o[i] || v < 0 || v >= 256) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function ensureInteger(value, name) {
+        var intValue = parseInt(value);
+        if (value != intValue) { throw new Error('invalid ' + name); }
+        return intValue;
+    }
+
+    // N = Cpu cost, r = Memory cost, p = parallelization cost
+    // callback(error, progress, key)
+    function scrypt(password, salt, N, r, p, dkLen, callback) {
+
+        if (!callback) { throw new Error('missing callback'); }
+
+        N = ensureInteger(N, 'N');
+        r = ensureInteger(r, 'r');
+        p = ensureInteger(p, 'p');
+
+        dkLen = ensureInteger(dkLen, 'dkLen');
+
+        if (N === 0 || (N & (N - 1)) !== 0) { throw new Error('N must be power of 2'); }
+
+        if (N > MAX_VALUE / 128 / r) { throw new Error('N too large'); }
+        if (r > MAX_VALUE / 128 / p) { throw new Error('r too large'); }
+
+        if (!checkBufferish(password)) {
+            throw new Error('password must be an array or buffer');
+        }
+
+        if (!checkBufferish(salt)) {
+            throw new Error('salt must be an array or buffer');
+        }
+
+        var b = PBKDF2_HMAC_SHA256_OneIter(password, salt, p * 128 * r);
+        var B = new Uint32Array(p * 32 * r)
+        for (var i = 0; i < B.length; i++) {
+            var j = i * 4;
+            B[i] = ((b[j + 3] & 0xff) << 24) |
+                   ((b[j + 2] & 0xff) << 16) |
+                   ((b[j + 1] & 0xff) << 8) |
+                   ((b[j + 0] & 0xff) << 0);
+        }
+
+        var XY = new Uint32Array(64 * r);
+        var V = new Uint32Array(32 * r * N);
+
+        var Yi = 32 * r;
+
+        // scratch space
+        var x = new Uint32Array(16);       // salsa20_8
+        var _X = new Uint32Array(16);      // blockmix_salsa8
+
+        var totalOps = p * N * 2;
+        var currentOp = 0;
+        var lastPercent10 = null;
+
+        // Set this to true to abandon the scrypt on the next step
+        var stop = false;
+
+        // State information
+        var state = 0;
+        var i0 = 0, i1;
+        var Bi;
+
+        // How many blockmix_salsa8 can we do per step?
+        var limit = parseInt(1000 / r);
+
+        // Trick from scrypt-async; if there is a setImmediate shim in place, use it
+        var nextTick = (typeof(setImmediate) !== 'undefined') ? setImmediate : setTimeout;
+
+        // This is really all I changed; making scryptsy a state machine so we occasionally
+        // stop and give other evnts on the evnt loop a chance to run. ~RicMoo
+        var incrementalSMix = function() {
+            if (stop) {
+                return callback(new Error('cancelled'), currentOp / totalOps);
+            }
+
+            switch (state) {
+                case 0:
+                    // for (var i = 0; i < p; i++)...
+                    Bi = i0 * 32 * r;
+
+                    arraycopy(B, Bi, XY, 0, Yi);                       // ROMix - 1
+
+                    state = 1;                                         // Move to ROMix 2
+                    i1 = 0;
+
+                    // Fall through
+
+                case 1:
+
+                    // Run up to 1000 steps of the first inner smix loop
+                    var steps = N - i1;
+                    if (steps > limit) { steps = limit; }
+                    for (var i = 0; i < steps; i++) {                  // ROMix - 2
+                        arraycopy(XY, 0, V, (i1 + i) * Yi, Yi)         // ROMix - 3
+                        blockmix_salsa8(XY, Yi, r, x, _X);             // ROMix - 4
+                    }
+
+                    // for (var i = 0; i < N; i++)
+                    i1 += steps;
+                    currentOp += steps;
+
+                    // Call the callback with the progress (optionally stopping us)
+                    var percent10 = parseInt(1000 * currentOp / totalOps);
+                    if (percent10 !== lastPercent10) {
+                        stop = callback(null, currentOp / totalOps);
+                        if (stop) { break; }
+                        lastPercent10 = percent10;
+                    }
+
+                    if (i1 < N) {
+                        break;
+                    }
+
+                    i1 = 0;                                          // Move to ROMix 6
+                    state = 2;
+
+                    // Fall through
+
+                case 2:
+
+                    // Run up to 1000 steps of the second inner smix loop
+                    var steps = N - i1;
+                    if (steps > limit) { steps = limit; }
+                    for (var i = 0; i < steps; i++) {                // ROMix - 6
+                        var offset = (2 * r - 1) * 16;               // ROMix - 7
+                        var j = XY[offset] & (N - 1);
+                        blockxor(V, j * Yi, XY, Yi);                 // ROMix - 8 (inner)
+                        blockmix_salsa8(XY, Yi, r, x, _X);           // ROMix - 9 (outer)
+                    }
+
+                    // for (var i = 0; i < N; i++)...
+                    i1 += steps;
+                    currentOp += steps;
+
+                    // Call the callback with the progress (optionally stopping us)
+                    var percent10 = parseInt(1000 * currentOp / totalOps);
+                    if (percent10 !== lastPercent10) {
+                        stop = callback(null, currentOp / totalOps);
+                        if (stop) { break; }
+                        lastPercent10 = percent10;
+                    }
+
+                    if (i1 < N) {
+                        break;
+                    }
+
+                    arraycopy(XY, 0, B, Bi, Yi);                     // ROMix - 10
+
+                    // for (var i = 0; i < p; i++)...
+                    i0++;
+                    if (i0 < p) {
+                        state = 0;
+                        break;
+                    }
+
+                    b = [];
+                    for (var i = 0; i < B.length; i++) {
+                        b.push((B[i] >>  0) & 0xff);
+                        b.push((B[i] >>  8) & 0xff);
+                        b.push((B[i] >> 16) & 0xff);
+                        b.push((B[i] >> 24) & 0xff);
+                    }
+
+                    var derivedKey = PBKDF2_HMAC_SHA256_OneIter(password, b, dkLen);
+
+                    // Done; don't break (which would reschedule)
+                    return callback(null, 1.0, derivedKey);
+                }
+
+                // Schedule the next steps
+                nextTick(incrementalSMix);
+            }
+
+            // Bootstrap the incremental smix
+            incrementalSMix();
+    }
+
+    // node.js
+    if (typeof(exports) !== 'undefined') {
+       module.exports = scrypt;
+
+    // RequireJS/AMD
+    // http://www.requirejs.org/docs/api.html
+    // https://github.com/amdjs/amdjs-api/wiki/AMD
+    } else if (typeof(define) === 'function' && define.amd) {
+        define(scrypt);
+
+    // Web Browsers
+    } else if (root) {
+
+        // If there was an existing library "scrypt", make sure it is still available
+        if (root.scrypt) {
+            root._scrypt = root.scrypt;
+        }
+
+        root.scrypt = scrypt;
+    }
+
+})(this);
+
+(function (global, undefined) {
+    "use strict";
+
+    if (global.setImmediate) {
+        return;
+    }
+
+    var nextHandle = 1; // Spec says greater than zero
+    var tasksByHandle = {};
+    var currentlyRunningATask = false;
+    var doc = global.document;
+    var setImmediate;
+
+    function addFromSetImmediateArguments(args) {
+        tasksByHandle[nextHandle] = partiallyApplied.apply(undefined, args);
+        return nextHandle++;
+    }
+
+    // This function accepts the same arguments as setImmediate, but
+    // returns a function that requires no arguments.
+    function partiallyApplied(handler) {
+        var args = [].slice.call(arguments, 1);
+        return function() {
+            if (typeof handler === "function") {
+                handler.apply(undefined, args);
+            } else {
+                (new Function("" + handler))();
+            }
+        };
+    }
+
+    function runIfPresent(handle) {
+        // From the spec: "Wait until any invocations of this algorithm started before this one have completed."
+        // So if we're currently running a task, we'll need to delay this invocation.
+        if (currentlyRunningATask) {
+            // Delay by doing a setTimeout. setImmediate was tried instead, but in Firefox 7 it generated a
+            // "too much recursion" error.
+            setTimeout(partiallyApplied(runIfPresent, handle), 0);
+        } else {
+            var task = tasksByHandle[handle];
+            if (task) {
+                currentlyRunningATask = true;
+                try {
+                    task();
+                } finally {
+                    clearImmediate(handle);
+                    currentlyRunningATask = false;
+                }
+            }
+        }
+    }
+
+    function clearImmediate(handle) {
+        delete tasksByHandle[handle];
+    }
+
+    function installNextTickImplementation() {
+        setImmediate = function() {
+            var handle = addFromSetImmediateArguments(arguments);
+            process.nextTick(partiallyApplied(runIfPresent, handle));
+            return handle;
+        };
+    }
+
+    function canUsePostMessage() {
+        // The test against `importScripts` prevents this implementation from being installed inside a web worker,
+        // where `global.postMessage` means something completely different and can't be used for this purpose.
+        if (global.postMessage && !global.importScripts) {
+            var postMessageIsAsynchronous = true;
+            var oldOnMessage = global.onmessage;
+            global.onmessage = function() {
+                postMessageIsAsynchronous = false;
+            };
+            global.postMessage("", "*");
+            global.onmessage = oldOnMessage;
+            return postMessageIsAsynchronous;
+        }
+    }
+
+    function installPostMessageImplementation() {
+        // Installs an event handler on `global` for the `message` event: see
+        // * https://developer.mozilla.org/en/DOM/window.postMessage
+        // * http://www.whatwg.org/specs/web-apps/current-work/multipage/comms.html#crossDocumentMessages
+
+        var messagePrefix = "setImmediate$" + Math.random() + "$";
+        var onGlobalMessage = function(event) {
+            if (event.source === global &&
+                typeof event.data === "string" &&
+                event.data.indexOf(messagePrefix) === 0) {
+                runIfPresent(+event.data.slice(messagePrefix.length));
+            }
+        };
+
+        if (global.addEventListener) {
+            global.addEventListener("message", onGlobalMessage, false);
+        } else {
+            global.attachEvent("onmessage", onGlobalMessage);
+        }
+
+        setImmediate = function() {
+            var handle = addFromSetImmediateArguments(arguments);
+            global.postMessage(messagePrefix + handle, "*");
+            return handle;
+        };
+    }
+
+    function installMessageChannelImplementation() {
+        var channel = new MessageChannel();
+        channel.port1.onmessage = function(event) {
+            var handle = event.data;
+            runIfPresent(handle);
+        };
+
+        setImmediate = function() {
+            var handle = addFromSetImmediateArguments(arguments);
+            channel.port2.postMessage(handle);
+            return handle;
+        };
+    }
+
+    function installReadyStateChangeImplementation() {
+        var html = doc.documentElement;
+        setImmediate = function() {
+            var handle = addFromSetImmediateArguments(arguments);
+            // Create a <script> element; its readystatechange event will be fired asynchronously once it is inserted
+            // into the document. Do so, thus queuing up the task. Remember to clean up once it's been called.
+            var script = doc.createElement("script");
+            script.onreadystatechange = function () {
+                runIfPresent(handle);
+                script.onreadystatechange = null;
+                html.removeChild(script);
+                script = null;
+            };
+            html.appendChild(script);
+            return handle;
+        };
+    }
+
+    function installSetTimeoutImplementation() {
+        setImmediate = function() {
+            var handle = addFromSetImmediateArguments(arguments);
+            setTimeout(partiallyApplied(runIfPresent, handle), 0);
+            return handle;
+        };
+    }
+
+    // If supported, we should attach to the prototype of global, since that is where setTimeout et al. live.
+    var attachTo = Object.getPrototypeOf && Object.getPrototypeOf(global);
+    attachTo = attachTo && attachTo.setTimeout ? attachTo : global;
+
+    // Don't get fooled by e.g. browserify environments.
+    if ({}.toString.call(global.process) === "[object process]") {
+        // For Node.js before 0.9
+        installNextTickImplementation();
+
+    } else if (canUsePostMessage()) {
+        // For non-IE10 modern browsers
+        installPostMessageImplementation();
+
+    } else if (global.MessageChannel) {
+        // For web workers, where supported
+        installMessageChannelImplementation();
+
+    } else if (doc && "onreadystatechange" in doc.createElement("script")) {
+        // For IE 6–8
+        installReadyStateChangeImplementation();
+
+    } else {
+        // For older browsers
+        installSetTimeoutImplementation();
+    }
+
+    attachTo.setImmediate = setImmediate;
+    attachTo.clearImmediate = clearImmediate;
+}(typeof self === "undefined" ? typeof global === "undefined" ? this : global : self));
+
+(function (root) {
+   "use strict";
+
+/***** unorm.js *****/
+
+/*
+ * UnicodeNormalizer 1.0.0
+ * Copyright (c) 2008 Matsuza
+ * Dual licensed under the MIT (MIT-LICENSE.txt) and GPL (GPL-LICENSE.txt) licenses.
+ * $Date: 2008-06-05 16:44:17 +0200 (Thu, 05 Jun 2008) $
+ * $Rev: 13309 $
+ */
+
+   var DEFAULT_FEATURE = [null, 0, {}];
+   var CACHE_THRESHOLD = 10;
+   var SBase = 0xAC00, LBase = 0x1100, VBase = 0x1161, TBase = 0x11A7, LCount = 19, VCount = 21, TCount = 28;
+   var NCount = VCount * TCount; // 588
+   var SCount = LCount * NCount; // 11172
+
+   var UChar = function(cp, feature){
+      this.codepoint = cp;
+      this.feature = feature;
+   };
+
+   // Strategies
+   var cache = {};
+   var cacheCounter = [];
+   for (var i = 0; i <= 0xFF; ++i){
+      cacheCounter[i] = 0;
+   }
+
+   function fromCache(next, cp, needFeature){
+      var ret = cache[cp];
+      if(!ret){
+         ret = next(cp, needFeature);
+         if(!!ret.feature && ++cacheCounter[(cp >> 8) & 0xFF] > CACHE_THRESHOLD){
+            cache[cp] = ret;
+         }
+      }
+      return ret;
+   }
+
+   function fromData(next, cp, needFeature){
+      var hash = cp & 0xFF00;
+      var dunit = UChar.udata[hash] || {};
+      var f = dunit[cp];
+      return f ? new UChar(cp, f) : new UChar(cp, DEFAULT_FEATURE);
+   }
+   function fromCpOnly(next, cp, needFeature){
+      return !!needFeature ? next(cp, needFeature) : new UChar(cp, null);
+   }
+   function fromRuleBasedJamo(next, cp, needFeature){
+      var j;
+      if(cp < LBase || (LBase + LCount <= cp && cp < SBase) || (SBase + SCount < cp)){
+         return next(cp, needFeature);
+      }
+      if(LBase <= cp && cp < LBase + LCount){
+         var c = {};
+         var base = (cp - LBase) * VCount;
+         for (j = 0; j < VCount; ++j){
+            c[VBase + j] = SBase + TCount * (j + base);
+         }
+         return new UChar(cp, [,,c]);
+      }
+
+      var SIndex = cp - SBase;
+      var TIndex = SIndex % TCount;
+      var feature = [];
+      if(TIndex !== 0){
+         feature[0] = [SBase + SIndex - TIndex, TBase + TIndex];
+      } else {
+         feature[0] = [LBase + Math.floor(SIndex / NCount), VBase + Math.floor((SIndex % NCount) / TCount)];
+         feature[2] = {};
+         for (j = 1; j < TCount; ++j){
+            feature[2][TBase + j] = cp + j;
+         }
+      }
+      return new UChar(cp, feature);
+   }
+   function fromCpFilter(next, cp, needFeature){
+      return cp < 60 || 13311 < cp && cp < 42607 ? new UChar(cp, DEFAULT_FEATURE) : next(cp, needFeature);
+   }
+
+   var strategies = [fromCpFilter, fromCache, fromCpOnly, fromRuleBasedJamo, fromData];
+
+   UChar.fromCharCode = strategies.reduceRight(function (next, strategy) {
+      return function (cp, needFeature) {
+         return strategy(next, cp, needFeature);
+      };
+   }, null);
+
+   UChar.isHighSurrogate = function(cp){
+      return cp >= 0xD800 && cp <= 0xDBFF;
+   };
+   UChar.isLowSurrogate = function(cp){
+      return cp >= 0xDC00 && cp <= 0xDFFF;
+   };
+
+   UChar.prototype.prepFeature = function(){
+      if(!this.feature){
+         this.feature = UChar.fromCharCode(this.codepoint, true).feature;
+      }
+   };
+
+   UChar.prototype.toString = function(){
+      if(this.codepoint < 0x10000){
+         return String.fromCharCode(this.codepoint);
+      } else {
+         var x = this.codepoint - 0x10000;
+         return String.fromCharCode(Math.floor(x / 0x400) + 0xD800, x % 0x400 + 0xDC00);
+      }
+   };
+
+   UChar.prototype.getDecomp = function(){
+      this.prepFeature();
+      return this.feature[0] || null;
+   };
+
+   UChar.prototype.isCompatibility = function(){
+      this.prepFeature();
+      return !!this.feature[1] && (this.feature[1] & (1 << 8));
+   };
+   UChar.prototype.isExclude = function(){
+      this.prepFeature();
+      return !!this.feature[1] && (this.feature[1] & (1 << 9));
+   };
+   UChar.prototype.getCanonicalClass = function(){
+      this.prepFeature();
+      return !!this.feature[1] ? (this.feature[1] & 0xff) : 0;
+   };
+   UChar.prototype.getComposite = function(following){
+      this.prepFeature();
+      if(!this.feature[2]){
+         return null;
+      }
+      var cp = this.feature[2][following.codepoint];
+      return cp ? UChar.fromCharCode(cp) : null;
+   };
+
+   var UCharIterator = function(str){
+      this.str = str;
+      this.cursor = 0;
+   };
+   UCharIterator.prototype.next = function(){
+      if(!!this.str && this.cursor < this.str.length){
+         var cp = this.str.charCodeAt(this.cursor++);
+         var d;
+         if(UChar.isHighSurrogate(cp) && this.cursor < this.str.length && UChar.isLowSurrogate((d = this.str.charCodeAt(this.cursor)))){
+            cp = (cp - 0xD800) * 0x400 + (d -0xDC00) + 0x10000;
+            ++this.cursor;
+         }
+         return UChar.fromCharCode(cp);
+      } else {
+         this.str = null;
+         return null;
+      }
+   };
+
+   var RecursDecompIterator = function(it, cano){
+      this.it = it;
+      this.canonical = cano;
+      this.resBuf = [];
+   };
+
+   RecursDecompIterator.prototype.next = function(){
+      function recursiveDecomp(cano, uchar){
+         var decomp = uchar.getDecomp();
+         if(!!decomp && !(cano && uchar.isCompatibility())){
+            var ret = [];
+            for(var i = 0; i < decomp.length; ++i){
+               var a = recursiveDecomp(cano, UChar.fromCharCode(decomp[i]));
+                ret = ret.concat(a);
+            }
+            return ret;
+         } else {
+            return [uchar];
+         }
+      }
+      if(this.resBuf.length === 0){
+         var uchar = this.it.next();
+         if(!uchar){
+            return null;
+         }
+         this.resBuf = recursiveDecomp(this.canonical, uchar);
+      }
+      return this.resBuf.shift();
+   };
+
+   var DecompIterator = function(it){
+      this.it = it;
+      this.resBuf = [];
+   };
+
+   DecompIterator.prototype.next = function(){
+      var cc;
+      if(this.resBuf.length === 0){
+         do{
+            var uchar = this.it.next();
+            if(!uchar){
+               break;
+            }
+            cc = uchar.getCanonicalClass();
+            var inspt = this.resBuf.length;
+            if(cc !== 0){
+               for(; inspt > 0; --inspt){
+                  var uchar2 = this.resBuf[inspt - 1];
+                  var cc2 = uchar2.getCanonicalClass();
+                  if(cc2 <= cc){
+                     break;
+                  }
+               }
+            }
+            this.resBuf.splice(inspt, 0, uchar);
+         } while(cc !== 0);
+      }
+      return this.resBuf.shift();
+   };
+
+   var CompIterator = function(it){
+      this.it = it;
+      this.procBuf = [];
+      this.resBuf = [];
+      this.lastClass = null;
+   };
+
+   CompIterator.prototype.next = function(){
+      while(this.resBuf.length === 0){
+         var uchar = this.it.next();
+         if(!uchar){
+            this.resBuf = this.procBuf;
+            this.procBuf = [];
+            break;
+         }
+         if(this.procBuf.length === 0){
+            this.lastClass = uchar.getCanonicalClass();
+            this.procBuf.push(uchar);
+         } else {
+            var starter = this.procBuf[0];
+            var composite = starter.getComposite(uchar);
+            var cc = uchar.getCanonicalClass();
+            if(!!composite && (this.lastClass < cc || this.lastClass === 0)){
+               this.procBuf[0] = composite;
+            } else {
+               if(cc === 0){
+                  this.resBuf = this.procBuf;
+                  this.procBuf = [];
+               }
+               this.lastClass = cc;
+               this.procBuf.push(uchar);
+            }
+         }
+      }
+      return this.resBuf.shift();
+   };
+
+   var createIterator = function(mode, str){
+      switch(mode){
+         case "NFD":
+            return new DecompIterator(new RecursDecompIterator(new UCharIterator(str), true));
+         case "NFKD":
+            return new DecompIterator(new RecursDecompIterator(new UCharIterator(str), false));
+         case "NFC":
+            return new CompIterator(new DecompIterator(new RecursDecompIterator(new UCharIterator(str), true)));
+         case "NFKC":
+            return new CompIterator(new DecompIterator(new RecursDecompIterator(new UCharIterator(str), false)));
+      }
+      throw mode + " is invalid";
+   };
+   var normalize = function(mode, str){
+      var it = createIterator(mode, str);
+      var ret = "";
+      var uchar;
+      while(!!(uchar = it.next())){
+         ret += uchar.toString();
+      }
+      return ret;
+   };
+
+   /* API functions */
+   function nfd(str){
+      return normalize("NFD", str);
+   }
+
+   function nfkd(str){
+      return normalize("NFKD", str);
+   }
+
+   function nfc(str){
+      return normalize("NFC", str);
+   }
+
+   function nfkc(str){
+      return normalize("NFKC", str);
+   }
+
+/* Unicode data */
+UChar.udata={
+0:{60:[,,{824:8814}],61:[,,{824:8800}],62:[,,{824:8815}],65:[,,{768:192,769:193,770:194,771:195,772:256,774:258,775:550,776:196,777:7842,778:197,780:461,783:512,785:514,803:7840,805:7680,808:260}],66:[,,{775:7682,803:7684,817:7686}],67:[,,{769:262,770:264,775:266,780:268,807:199}],68:[,,{775:7690,780:270,803:7692,807:7696,813:7698,817:7694}],69:[,,{768:200,769:201,770:202,771:7868,772:274,774:276,775:278,776:203,777:7866,780:282,783:516,785:518,803:7864,807:552,808:280,813:7704,816:7706}],70:[,,{775:7710}],71:[,,{769:500,770:284,772:7712,774:286,775:288,780:486,807:290}],72:[,,{770:292,775:7714,776:7718,780:542,803:7716,807:7720,814:7722}],73:[,,{768:204,769:205,770:206,771:296,772:298,774:300,775:304,776:207,777:7880,780:463,783:520,785:522,803:7882,808:302,816:7724}],74:[,,{770:308}],75:[,,{769:7728,780:488,803:7730,807:310,817:7732}],76:[,,{769:313,780:317,803:7734,807:315,813:7740,817:7738}],77:[,,{769:7742,775:7744,803:7746}],78:[,,{768:504,769:323,771:209,775:7748,780:327,803:7750,807:325,813:7754,817:7752}],79:[,,{768:210,769:211,770:212,771:213,772:332,774:334,775:558,776:214,777:7886,779:336,780:465,783:524,785:526,795:416,803:7884,808:490}],80:[,,{769:7764,775:7766}],82:[,,{769:340,775:7768,780:344,783:528,785:530,803:7770,807:342,817:7774}],83:[,,{769:346,770:348,775:7776,780:352,803:7778,806:536,807:350}],84:[,,{775:7786,780:356,803:7788,806:538,807:354,813:7792,817:7790}],85:[,,{768:217,769:218,770:219,771:360,772:362,774:364,776:220,777:7910,778:366,779:368,780:467,783:532,785:534,795:431,803:7908,804:7794,808:370,813:7798,816:7796}],86:[,,{771:7804,803:7806}],87:[,,{768:7808,769:7810,770:372,775:7814,776:7812,803:7816}],88:[,,{775:7818,776:7820}],89:[,,{768:7922,769:221,770:374,771:7928,772:562,775:7822,776:376,777:7926,803:7924}],90:[,,{769:377,770:7824,775:379,780:381,803:7826,817:7828}],97:[,,{768:224,769:225,770:226,771:227,772:257,774:259,775:551,776:228,777:7843,778:229,780:462,783:513,785:515,803:7841,805:7681,808:261}],98:[,,{775:7683,803:7685,817:7687}],99:[,,{769:263,770:265,775:267,780:269,807:231}],100:[,,{775:7691,780:271,803:7693,807:7697,813:7699,817:7695}],101:[,,{768:232,769:233,770:234,771:7869,772:275,774:277,775:279,776:235,777:7867,780:283,783:517,785:519,803:7865,807:553,808:281,813:7705,816:7707}],102:[,,{775:7711}],103:[,,{769:501,770:285,772:7713,774:287,775:289,780:487,807:291}],104:[,,{770:293,775:7715,776:7719,780:543,803:7717,807:7721,814:7723,817:7830}],105:[,,{768:236,769:237,770:238,771:297,772:299,774:301,776:239,777:7881,780:464,783:521,785:523,803:7883,808:303,816:7725}],106:[,,{770:309,780:496}],107:[,,{769:7729,780:489,803:7731,807:311,817:7733}],108:[,,{769:314,780:318,803:7735,807:316,813:7741,817:7739}],109:[,,{769:7743,775:7745,803:7747}],110:[,,{768:505,769:324,771:241,775:7749,780:328,803:7751,807:326,813:7755,817:7753}],111:[,,{768:242,769:243,770:244,771:245,772:333,774:335,775:559,776:246,777:7887,779:337,780:466,783:525,785:527,795:417,803:7885,808:491}],112:[,,{769:7765,775:7767}],114:[,,{769:341,775:7769,780:345,783:529,785:531,803:7771,807:343,817:7775}],115:[,,{769:347,770:349,775:7777,780:353,803:7779,806:537,807:351}],116:[,,{775:7787,776:7831,780:357,803:7789,806:539,807:355,813:7793,817:7791}],117:[,,{768:249,769:250,770:251,771:361,772:363,774:365,776:252,777:7911,778:367,779:369,780:468,783:533,785:535,795:432,803:7909,804:7795,808:371,813:7799,816:7797}],118:[,,{771:7805,803:7807}],119:[,,{768:7809,769:7811,770:373,775:7815,776:7813,778:7832,803:7817}],120:[,,{775:7819,776:7821}],121:[,,{768:7923,769:253,770:375,771:7929,772:563,775:7823,776:255,777:7927,778:7833,803:7925}],122:[,,{769:378,770:7825,775:380,780:382,803:7827,817:7829}],160:[[32],256],168:[[32,776],256,{768:8173,769:901,834:8129}],170:[[97],256],175:[[32,772],256],178:[[50],256],179:[[51],256],180:[[32,769],256],181:[[956],256],184:[[32,807],256],185:[[49],256],186:[[111],256],188:[[49,8260,52],256],189:[[49,8260,50],256],190:[[51,8260,52],256],192:[[65,768]],193:[[65,769]],194:[[65,770],,{768:7846,769:7844,771:7850,777:7848}],195:[[65,771]],196:[[65,776],,{772:478}],197:[[65,778],,{769:506}],198:[,,{769:508,772:482}],199:[[67,807],,{769:7688}],200:[[69,768]],201:[[69,769]],202:[[69,770],,{768:7872,769:7870,771:7876,777:7874}],203:[[69,776]],204:[[73,768]],205:[[73,769]],206:[[73,770]],207:[[73,776],,{769:7726}],209:[[78,771]],210:[[79,768]],211:[[79,769]],212:[[79,770],,{768:7890,769:7888,771:7894,777:7892}],213:[[79,771],,{769:7756,772:556,776:7758}],214:[[79,776],,{772:554}],216:[,,{769:510}],217:[[85,768]],218:[[85,769]],219:[[85,770]],220:[[85,776],,{768:475,769:471,772:469,780:473}],221:[[89,769]],224:[[97,768]],225:[[97,769]],226:[[97,770],,{768:7847,769:7845,771:7851,777:7849}],227:[[97,771]],228:[[97,776],,{772:479}],229:[[97,778],,{769:507}],230:[,,{769:509,772:483}],231:[[99,807],,{769:7689}],232:[[101,768]],233:[[101,769]],234:[[101,770],,{768:7873,769:7871,771:7877,777:7875}],235:[[101,776]],236:[[105,768]],237:[[105,769]],238:[[105,770]],239:[[105,776],,{769:7727}],241:[[110,771]],242:[[111,768]],243:[[111,769]],244:[[111,770],,{768:7891,769:7889,771:7895,777:7893}],245:[[111,771],,{769:7757,772:557,776:7759}],246:[[111,776],,{772:555}],248:[,,{769:511}],249:[[117,768]],250:[[117,769]],251:[[117,770]],252:[[117,776],,{768:476,769:472,772:470,780:474}],253:[[121,769]],255:[[121,776]]},
+256:{256:[[65,772]],257:[[97,772]],258:[[65,774],,{768:7856,769:7854,771:7860,777:7858}],259:[[97,774],,{768:7857,769:7855,771:7861,777:7859}],260:[[65,808]],261:[[97,808]],262:[[67,769]],263:[[99,769]],264:[[67,770]],265:[[99,770]],266:[[67,775]],267:[[99,775]],268:[[67,780]],269:[[99,780]],270:[[68,780]],271:[[100,780]],274:[[69,772],,{768:7700,769:7702}],275:[[101,772],,{768:7701,769:7703}],276:[[69,774]],277:[[101,774]],278:[[69,775]],279:[[101,775]],280:[[69,808]],281:[[101,808]],282:[[69,780]],283:[[101,780]],284:[[71,770]],285:[[103,770]],286:[[71,774]],287:[[103,774]],288:[[71,775]],289:[[103,775]],290:[[71,807]],291:[[103,807]],292:[[72,770]],293:[[104,770]],296:[[73,771]],297:[[105,771]],298:[[73,772]],299:[[105,772]],300:[[73,774]],301:[[105,774]],302:[[73,808]],303:[[105,808]],304:[[73,775]],306:[[73,74],256],307:[[105,106],256],308:[[74,770]],309:[[106,770]],310:[[75,807]],311:[[107,807]],313:[[76,769]],314:[[108,769]],315:[[76,807]],316:[[108,807]],317:[[76,780]],318:[[108,780]],319:[[76,183],256],320:[[108,183],256],323:[[78,769]],324:[[110,769]],325:[[78,807]],326:[[110,807]],327:[[78,780]],328:[[110,780]],329:[[700,110],256],332:[[79,772],,{768:7760,769:7762}],333:[[111,772],,{768:7761,769:7763}],334:[[79,774]],335:[[111,774]],336:[[79,779]],337:[[111,779]],340:[[82,769]],341:[[114,769]],342:[[82,807]],343:[[114,807]],344:[[82,780]],345:[[114,780]],346:[[83,769],,{775:7780}],347:[[115,769],,{775:7781}],348:[[83,770]],349:[[115,770]],350:[[83,807]],351:[[115,807]],352:[[83,780],,{775:7782}],353:[[115,780],,{775:7783}],354:[[84,807]],355:[[116,807]],356:[[84,780]],357:[[116,780]],360:[[85,771],,{769:7800}],361:[[117,771],,{769:7801}],362:[[85,772],,{776:7802}],363:[[117,772],,{776:7803}],364:[[85,774]],365:[[117,774]],366:[[85,778]],367:[[117,778]],368:[[85,779]],369:[[117,779]],370:[[85,808]],371:[[117,808]],372:[[87,770]],373:[[119,770]],374:[[89,770]],375:[[121,770]],376:[[89,776]],377:[[90,769]],378:[[122,769]],379:[[90,775]],380:[[122,775]],381:[[90,780]],382:[[122,780]],383:[[115],256,{775:7835}],416:[[79,795],,{768:7900,769:7898,771:7904,777:7902,803:7906}],417:[[111,795],,{768:7901,769:7899,771:7905,777:7903,803:7907}],431:[[85,795],,{768:7914,769:7912,771:7918,777:7916,803:7920}],432:[[117,795],,{768:7915,769:7913,771:7919,777:7917,803:7921}],439:[,,{780:494}],452:[[68,381],256],453:[[68,382],256],454:[[100,382],256],455:[[76,74],256],456:[[76,106],256],457:[[108,106],256],458:[[78,74],256],459:[[78,106],256],460:[[110,106],256],461:[[65,780]],462:[[97,780]],463:[[73,780]],464:[[105,780]],465:[[79,780]],466:[[111,780]],467:[[85,780]],468:[[117,780]],469:[[220,772]],470:[[252,772]],471:[[220,769]],472:[[252,769]],473:[[220,780]],474:[[252,780]],475:[[220,768]],476:[[252,768]],478:[[196,772]],479:[[228,772]],480:[[550,772]],481:[[551,772]],482:[[198,772]],483:[[230,772]],486:[[71,780]],487:[[103,780]],488:[[75,780]],489:[[107,780]],490:[[79,808],,{772:492}],491:[[111,808],,{772:493}],492:[[490,772]],493:[[491,772]],494:[[439,780]],495:[[658,780]],496:[[106,780]],497:[[68,90],256],498:[[68,122],256],499:[[100,122],256],500:[[71,769]],501:[[103,769]],504:[[78,768]],505:[[110,768]],506:[[197,769]],507:[[229,769]],508:[[198,769]],509:[[230,769]],510:[[216,769]],511:[[248,769]],66045:[,220]},
+512:{512:[[65,783]],513:[[97,783]],514:[[65,785]],515:[[97,785]],516:[[69,783]],517:[[101,783]],518:[[69,785]],519:[[101,785]],520:[[73,783]],521:[[105,783]],522:[[73,785]],523:[[105,785]],524:[[79,783]],525:[[111,783]],526:[[79,785]],527:[[111,785]],528:[[82,783]],529:[[114,783]],530:[[82,785]],531:[[114,785]],532:[[85,783]],533:[[117,783]],534:[[85,785]],535:[[117,785]],536:[[83,806]],537:[[115,806]],538:[[84,806]],539:[[116,806]],542:[[72,780]],543:[[104,780]],550:[[65,775],,{772:480}],551:[[97,775],,{772:481}],552:[[69,807],,{774:7708}],553:[[101,807],,{774:7709}],554:[[214,772]],555:[[246,772]],556:[[213,772]],557:[[245,772]],558:[[79,775],,{772:560}],559:[[111,775],,{772:561}],560:[[558,772]],561:[[559,772]],562:[[89,772]],563:[[121,772]],658:[,,{780:495}],688:[[104],256],689:[[614],256],690:[[106],256],691:[[114],256],692:[[633],256],693:[[635],256],694:[[641],256],695:[[119],256],696:[[121],256],728:[[32,774],256],729:[[32,775],256],730:[[32,778],256],731:[[32,808],256],732:[[32,771],256],733:[[32,779],256],736:[[611],256],737:[[108],256],738:[[115],256],739:[[120],256],740:[[661],256],66272:[,220]},
+768:{768:[,230],769:[,230],770:[,230],771:[,230],772:[,230],773:[,230],774:[,230],775:[,230],776:[,230,{769:836}],777:[,230],778:[,230],779:[,230],780:[,230],781:[,230],782:[,230],783:[,230],784:[,230],785:[,230],786:[,230],787:[,230],788:[,230],789:[,232],790:[,220],791:[,220],792:[,220],793:[,220],794:[,232],795:[,216],796:[,220],797:[,220],798:[,220],799:[,220],800:[,220],801:[,202],802:[,202],803:[,220],804:[,220],805:[,220],806:[,220],807:[,202],808:[,202],809:[,220],810:[,220],811:[,220],812:[,220],813:[,220],814:[,220],815:[,220],816:[,220],817:[,220],818:[,220],819:[,220],820:[,1],821:[,1],822:[,1],823:[,1],824:[,1],825:[,220],826:[,220],827:[,220],828:[,220],829:[,230],830:[,230],831:[,230],832:[[768],230],833:[[769],230],834:[,230],835:[[787],230],836:[[776,769],230],837:[,240],838:[,230],839:[,220],840:[,220],841:[,220],842:[,230],843:[,230],844:[,230],845:[,220],846:[,220],848:[,230],849:[,230],850:[,230],851:[,220],852:[,220],853:[,220],854:[,220],855:[,230],856:[,232],857:[,220],858:[,220],859:[,230],860:[,233],861:[,234],862:[,234],863:[,233],864:[,234],865:[,234],866:[,233],867:[,230],868:[,230],869:[,230],870:[,230],871:[,230],872:[,230],873:[,230],874:[,230],875:[,230],876:[,230],877:[,230],878:[,230],879:[,230],884:[[697]],890:[[32,837],256],894:[[59]],900:[[32,769],256],901:[[168,769]],902:[[913,769]],903:[[183]],904:[[917,769]],905:[[919,769]],906:[[921,769]],908:[[927,769]],910:[[933,769]],911:[[937,769]],912:[[970,769]],913:[,,{768:8122,769:902,772:8121,774:8120,787:7944,788:7945,837:8124}],917:[,,{768:8136,769:904,787:7960,788:7961}],919:[,,{768:8138,769:905,787:7976,788:7977,837:8140}],921:[,,{768:8154,769:906,772:8153,774:8152,776:938,787:7992,788:7993}],927:[,,{768:8184,769:908,787:8008,788:8009}],929:[,,{788:8172}],933:[,,{768:8170,769:910,772:8169,774:8168,776:939,788:8025}],937:[,,{768:8186,769:911,787:8040,788:8041,837:8188}],938:[[921,776]],939:[[933,776]],940:[[945,769],,{837:8116}],941:[[949,769]],942:[[951,769],,{837:8132}],943:[[953,769]],944:[[971,769]],945:[,,{768:8048,769:940,772:8113,774:8112,787:7936,788:7937,834:8118,837:8115}],949:[,,{768:8050,769:941,787:7952,788:7953}],951:[,,{768:8052,769:942,787:7968,788:7969,834:8134,837:8131}],953:[,,{768:8054,769:943,772:8145,774:8144,776:970,787:7984,788:7985,834:8150}],959:[,,{768:8056,769:972,787:8000,788:8001}],961:[,,{787:8164,788:8165}],965:[,,{768:8058,769:973,772:8161,774:8160,776:971,787:8016,788:8017,834:8166}],969:[,,{768:8060,769:974,787:8032,788:8033,834:8182,837:8179}],970:[[953,776],,{768:8146,769:912,834:8151}],971:[[965,776],,{768:8162,769:944,834:8167}],972:[[959,769]],973:[[965,769]],974:[[969,769],,{837:8180}],976:[[946],256],977:[[952],256],978:[[933],256,{769:979,776:980}],979:[[978,769]],980:[[978,776]],981:[[966],256],982:[[960],256],1008:[[954],256],1009:[[961],256],1010:[[962],256],1012:[[920],256],1013:[[949],256],1017:[[931],256],66422:[,230],66423:[,230],66424:[,230],66425:[,230],66426:[,230]},
+1024:{1024:[[1045,768]],1025:[[1045,776]],1027:[[1043,769]],1030:[,,{776:1031}],1031:[[1030,776]],1036:[[1050,769]],1037:[[1048,768]],1038:[[1059,774]],1040:[,,{774:1232,776:1234}],1043:[,,{769:1027}],1045:[,,{768:1024,774:1238,776:1025}],1046:[,,{774:1217,776:1244}],1047:[,,{776:1246}],1048:[,,{768:1037,772:1250,774:1049,776:1252}],1049:[[1048,774]],1050:[,,{769:1036}],1054:[,,{776:1254}],1059:[,,{772:1262,774:1038,776:1264,779:1266}],1063:[,,{776:1268}],1067:[,,{776:1272}],1069:[,,{776:1260}],1072:[,,{774:1233,776:1235}],1075:[,,{769:1107}],1077:[,,{768:1104,774:1239,776:1105}],1078:[,,{774:1218,776:1245}],1079:[,,{776:1247}],1080:[,,{768:1117,772:1251,774:1081,776:1253}],1081:[[1080,774]],1082:[,,{769:1116}],1086:[,,{776:1255}],1091:[,,{772:1263,774:1118,776:1265,779:1267}],1095:[,,{776:1269}],1099:[,,{776:1273}],1101:[,,{776:1261}],1104:[[1077,768]],1105:[[1077,776]],1107:[[1075,769]],1110:[,,{776:1111}],1111:[[1110,776]],1116:[[1082,769]],1117:[[1080,768]],1118:[[1091,774]],1140:[,,{783:1142}],1141:[,,{783:1143}],1142:[[1140,783]],1143:[[1141,783]],1155:[,230],1156:[,230],1157:[,230],1158:[,230],1159:[,230],1217:[[1046,774]],1218:[[1078,774]],1232:[[1040,774]],1233:[[1072,774]],1234:[[1040,776]],1235:[[1072,776]],1238:[[1045,774]],1239:[[1077,774]],1240:[,,{776:1242}],1241:[,,{776:1243}],1242:[[1240,776]],1243:[[1241,776]],1244:[[1046,776]],1245:[[1078,776]],1246:[[1047,776]],1247:[[1079,776]],1250:[[1048,772]],1251:[[1080,772]],1252:[[1048,776]],1253:[[1080,776]],1254:[[1054,776]],1255:[[1086,776]],1256:[,,{776:1258}],1257:[,,{776:1259}],1258:[[1256,776]],1259:[[1257,776]],1260:[[1069,776]],1261:[[1101,776]],1262:[[1059,772]],1263:[[1091,772]],1264:[[1059,776]],1265:[[1091,776]],1266:[[1059,779]],1267:[[1091,779]],1268:[[1063,776]],1269:[[1095,776]],1272:[[1067,776]],1273:[[1099,776]]},
+1280:{1415:[[1381,1410],256],1425:[,220],1426:[,230],1427:[,230],1428:[,230],1429:[,230],1430:[,220],1431:[,230],1432:[,230],1433:[,230],1434:[,222],1435:[,220],1436:[,230],1437:[,230],1438:[,230],1439:[,230],1440:[,230],1441:[,230],1442:[,220],1443:[,220],1444:[,220],1445:[,220],1446:[,220],1447:[,220],1448:[,230],1449:[,230],1450:[,220],1451:[,230],1452:[,230],1453:[,222],1454:[,228],1455:[,230],1456:[,10],1457:[,11],1458:[,12],1459:[,13],1460:[,14],1461:[,15],1462:[,16],1463:[,17],1464:[,18],1465:[,19],1466:[,19],1467:[,20],1468:[,21],1469:[,22],1471:[,23],1473:[,24],1474:[,25],1476:[,230],1477:[,220],1479:[,18]},
+1536:{1552:[,230],1553:[,230],1554:[,230],1555:[,230],1556:[,230],1557:[,230],1558:[,230],1559:[,230],1560:[,30],1561:[,31],1562:[,32],1570:[[1575,1619]],1571:[[1575,1620]],1572:[[1608,1620]],1573:[[1575,1621]],1574:[[1610,1620]],1575:[,,{1619:1570,1620:1571,1621:1573}],1608:[,,{1620:1572}],1610:[,,{1620:1574}],1611:[,27],1612:[,28],1613:[,29],1614:[,30],1615:[,31],1616:[,32],1617:[,33],1618:[,34],1619:[,230],1620:[,230],1621:[,220],1622:[,220],1623:[,230],1624:[,230],1625:[,230],1626:[,230],1627:[,230],1628:[,220],1629:[,230],1630:[,230],1631:[,220],1648:[,35],1653:[[1575,1652],256],1654:[[1608,1652],256],1655:[[1735,1652],256],1656:[[1610,1652],256],1728:[[1749,1620]],1729:[,,{1620:1730}],1730:[[1729,1620]],1746:[,,{1620:1747}],1747:[[1746,1620]],1749:[,,{1620:1728}],1750:[,230],1751:[,230],1752:[,230],1753:[,230],1754:[,230],1755:[,230],1756:[,230],1759:[,230],1760:[,230],1761:[,230],1762:[,230],1763:[,220],1764:[,230],1767:[,230],1768:[,230],1770:[,220],1771:[,230],1772:[,230],1773:[,220]},
+1792:{1809:[,36],1840:[,230],1841:[,220],1842:[,230],1843:[,230],1844:[,220],1845:[,230],1846:[,230],1847:[,220],1848:[,220],1849:[,220],1850:[,230],1851:[,220],1852:[,220],1853:[,230],1854:[,220],1855:[,230],1856:[,230],1857:[,230],1858:[,220],1859:[,230],1860:[,220],1861:[,230],1862:[,220],1863:[,230],1864:[,220],1865:[,230],1866:[,230],2027:[,230],2028:[,230],2029:[,230],2030:[,230],2031:[,230],2032:[,230],2033:[,230],2034:[,220],2035:[,230]},
+2048:{2070:[,230],2071:[,230],2072:[,230],2073:[,230],2075:[,230],2076:[,230],2077:[,230],2078:[,230],2079:[,230],2080:[,230],2081:[,230],2082:[,230],2083:[,230],2085:[,230],2086:[,230],2087:[,230],2089:[,230],2090:[,230],2091:[,230],2092:[,230],2093:[,230],2137:[,220],2138:[,220],2139:[,220],2276:[,230],2277:[,230],2278:[,220],2279:[,230],2280:[,230],2281:[,220],2282:[,230],2283:[,230],2284:[,230],2285:[,220],2286:[,220],2287:[,220],2288:[,27],2289:[,28],2290:[,29],2291:[,230],2292:[,230],2293:[,230],2294:[,220],2295:[,230],2296:[,230],2297:[,220],2298:[,220],2299:[,230],2300:[,230],2301:[,230],2302:[,230],2303:[,230]},
+2304:{2344:[,,{2364:2345}],2345:[[2344,2364]],2352:[,,{2364:2353}],2353:[[2352,2364]],2355:[,,{2364:2356}],2356:[[2355,2364]],2364:[,7],2381:[,9],2385:[,230],2386:[,220],2387:[,230],2388:[,230],2392:[[2325,2364],512],2393:[[2326,2364],512],2394:[[2327,2364],512],2395:[[2332,2364],512],2396:[[2337,2364],512],2397:[[2338,2364],512],2398:[[2347,2364],512],2399:[[2351,2364],512],2492:[,7],2503:[,,{2494:2507,2519:2508}],2507:[[2503,2494]],2508:[[2503,2519]],2509:[,9],2524:[[2465,2492],512],2525:[[2466,2492],512],2527:[[2479,2492],512]},
+2560:{2611:[[2610,2620],512],2614:[[2616,2620],512],2620:[,7],2637:[,9],2649:[[2582,2620],512],2650:[[2583,2620],512],2651:[[2588,2620],512],2654:[[2603,2620],512],2748:[,7],2765:[,9],68109:[,220],68111:[,230],68152:[,230],68153:[,1],68154:[,220],68159:[,9],68325:[,230],68326:[,220]},
+2816:{2876:[,7],2887:[,,{2878:2891,2902:2888,2903:2892}],2888:[[2887,2902]],2891:[[2887,2878]],2892:[[2887,2903]],2893:[,9],2908:[[2849,2876],512],2909:[[2850,2876],512],2962:[,,{3031:2964}],2964:[[2962,3031]],3014:[,,{3006:3018,3031:3020}],3015:[,,{3006:3019}],3018:[[3014,3006]],3019:[[3015,3006]],3020:[[3014,3031]],3021:[,9]},
+3072:{3142:[,,{3158:3144}],3144:[[3142,3158]],3149:[,9],3157:[,84],3158:[,91],3260:[,7],3263:[,,{3285:3264}],3264:[[3263,3285]],3270:[,,{3266:3274,3285:3271,3286:3272}],3271:[[3270,3285]],3272:[[3270,3286]],3274:[[3270,3266],,{3285:3275}],3275:[[3274,3285]],3277:[,9]},
+3328:{3398:[,,{3390:3402,3415:3404}],3399:[,,{3390:3403}],3402:[[3398,3390]],3403:[[3399,3390]],3404:[[3398,3415]],3405:[,9],3530:[,9],3545:[,,{3530:3546,3535:3548,3551:3550}],3546:[[3545,3530]],3548:[[3545,3535],,{3530:3549}],3549:[[3548,3530]],3550:[[3545,3551]]},
+3584:{3635:[[3661,3634],256],3640:[,103],3641:[,103],3642:[,9],3656:[,107],3657:[,107],3658:[,107],3659:[,107],3763:[[3789,3762],256],3768:[,118],3769:[,118],3784:[,122],3785:[,122],3786:[,122],3787:[,122],3804:[[3755,3737],256],3805:[[3755,3745],256]},
+3840:{3852:[[3851],256],3864:[,220],3865:[,220],3893:[,220],3895:[,220],3897:[,216],3907:[[3906,4023],512],3917:[[3916,4023],512],3922:[[3921,4023],512],3927:[[3926,4023],512],3932:[[3931,4023],512],3945:[[3904,4021],512],3953:[,129],3954:[,130],3955:[[3953,3954],512],3956:[,132],3957:[[3953,3956],512],3958:[[4018,3968],512],3959:[[4018,3969],256],3960:[[4019,3968],512],3961:[[4019,3969],256],3962:[,130],3963:[,130],3964:[,130],3965:[,130],3968:[,130],3969:[[3953,3968],512],3970:[,230],3971:[,230],3972:[,9],3974:[,230],3975:[,230],3987:[[3986,4023],512],3997:[[3996,4023],512],4002:[[4001,4023],512],4007:[[4006,4023],512],4012:[[4011,4023],512],4025:[[3984,4021],512],4038:[,220]},
+4096:{4133:[,,{4142:4134}],4134:[[4133,4142]],4151:[,7],4153:[,9],4154:[,9],4237:[,220],4348:[[4316],256],69702:[,9],69759:[,9],69785:[,,{69818:69786}],69786:[[69785,69818]],69787:[,,{69818:69788}],69788:[[69787,69818]],69797:[,,{69818:69803}],69803:[[69797,69818]],69817:[,9],69818:[,7]},
+4352:{69888:[,230],69889:[,230],69890:[,230],69934:[[69937,69927]],69935:[[69938,69927]],69937:[,,{69927:69934}],69938:[,,{69927:69935}],69939:[,9],69940:[,9],70003:[,7],70080:[,9]},
+4608:{70197:[,9],70198:[,7],70377:[,7],70378:[,9]},
+4864:{4957:[,230],4958:[,230],4959:[,230],70460:[,7],70471:[,,{70462:70475,70487:70476}],70475:[[70471,70462]],70476:[[70471,70487]],70477:[,9],70502:[,230],70503:[,230],70504:[,230],70505:[,230],70506:[,230],70507:[,230],70508:[,230],70512:[,230],70513:[,230],70514:[,230],70515:[,230],70516:[,230]},
+5120:{70841:[,,{70832:70844,70842:70843,70845:70846}],70843:[[70841,70842]],70844:[[70841,70832]],70846:[[70841,70845]],70850:[,9],70851:[,7]},
+5376:{71096:[,,{71087:71098}],71097:[,,{71087:71099}],71098:[[71096,71087]],71099:[[71097,71087]],71103:[,9],71104:[,7]},
+5632:{71231:[,9],71350:[,9],71351:[,7]},
+5888:{5908:[,9],5940:[,9],6098:[,9],6109:[,230]},
+6144:{6313:[,228]},
+6400:{6457:[,222],6458:[,230],6459:[,220]},
+6656:{6679:[,230],6680:[,220],6752:[,9],6773:[,230],6774:[,230],6775:[,230],6776:[,230],6777:[,230],6778:[,230],6779:[,230],6780:[,230],6783:[,220],6832:[,230],6833:[,230],6834:[,230],6835:[,230],6836:[,230],6837:[,220],6838:[,220],6839:[,220],6840:[,220],6841:[,220],6842:[,220],6843:[,230],6844:[,230],6845:[,220]},
+6912:{6917:[,,{6965:6918}],6918:[[6917,6965]],6919:[,,{6965:6920}],6920:[[6919,6965]],6921:[,,{6965:6922}],6922:[[6921,6965]],6923:[,,{6965:6924}],6924:[[6923,6965]],6925:[,,{6965:6926}],6926:[[6925,6965]],6929:[,,{6965:6930}],6930:[[6929,6965]],6964:[,7],6970:[,,{6965:6971}],6971:[[6970,6965]],6972:[,,{6965:6973}],6973:[[6972,6965]],6974:[,,{6965:6976}],6975:[,,{6965:6977}],6976:[[6974,6965]],6977:[[6975,6965]],6978:[,,{6965:6979}],6979:[[6978,6965]],6980:[,9],7019:[,230],7020:[,220],7021:[,230],7022:[,230],7023:[,230],7024:[,230],7025:[,230],7026:[,230],7027:[,230],7082:[,9],7083:[,9],7142:[,7],7154:[,9],7155:[,9]},
+7168:{7223:[,7],7376:[,230],7377:[,230],7378:[,230],7380:[,1],7381:[,220],7382:[,220],7383:[,220],7384:[,220],7385:[,220],7386:[,230],7387:[,230],7388:[,220],7389:[,220],7390:[,220],7391:[,220],7392:[,230],7394:[,1],7395:[,1],7396:[,1],7397:[,1],7398:[,1],7399:[,1],7400:[,1],7405:[,220],7412:[,230],7416:[,230],7417:[,230]},
+7424:{7468:[[65],256],7469:[[198],256],7470:[[66],256],7472:[[68],256],7473:[[69],256],7474:[[398],256],7475:[[71],256],7476:[[72],256],7477:[[73],256],7478:[[74],256],7479:[[75],256],7480:[[76],256],7481:[[77],256],7482:[[78],256],7484:[[79],256],7485:[[546],256],7486:[[80],256],7487:[[82],256],7488:[[84],256],7489:[[85],256],7490:[[87],256],7491:[[97],256],7492:[[592],256],7493:[[593],256],7494:[[7426],256],7495:[[98],256],7496:[[100],256],7497:[[101],256],7498:[[601],256],7499:[[603],256],7500:[[604],256],7501:[[103],256],7503:[[107],256],7504:[[109],256],7505:[[331],256],7506:[[111],256],7507:[[596],256],7508:[[7446],256],7509:[[7447],256],7510:[[112],256],7511:[[116],256],7512:[[117],256],7513:[[7453],256],7514:[[623],256],7515:[[118],256],7516:[[7461],256],7517:[[946],256],7518:[[947],256],7519:[[948],256],7520:[[966],256],7521:[[967],256],7522:[[105],256],7523:[[114],256],7524:[[117],256],7525:[[118],256],7526:[[946],256],7527:[[947],256],7528:[[961],256],7529:[[966],256],7530:[[967],256],7544:[[1085],256],7579:[[594],256],7580:[[99],256],7581:[[597],256],7582:[[240],256],7583:[[604],256],7584:[[102],256],7585:[[607],256],7586:[[609],256],7587:[[613],256],7588:[[616],256],7589:[[617],256],7590:[[618],256],7591:[[7547],256],7592:[[669],256],7593:[[621],256],7594:[[7557],256],7595:[[671],256],7596:[[625],256],7597:[[624],256],7598:[[626],256],7599:[[627],256],7600:[[628],256],7601:[[629],256],7602:[[632],256],7603:[[642],256],7604:[[643],256],7605:[[427],256],7606:[[649],256],7607:[[650],256],7608:[[7452],256],7609:[[651],256],7610:[[652],256],7611:[[122],256],7612:[[656],256],7613:[[657],256],7614:[[658],256],7615:[[952],256],7616:[,230],7617:[,230],7618:[,220],7619:[,230],7620:[,230],7621:[,230],7622:[,230],7623:[,230],7624:[,230],7625:[,230],7626:[,220],7627:[,230],7628:[,230],7629:[,234],7630:[,214],7631:[,220],7632:[,202],7633:[,230],7634:[,230],7635:[,230],7636:[,230],7637:[,230],7638:[,230],7639:[,230],7640:[,230],7641:[,230],7642:[,230],7643:[,230],7644:[,230],7645:[,230],7646:[,230],7647:[,230],7648:[,230],7649:[,230],7650:[,230],7651:[,230],7652:[,230],7653:[,230],7654:[,230],7655:[,230],7656:[,230],7657:[,230],7658:[,230],7659:[,230],7660:[,230],7661:[,230],7662:[,230],7663:[,230],7664:[,230],7665:[,230],7666:[,230],7667:[,230],7668:[,230],7669:[,230],7676:[,233],7677:[,220],7678:[,230],7679:[,220]},
+7680:{7680:[[65,805]],7681:[[97,805]],7682:[[66,775]],7683:[[98,775]],7684:[[66,803]],7685:[[98,803]],7686:[[66,817]],7687:[[98,817]],7688:[[199,769]],7689:[[231,769]],7690:[[68,775]],7691:[[100,775]],7692:[[68,803]],7693:[[100,803]],7694:[[68,817]],7695:[[100,817]],7696:[[68,807]],7697:[[100,807]],7698:[[68,813]],7699:[[100,813]],7700:[[274,768]],7701:[[275,768]],7702:[[274,769]],7703:[[275,769]],7704:[[69,813]],7705:[[101,813]],7706:[[69,816]],7707:[[101,816]],7708:[[552,774]],7709:[[553,774]],7710:[[70,775]],7711:[[102,775]],7712:[[71,772]],7713:[[103,772]],7714:[[72,775]],7715:[[104,775]],7716:[[72,803]],7717:[[104,803]],7718:[[72,776]],7719:[[104,776]],7720:[[72,807]],7721:[[104,807]],7722:[[72,814]],7723:[[104,814]],7724:[[73,816]],7725:[[105,816]],7726:[[207,769]],7727:[[239,769]],7728:[[75,769]],7729:[[107,769]],7730:[[75,803]],7731:[[107,803]],7732:[[75,817]],7733:[[107,817]],7734:[[76,803],,{772:7736}],7735:[[108,803],,{772:7737}],7736:[[7734,772]],7737:[[7735,772]],7738:[[76,817]],7739:[[108,817]],7740:[[76,813]],7741:[[108,813]],7742:[[77,769]],7743:[[109,769]],7744:[[77,775]],7745:[[109,775]],7746:[[77,803]],7747:[[109,803]],7748:[[78,775]],7749:[[110,775]],7750:[[78,803]],7751:[[110,803]],7752:[[78,817]],7753:[[110,817]],7754:[[78,813]],7755:[[110,813]],7756:[[213,769]],7757:[[245,769]],7758:[[213,776]],7759:[[245,776]],7760:[[332,768]],7761:[[333,768]],7762:[[332,769]],7763:[[333,769]],7764:[[80,769]],7765:[[112,769]],7766:[[80,775]],7767:[[112,775]],7768:[[82,775]],7769:[[114,775]],7770:[[82,803],,{772:7772}],7771:[[114,803],,{772:7773}],7772:[[7770,772]],7773:[[7771,772]],7774:[[82,817]],7775:[[114,817]],7776:[[83,775]],7777:[[115,775]],7778:[[83,803],,{775:7784}],7779:[[115,803],,{775:7785}],7780:[[346,775]],7781:[[347,775]],7782:[[352,775]],7783:[[353,775]],7784:[[7778,775]],7785:[[7779,775]],7786:[[84,775]],7787:[[116,775]],7788:[[84,803]],7789:[[116,803]],7790:[[84,817]],7791:[[116,817]],7792:[[84,813]],7793:[[116,813]],7794:[[85,804]],7795:[[117,804]],7796:[[85,816]],7797:[[117,816]],7798:[[85,813]],7799:[[117,813]],7800:[[360,769]],7801:[[361,769]],7802:[[362,776]],7803:[[363,776]],7804:[[86,771]],7805:[[118,771]],7806:[[86,803]],7807:[[118,803]],7808:[[87,768]],7809:[[119,768]],7810:[[87,769]],7811:[[119,769]],7812:[[87,776]],7813:[[119,776]],7814:[[87,775]],7815:[[119,775]],7816:[[87,803]],7817:[[119,803]],7818:[[88,775]],7819:[[120,775]],7820:[[88,776]],7821:[[120,776]],7822:[[89,775]],7823:[[121,775]],7824:[[90,770]],7825:[[122,770]],7826:[[90,803]],7827:[[122,803]],7828:[[90,817]],7829:[[122,817]],7830:[[104,817]],7831:[[116,776]],7832:[[119,778]],7833:[[121,778]],7834:[[97,702],256],7835:[[383,775]],7840:[[65,803],,{770:7852,774:7862}],7841:[[97,803],,{770:7853,774:7863}],7842:[[65,777]],7843:[[97,777]],7844:[[194,769]],7845:[[226,769]],7846:[[194,768]],7847:[[226,768]],7848:[[194,777]],7849:[[226,777]],7850:[[194,771]],7851:[[226,771]],7852:[[7840,770]],7853:[[7841,770]],7854:[[258,769]],7855:[[259,769]],7856:[[258,768]],7857:[[259,768]],7858:[[258,777]],7859:[[259,777]],7860:[[258,771]],7861:[[259,771]],7862:[[7840,774]],7863:[[7841,774]],7864:[[69,803],,{770:7878}],7865:[[101,803],,{770:7879}],7866:[[69,777]],7867:[[101,777]],7868:[[69,771]],7869:[[101,771]],7870:[[202,769]],7871:[[234,769]],7872:[[202,768]],7873:[[234,768]],7874:[[202,777]],7875:[[234,777]],7876:[[202,771]],7877:[[234,771]],7878:[[7864,770]],7879:[[7865,770]],7880:[[73,777]],7881:[[105,777]],7882:[[73,803]],7883:[[105,803]],7884:[[79,803],,{770:7896}],7885:[[111,803],,{770:7897}],7886:[[79,777]],7887:[[111,777]],7888:[[212,769]],7889:[[244,769]],7890:[[212,768]],7891:[[244,768]],7892:[[212,777]],7893:[[244,777]],7894:[[212,771]],7895:[[244,771]],7896:[[7884,770]],7897:[[7885,770]],7898:[[416,769]],7899:[[417,769]],7900:[[416,768]],7901:[[417,768]],7902:[[416,777]],7903:[[417,777]],7904:[[416,771]],7905:[[417,771]],7906:[[416,803]],7907:[[417,803]],7908:[[85,803]],7909:[[117,803]],7910:[[85,777]],7911:[[117,777]],7912:[[431,769]],7913:[[432,769]],7914:[[431,768]],7915:[[432,768]],7916:[[431,777]],7917:[[432,777]],7918:[[431,771]],7919:[[432,771]],7920:[[431,803]],7921:[[432,803]],7922:[[89,768]],7923:[[121,768]],7924:[[89,803]],7925:[[121,803]],7926:[[89,777]],7927:[[121,777]],7928:[[89,771]],7929:[[121,771]]},
+7936:{7936:[[945,787],,{768:7938,769:7940,834:7942,837:8064}],7937:[[945,788],,{768:7939,769:7941,834:7943,837:8065}],7938:[[7936,768],,{837:8066}],7939:[[7937,768],,{837:8067}],7940:[[7936,769],,{837:8068}],7941:[[7937,769],,{837:8069}],7942:[[7936,834],,{837:8070}],7943:[[7937,834],,{837:8071}],7944:[[913,787],,{768:7946,769:7948,834:7950,837:8072}],7945:[[913,788],,{768:7947,769:7949,834:7951,837:8073}],7946:[[7944,768],,{837:8074}],7947:[[7945,768],,{837:8075}],7948:[[7944,769],,{837:8076}],7949:[[7945,769],,{837:8077}],7950:[[7944,834],,{837:8078}],7951:[[7945,834],,{837:8079}],7952:[[949,787],,{768:7954,769:7956}],7953:[[949,788],,{768:7955,769:7957}],7954:[[7952,768]],7955:[[7953,768]],7956:[[7952,769]],7957:[[7953,769]],7960:[[917,787],,{768:7962,769:7964}],7961:[[917,788],,{768:7963,769:7965}],7962:[[7960,768]],7963:[[7961,768]],7964:[[7960,769]],7965:[[7961,769]],7968:[[951,787],,{768:7970,769:7972,834:7974,837:8080}],7969:[[951,788],,{768:7971,769:7973,834:7975,837:8081}],7970:[[7968,768],,{837:8082}],7971:[[7969,768],,{837:8083}],7972:[[7968,769],,{837:8084}],7973:[[7969,769],,{837:8085}],7974:[[7968,834],,{837:8086}],7975:[[7969,834],,{837:8087}],7976:[[919,787],,{768:7978,769:7980,834:7982,837:8088}],7977:[[919,788],,{768:7979,769:7981,834:7983,837:8089}],7978:[[7976,768],,{837:8090}],7979:[[7977,768],,{837:8091}],7980:[[7976,769],,{837:8092}],7981:[[7977,769],,{837:8093}],7982:[[7976,834],,{837:8094}],7983:[[7977,834],,{837:8095}],7984:[[953,787],,{768:7986,769:7988,834:7990}],7985:[[953,788],,{768:7987,769:7989,834:7991}],7986:[[7984,768]],7987:[[7985,768]],7988:[[7984,769]],7989:[[7985,769]],7990:[[7984,834]],7991:[[7985,834]],7992:[[921,787],,{768:7994,769:7996,834:7998}],7993:[[921,788],,{768:7995,769:7997,834:7999}],7994:[[7992,768]],7995:[[7993,768]],7996:[[7992,769]],7997:[[7993,769]],7998:[[7992,834]],7999:[[7993,834]],8000:[[959,787],,{768:8002,769:8004}],8001:[[959,788],,{768:8003,769:8005}],8002:[[8000,768]],8003:[[8001,768]],8004:[[8000,769]],8005:[[8001,769]],8008:[[927,787],,{768:8010,769:8012}],8009:[[927,788],,{768:8011,769:8013}],8010:[[8008,768]],8011:[[8009,768]],8012:[[8008,769]],8013:[[8009,769]],8016:[[965,787],,{768:8018,769:8020,834:8022}],8017:[[965,788],,{768:8019,769:8021,834:8023}],8018:[[8016,768]],8019:[[8017,768]],8020:[[8016,769]],8021:[[8017,769]],8022:[[8016,834]],8023:[[8017,834]],8025:[[933,788],,{768:8027,769:8029,834:8031}],8027:[[8025,768]],8029:[[8025,769]],8031:[[8025,834]],8032:[[969,787],,{768:8034,769:8036,834:8038,837:8096}],8033:[[969,788],,{768:8035,769:8037,834:8039,837:8097}],8034:[[8032,768],,{837:8098}],8035:[[8033,768],,{837:8099}],8036:[[8032,769],,{837:8100}],8037:[[8033,769],,{837:8101}],8038:[[8032,834],,{837:8102}],8039:[[8033,834],,{837:8103}],8040:[[937,787],,{768:8042,769:8044,834:8046,837:8104}],8041:[[937,788],,{768:8043,769:8045,834:8047,837:8105}],8042:[[8040,768],,{837:8106}],8043:[[8041,768],,{837:8107}],8044:[[8040,769],,{837:8108}],8045:[[8041,769],,{837:8109}],8046:[[8040,834],,{837:8110}],8047:[[8041,834],,{837:8111}],8048:[[945,768],,{837:8114}],8049:[[940]],8050:[[949,768]],8051:[[941]],8052:[[951,768],,{837:8130}],8053:[[942]],8054:[[953,768]],8055:[[943]],8056:[[959,768]],8057:[[972]],8058:[[965,768]],8059:[[973]],8060:[[969,768],,{837:8178}],8061:[[974]],8064:[[7936,837]],8065:[[7937,837]],8066:[[7938,837]],8067:[[7939,837]],8068:[[7940,837]],8069:[[7941,837]],8070:[[7942,837]],8071:[[7943,837]],8072:[[7944,837]],8073:[[7945,837]],8074:[[7946,837]],8075:[[7947,837]],8076:[[7948,837]],8077:[[7949,837]],8078:[[7950,837]],8079:[[7951,837]],8080:[[7968,837]],8081:[[7969,837]],8082:[[7970,837]],8083:[[7971,837]],8084:[[7972,837]],8085:[[7973,837]],8086:[[7974,837]],8087:[[7975,837]],8088:[[7976,837]],8089:[[7977,837]],8090:[[7978,837]],8091:[[7979,837]],8092:[[7980,837]],8093:[[7981,837]],8094:[[7982,837]],8095:[[7983,837]],8096:[[8032,837]],8097:[[8033,837]],8098:[[8034,837]],8099:[[8035,837]],8100:[[8036,837]],8101:[[8037,837]],8102:[[8038,837]],8103:[[8039,837]],8104:[[8040,837]],8105:[[8041,837]],8106:[[8042,837]],8107:[[8043,837]],8108:[[8044,837]],8109:[[8045,837]],8110:[[8046,837]],8111:[[8047,837]],8112:[[945,774]],8113:[[945,772]],8114:[[8048,837]],8115:[[945,837]],8116:[[940,837]],8118:[[945,834],,{837:8119}],8119:[[8118,837]],8120:[[913,774]],8121:[[913,772]],8122:[[913,768]],8123:[[902]],8124:[[913,837]],8125:[[32,787],256],8126:[[953]],8127:[[32,787],256,{768:8141,769:8142,834:8143}],8128:[[32,834],256],8129:[[168,834]],8130:[[8052,837]],8131:[[951,837]],8132:[[942,837]],8134:[[951,834],,{837:8135}],8135:[[8134,837]],8136:[[917,768]],8137:[[904]],8138:[[919,768]],8139:[[905]],8140:[[919,837]],8141:[[8127,768]],8142:[[8127,769]],8143:[[8127,834]],8144:[[953,774]],8145:[[953,772]],8146:[[970,768]],8147:[[912]],8150:[[953,834]],8151:[[970,834]],8152:[[921,774]],8153:[[921,772]],8154:[[921,768]],8155:[[906]],8157:[[8190,768]],8158:[[8190,769]],8159:[[8190,834]],8160:[[965,774]],8161:[[965,772]],8162:[[971,768]],8163:[[944]],8164:[[961,787]],8165:[[961,788]],8166:[[965,834]],8167:[[971,834]],8168:[[933,774]],8169:[[933,772]],8170:[[933,768]],8171:[[910]],8172:[[929,788]],8173:[[168,768]],8174:[[901]],8175:[[96]],8178:[[8060,837]],8179:[[969,837]],8180:[[974,837]],8182:[[969,834],,{837:8183}],8183:[[8182,837]],8184:[[927,768]],8185:[[908]],8186:[[937,768]],8187:[[911]],8188:[[937,837]],8189:[[180]],8190:[[32,788],256,{768:8157,769:8158,834:8159}]},
+8192:{8192:[[8194]],8193:[[8195]],8194:[[32],256],8195:[[32],256],8196:[[32],256],8197:[[32],256],8198:[[32],256],8199:[[32],256],8200:[[32],256],8201:[[32],256],8202:[[32],256],8209:[[8208],256],8215:[[32,819],256],8228:[[46],256],8229:[[46,46],256],8230:[[46,46,46],256],8239:[[32],256],8243:[[8242,8242],256],8244:[[8242,8242,8242],256],8246:[[8245,8245],256],8247:[[8245,8245,8245],256],8252:[[33,33],256],8254:[[32,773],256],8263:[[63,63],256],8264:[[63,33],256],8265:[[33,63],256],8279:[[8242,8242,8242,8242],256],8287:[[32],256],8304:[[48],256],8305:[[105],256],8308:[[52],256],8309:[[53],256],8310:[[54],256],8311:[[55],256],8312:[[56],256],8313:[[57],256],8314:[[43],256],8315:[[8722],256],8316:[[61],256],8317:[[40],256],8318:[[41],256],8319:[[110],256],8320:[[48],256],8321:[[49],256],8322:[[50],256],8323:[[51],256],8324:[[52],256],8325:[[53],256],8326:[[54],256],8327:[[55],256],8328:[[56],256],8329:[[57],256],8330:[[43],256],8331:[[8722],256],8332:[[61],256],8333:[[40],256],8334:[[41],256],8336:[[97],256],8337:[[101],256],8338:[[111],256],8339:[[120],256],8340:[[601],256],8341:[[104],256],8342:[[107],256],8343:[[108],256],8344:[[109],256],8345:[[110],256],8346:[[112],256],8347:[[115],256],8348:[[116],256],8360:[[82,115],256],8400:[,230],8401:[,230],8402:[,1],8403:[,1],8404:[,230],8405:[,230],8406:[,230],8407:[,230],8408:[,1],8409:[,1],8410:[,1],8411:[,230],8412:[,230],8417:[,230],8421:[,1],8422:[,1],8423:[,230],8424:[,220],8425:[,230],8426:[,1],8427:[,1],8428:[,220],8429:[,220],8430:[,220],8431:[,220],8432:[,230]},
+8448:{8448:[[97,47,99],256],8449:[[97,47,115],256],8450:[[67],256],8451:[[176,67],256],8453:[[99,47,111],256],8454:[[99,47,117],256],8455:[[400],256],8457:[[176,70],256],8458:[[103],256],8459:[[72],256],8460:[[72],256],8461:[[72],256],8462:[[104],256],8463:[[295],256],8464:[[73],256],8465:[[73],256],8466:[[76],256],8467:[[108],256],8469:[[78],256],8470:[[78,111],256],8473:[[80],256],8474:[[81],256],8475:[[82],256],8476:[[82],256],8477:[[82],256],8480:[[83,77],256],8481:[[84,69,76],256],8482:[[84,77],256],8484:[[90],256],8486:[[937]],8488:[[90],256],8490:[[75]],8491:[[197]],8492:[[66],256],8493:[[67],256],8495:[[101],256],8496:[[69],256],8497:[[70],256],8499:[[77],256],8500:[[111],256],8501:[[1488],256],8502:[[1489],256],8503:[[1490],256],8504:[[1491],256],8505:[[105],256],8507:[[70,65,88],256],8508:[[960],256],8509:[[947],256],8510:[[915],256],8511:[[928],256],8512:[[8721],256],8517:[[68],256],8518:[[100],256],8519:[[101],256],8520:[[105],256],8521:[[106],256],8528:[[49,8260,55],256],8529:[[49,8260,57],256],8530:[[49,8260,49,48],256],8531:[[49,8260,51],256],8532:[[50,8260,51],256],8533:[[49,8260,53],256],8534:[[50,8260,53],256],8535:[[51,8260,53],256],8536:[[52,8260,53],256],8537:[[49,8260,54],256],8538:[[53,8260,54],256],8539:[[49,8260,56],256],8540:[[51,8260,56],256],8541:[[53,8260,56],256],8542:[[55,8260,56],256],8543:[[49,8260],256],8544:[[73],256],8545:[[73,73],256],8546:[[73,73,73],256],8547:[[73,86],256],8548:[[86],256],8549:[[86,73],256],8550:[[86,73,73],256],8551:[[86,73,73,73],256],8552:[[73,88],256],8553:[[88],256],8554:[[88,73],256],8555:[[88,73,73],256],8556:[[76],256],8557:[[67],256],8558:[[68],256],8559:[[77],256],8560:[[105],256],8561:[[105,105],256],8562:[[105,105,105],256],8563:[[105,118],256],8564:[[118],256],8565:[[118,105],256],8566:[[118,105,105],256],8567:[[118,105,105,105],256],8568:[[105,120],256],8569:[[120],256],8570:[[120,105],256],8571:[[120,105,105],256],8572:[[108],256],8573:[[99],256],8574:[[100],256],8575:[[109],256],8585:[[48,8260,51],256],8592:[,,{824:8602}],8594:[,,{824:8603}],8596:[,,{824:8622}],8602:[[8592,824]],8603:[[8594,824]],8622:[[8596,824]],8653:[[8656,824]],8654:[[8660,824]],8655:[[8658,824]],8656:[,,{824:8653}],8658:[,,{824:8655}],8660:[,,{824:8654}]},
+8704:{8707:[,,{824:8708}],8708:[[8707,824]],8712:[,,{824:8713}],8713:[[8712,824]],8715:[,,{824:8716}],8716:[[8715,824]],8739:[,,{824:8740}],8740:[[8739,824]],8741:[,,{824:8742}],8742:[[8741,824]],8748:[[8747,8747],256],8749:[[8747,8747,8747],256],8751:[[8750,8750],256],8752:[[8750,8750,8750],256],8764:[,,{824:8769}],8769:[[8764,824]],8771:[,,{824:8772}],8772:[[8771,824]],8773:[,,{824:8775}],8775:[[8773,824]],8776:[,,{824:8777}],8777:[[8776,824]],8781:[,,{824:8813}],8800:[[61,824]],8801:[,,{824:8802}],8802:[[8801,824]],8804:[,,{824:8816}],8805:[,,{824:8817}],8813:[[8781,824]],8814:[[60,824]],8815:[[62,824]],8816:[[8804,824]],8817:[[8805,824]],8818:[,,{824:8820}],8819:[,,{824:8821}],8820:[[8818,824]],8821:[[8819,824]],8822:[,,{824:8824}],8823:[,,{824:8825}],8824:[[8822,824]],8825:[[8823,824]],8826:[,,{824:8832}],8827:[,,{824:8833}],8828:[,,{824:8928}],8829:[,,{824:8929}],8832:[[8826,824]],8833:[[8827,824]],8834:[,,{824:8836}],8835:[,,{824:8837}],8836:[[8834,824]],8837:[[8835,824]],8838:[,,{824:8840}],8839:[,,{824:8841}],8840:[[8838,824]],8841:[[8839,824]],8849:[,,{824:8930}],8850:[,,{824:8931}],8866:[,,{824:8876}],8872:[,,{824:8877}],8873:[,,{824:8878}],8875:[,,{824:8879}],8876:[[8866,824]],8877:[[8872,824]],8878:[[8873,824]],8879:[[8875,824]],8882:[,,{824:8938}],8883:[,,{824:8939}],8884:[,,{824:8940}],8885:[,,{824:8941}],8928:[[8828,824]],8929:[[8829,824]],8930:[[8849,824]],8931:[[8850,824]],8938:[[8882,824]],8939:[[8883,824]],8940:[[8884,824]],8941:[[8885,824]]},
+8960:{9001:[[12296]],9002:[[12297]]},
+9216:{9312:[[49],256],9313:[[50],256],9314:[[51],256],9315:[[52],256],9316:[[53],256],9317:[[54],256],9318:[[55],256],9319:[[56],256],9320:[[57],256],9321:[[49,48],256],9322:[[49,49],256],9323:[[49,50],256],9324:[[49,51],256],9325:[[49,52],256],9326:[[49,53],256],9327:[[49,54],256],9328:[[49,55],256],9329:[[49,56],256],9330:[[49,57],256],9331:[[50,48],256],9332:[[40,49,41],256],9333:[[40,50,41],256],9334:[[40,51,41],256],9335:[[40,52,41],256],9336:[[40,53,41],256],9337:[[40,54,41],256],9338:[[40,55,41],256],9339:[[40,56,41],256],9340:[[40,57,41],256],9341:[[40,49,48,41],256],9342:[[40,49,49,41],256],9343:[[40,49,50,41],256],9344:[[40,49,51,41],256],9345:[[40,49,52,41],256],9346:[[40,49,53,41],256],9347:[[40,49,54,41],256],9348:[[40,49,55,41],256],9349:[[40,49,56,41],256],9350:[[40,49,57,41],256],9351:[[40,50,48,41],256],9352:[[49,46],256],9353:[[50,46],256],9354:[[51,46],256],9355:[[52,46],256],9356:[[53,46],256],9357:[[54,46],256],9358:[[55,46],256],9359:[[56,46],256],9360:[[57,46],256],9361:[[49,48,46],256],9362:[[49,49,46],256],9363:[[49,50,46],256],9364:[[49,51,46],256],9365:[[49,52,46],256],9366:[[49,53,46],256],9367:[[49,54,46],256],9368:[[49,55,46],256],9369:[[49,56,46],256],9370:[[49,57,46],256],9371:[[50,48,46],256],9372:[[40,97,41],256],9373:[[40,98,41],256],9374:[[40,99,41],256],9375:[[40,100,41],256],9376:[[40,101,41],256],9377:[[40,102,41],256],9378:[[40,103,41],256],9379:[[40,104,41],256],9380:[[40,105,41],256],9381:[[40,106,41],256],9382:[[40,107,41],256],9383:[[40,108,41],256],9384:[[40,109,41],256],9385:[[40,110,41],256],9386:[[40,111,41],256],9387:[[40,112,41],256],9388:[[40,113,41],256],9389:[[40,114,41],256],9390:[[40,115,41],256],9391:[[40,116,41],256],9392:[[40,117,41],256],9393:[[40,118,41],256],9394:[[40,119,41],256],9395:[[40,120,41],256],9396:[[40,121,41],256],9397:[[40,122,41],256],9398:[[65],256],9399:[[66],256],9400:[[67],256],9401:[[68],256],9402:[[69],256],9403:[[70],256],9404:[[71],256],9405:[[72],256],9406:[[73],256],9407:[[74],256],9408:[[75],256],9409:[[76],256],9410:[[77],256],9411:[[78],256],9412:[[79],256],9413:[[80],256],9414:[[81],256],9415:[[82],256],9416:[[83],256],9417:[[84],256],9418:[[85],256],9419:[[86],256],9420:[[87],256],9421:[[88],256],9422:[[89],256],9423:[[90],256],9424:[[97],256],9425:[[98],256],9426:[[99],256],9427:[[100],256],9428:[[101],256],9429:[[102],256],9430:[[103],256],9431:[[104],256],9432:[[105],256],9433:[[106],256],9434:[[107],256],9435:[[108],256],9436:[[109],256],9437:[[110],256],9438:[[111],256],9439:[[112],256],9440:[[113],256],9441:[[114],256],9442:[[115],256],9443:[[116],256],9444:[[117],256],9445:[[118],256],9446:[[119],256],9447:[[120],256],9448:[[121],256],9449:[[122],256],9450:[[48],256]},
+10752:{10764:[[8747,8747,8747,8747],256],10868:[[58,58,61],256],10869:[[61,61],256],10870:[[61,61,61],256],10972:[[10973,824],512]},
+11264:{11388:[[106],256],11389:[[86],256],11503:[,230],11504:[,230],11505:[,230]},
+11520:{11631:[[11617],256],11647:[,9],11744:[,230],11745:[,230],11746:[,230],11747:[,230],11748:[,230],11749:[,230],11750:[,230],11751:[,230],11752:[,230],11753:[,230],11754:[,230],11755:[,230],11756:[,230],11757:[,230],11758:[,230],11759:[,230],11760:[,230],11761:[,230],11762:[,230],11763:[,230],11764:[,230],11765:[,230],11766:[,230],11767:[,230],11768:[,230],11769:[,230],11770:[,230],11771:[,230],11772:[,230],11773:[,230],11774:[,230],11775:[,230]},
+11776:{11935:[[27597],256],12019:[[40863],256]},
+12032:{12032:[[19968],256],12033:[[20008],256],12034:[[20022],256],12035:[[20031],256],12036:[[20057],256],12037:[[20101],256],12038:[[20108],256],12039:[[20128],256],12040:[[20154],256],12041:[[20799],256],12042:[[20837],256],12043:[[20843],256],12044:[[20866],256],12045:[[20886],256],12046:[[20907],256],12047:[[20960],256],12048:[[20981],256],12049:[[20992],256],12050:[[21147],256],12051:[[21241],256],12052:[[21269],256],12053:[[21274],256],12054:[[21304],256],12055:[[21313],256],12056:[[21340],256],12057:[[21353],256],12058:[[21378],256],12059:[[21430],256],12060:[[21448],256],12061:[[21475],256],12062:[[22231],256],12063:[[22303],256],12064:[[22763],256],12065:[[22786],256],12066:[[22794],256],12067:[[22805],256],12068:[[22823],256],12069:[[22899],256],12070:[[23376],256],12071:[[23424],256],12072:[[23544],256],12073:[[23567],256],12074:[[23586],256],12075:[[23608],256],12076:[[23662],256],12077:[[23665],256],12078:[[24027],256],12079:[[24037],256],12080:[[24049],256],12081:[[24062],256],12082:[[24178],256],12083:[[24186],256],12084:[[24191],256],12085:[[24308],256],12086:[[24318],256],12087:[[24331],256],12088:[[24339],256],12089:[[24400],256],12090:[[24417],256],12091:[[24435],256],12092:[[24515],256],12093:[[25096],256],12094:[[25142],256],12095:[[25163],256],12096:[[25903],256],12097:[[25908],256],12098:[[25991],256],12099:[[26007],256],12100:[[26020],256],12101:[[26041],256],12102:[[26080],256],12103:[[26085],256],12104:[[26352],256],12105:[[26376],256],12106:[[26408],256],12107:[[27424],256],12108:[[27490],256],12109:[[27513],256],12110:[[27571],256],12111:[[27595],256],12112:[[27604],256],12113:[[27611],256],12114:[[27663],256],12115:[[27668],256],12116:[[27700],256],12117:[[28779],256],12118:[[29226],256],12119:[[29238],256],12120:[[29243],256],12121:[[29247],256],12122:[[29255],256],12123:[[29273],256],12124:[[29275],256],12125:[[29356],256],12126:[[29572],256],12127:[[29577],256],12128:[[29916],256],12129:[[29926],256],12130:[[29976],256],12131:[[29983],256],12132:[[29992],256],12133:[[30000],256],12134:[[30091],256],12135:[[30098],256],12136:[[30326],256],12137:[[30333],256],12138:[[30382],256],12139:[[30399],256],12140:[[30446],256],12141:[[30683],256],12142:[[30690],256],12143:[[30707],256],12144:[[31034],256],12145:[[31160],256],12146:[[31166],256],12147:[[31348],256],12148:[[31435],256],12149:[[31481],256],12150:[[31859],256],12151:[[31992],256],12152:[[32566],256],12153:[[32593],256],12154:[[32650],256],12155:[[32701],256],12156:[[32769],256],12157:[[32780],256],12158:[[32786],256],12159:[[32819],256],12160:[[32895],256],12161:[[32905],256],12162:[[33251],256],12163:[[33258],256],12164:[[33267],256],12165:[[33276],256],12166:[[33292],256],12167:[[33307],256],12168:[[33311],256],12169:[[33390],256],12170:[[33394],256],12171:[[33400],256],12172:[[34381],256],12173:[[34411],256],12174:[[34880],256],12175:[[34892],256],12176:[[34915],256],12177:[[35198],256],12178:[[35211],256],12179:[[35282],256],12180:[[35328],256],12181:[[35895],256],12182:[[35910],256],12183:[[35925],256],12184:[[35960],256],12185:[[35997],256],12186:[[36196],256],12187:[[36208],256],12188:[[36275],256],12189:[[36523],256],12190:[[36554],256],12191:[[36763],256],12192:[[36784],256],12193:[[36789],256],12194:[[37009],256],12195:[[37193],256],12196:[[37318],256],12197:[[37324],256],12198:[[37329],256],12199:[[38263],256],12200:[[38272],256],12201:[[38428],256],12202:[[38582],256],12203:[[38585],256],12204:[[38632],256],12205:[[38737],256],12206:[[38750],256],12207:[[38754],256],12208:[[38761],256],12209:[[38859],256],12210:[[38893],256],12211:[[38899],256],12212:[[38913],256],12213:[[39080],256],12214:[[39131],256],12215:[[39135],256],12216:[[39318],256],12217:[[39321],256],12218:[[39340],256],12219:[[39592],256],12220:[[39640],256],12221:[[39647],256],12222:[[39717],256],12223:[[39727],256],12224:[[39730],256],12225:[[39740],256],12226:[[39770],256],12227:[[40165],256],12228:[[40565],256],12229:[[40575],256],12230:[[40613],256],12231:[[40635],256],12232:[[40643],256],12233:[[40653],256],12234:[[40657],256],12235:[[40697],256],12236:[[40701],256],12237:[[40718],256],12238:[[40723],256],12239:[[40736],256],12240:[[40763],256],12241:[[40778],256],12242:[[40786],256],12243:[[40845],256],12244:[[40860],256],12245:[[40864],256]},
+12288:{12288:[[32],256],12330:[,218],12331:[,228],12332:[,232],12333:[,222],12334:[,224],12335:[,224],12342:[[12306],256],12344:[[21313],256],12345:[[21316],256],12346:[[21317],256],12358:[,,{12441:12436}],12363:[,,{12441:12364}],12364:[[12363,12441]],12365:[,,{12441:12366}],12366:[[12365,12441]],12367:[,,{12441:12368}],12368:[[12367,12441]],12369:[,,{12441:12370}],12370:[[12369,12441]],12371:[,,{12441:12372}],12372:[[12371,12441]],12373:[,,{12441:12374}],12374:[[12373,12441]],12375:[,,{12441:12376}],12376:[[12375,12441]],12377:[,,{12441:12378}],12378:[[12377,12441]],12379:[,,{12441:12380}],12380:[[12379,12441]],12381:[,,{12441:12382}],12382:[[12381,12441]],12383:[,,{12441:12384}],12384:[[12383,12441]],12385:[,,{12441:12386}],12386:[[12385,12441]],12388:[,,{12441:12389}],12389:[[12388,12441]],12390:[,,{12441:12391}],12391:[[12390,12441]],12392:[,,{12441:12393}],12393:[[12392,12441]],12399:[,,{12441:12400,12442:12401}],12400:[[12399,12441]],12401:[[12399,12442]],12402:[,,{12441:12403,12442:12404}],12403:[[12402,12441]],12404:[[12402,12442]],12405:[,,{12441:12406,12442:12407}],12406:[[12405,12441]],12407:[[12405,12442]],12408:[,,{12441:12409,12442:12410}],12409:[[12408,12441]],12410:[[12408,12442]],12411:[,,{12441:12412,12442:12413}],12412:[[12411,12441]],12413:[[12411,12442]],12436:[[12358,12441]],12441:[,8],12442:[,8],12443:[[32,12441],256],12444:[[32,12442],256],12445:[,,{12441:12446}],12446:[[12445,12441]],12447:[[12424,12426],256],12454:[,,{12441:12532}],12459:[,,{12441:12460}],12460:[[12459,12441]],12461:[,,{12441:12462}],12462:[[12461,12441]],12463:[,,{12441:12464}],12464:[[12463,12441]],12465:[,,{12441:12466}],12466:[[12465,12441]],12467:[,,{12441:12468}],12468:[[12467,12441]],12469:[,,{12441:12470}],12470:[[12469,12441]],12471:[,,{12441:12472}],12472:[[12471,12441]],12473:[,,{12441:12474}],12474:[[12473,12441]],12475:[,,{12441:12476}],12476:[[12475,12441]],12477:[,,{12441:12478}],12478:[[12477,12441]],12479:[,,{12441:12480}],12480:[[12479,12441]],12481:[,,{12441:12482}],12482:[[12481,12441]],12484:[,,{12441:12485}],12485:[[12484,12441]],12486:[,,{12441:12487}],12487:[[12486,12441]],12488:[,,{12441:12489}],12489:[[12488,12441]],12495:[,,{12441:12496,12442:12497}],12496:[[12495,12441]],12497:[[12495,12442]],12498:[,,{12441:12499,12442:12500}],12499:[[12498,12441]],12500:[[12498,12442]],12501:[,,{12441:12502,12442:12503}],12502:[[12501,12441]],12503:[[12501,12442]],12504:[,,{12441:12505,12442:12506}],12505:[[12504,12441]],12506:[[12504,12442]],12507:[,,{12441:12508,12442:12509}],12508:[[12507,12441]],12509:[[12507,12442]],12527:[,,{12441:12535}],12528:[,,{12441:12536}],12529:[,,{12441:12537}],12530:[,,{12441:12538}],12532:[[12454,12441]],12535:[[12527,12441]],12536:[[12528,12441]],12537:[[12529,12441]],12538:[[12530,12441]],12541:[,,{12441:12542}],12542:[[12541,12441]],12543:[[12467,12488],256]},
+12544:{12593:[[4352],256],12594:[[4353],256],12595:[[4522],256],12596:[[4354],256],12597:[[4524],256],12598:[[4525],256],12599:[[4355],256],12600:[[4356],256],12601:[[4357],256],12602:[[4528],256],12603:[[4529],256],12604:[[4530],256],12605:[[4531],256],12606:[[4532],256],12607:[[4533],256],12608:[[4378],256],12609:[[4358],256],12610:[[4359],256],12611:[[4360],256],12612:[[4385],256],12613:[[4361],256],12614:[[4362],256],12615:[[4363],256],12616:[[4364],256],12617:[[4365],256],12618:[[4366],256],12619:[[4367],256],12620:[[4368],256],12621:[[4369],256],12622:[[4370],256],12623:[[4449],256],12624:[[4450],256],12625:[[4451],256],12626:[[4452],256],12627:[[4453],256],12628:[[4454],256],12629:[[4455],256],12630:[[4456],256],12631:[[4457],256],12632:[[4458],256],12633:[[4459],256],12634:[[4460],256],12635:[[4461],256],12636:[[4462],256],12637:[[4463],256],12638:[[4464],256],12639:[[4465],256],12640:[[4466],256],12641:[[4467],256],12642:[[4468],256],12643:[[4469],256],12644:[[4448],256],12645:[[4372],256],12646:[[4373],256],12647:[[4551],256],12648:[[4552],256],12649:[[4556],256],12650:[[4558],256],12651:[[4563],256],12652:[[4567],256],12653:[[4569],256],12654:[[4380],256],12655:[[4573],256],12656:[[4575],256],12657:[[4381],256],12658:[[4382],256],12659:[[4384],256],12660:[[4386],256],12661:[[4387],256],12662:[[4391],256],12663:[[4393],256],12664:[[4395],256],12665:[[4396],256],12666:[[4397],256],12667:[[4398],256],12668:[[4399],256],12669:[[4402],256],12670:[[4406],256],12671:[[4416],256],12672:[[4423],256],12673:[[4428],256],12674:[[4593],256],12675:[[4594],256],12676:[[4439],256],12677:[[4440],256],12678:[[4441],256],12679:[[4484],256],12680:[[4485],256],12681:[[4488],256],12682:[[4497],256],12683:[[4498],256],12684:[[4500],256],12685:[[4510],256],12686:[[4513],256],12690:[[19968],256],12691:[[20108],256],12692:[[19977],256],12693:[[22235],256],12694:[[19978],256],12695:[[20013],256],12696:[[19979],256],12697:[[30002],256],12698:[[20057],256],12699:[[19993],256],12700:[[19969],256],12701:[[22825],256],12702:[[22320],256],12703:[[20154],256]},
+12800:{12800:[[40,4352,41],256],12801:[[40,4354,41],256],12802:[[40,4355,41],256],12803:[[40,4357,41],256],12804:[[40,4358,41],256],12805:[[40,4359,41],256],12806:[[40,4361,41],256],12807:[[40,4363,41],256],12808:[[40,4364,41],256],12809:[[40,4366,41],256],12810:[[40,4367,41],256],12811:[[40,4368,41],256],12812:[[40,4369,41],256],12813:[[40,4370,41],256],12814:[[40,4352,4449,41],256],12815:[[40,4354,4449,41],256],12816:[[40,4355,4449,41],256],12817:[[40,4357,4449,41],256],12818:[[40,4358,4449,41],256],12819:[[40,4359,4449,41],256],12820:[[40,4361,4449,41],256],12821:[[40,4363,4449,41],256],12822:[[40,4364,4449,41],256],12823:[[40,4366,4449,41],256],12824:[[40,4367,4449,41],256],12825:[[40,4368,4449,41],256],12826:[[40,4369,4449,41],256],12827:[[40,4370,4449,41],256],12828:[[40,4364,4462,41],256],12829:[[40,4363,4457,4364,4453,4523,41],256],12830:[[40,4363,4457,4370,4462,41],256],12832:[[40,19968,41],256],12833:[[40,20108,41],256],12834:[[40,19977,41],256],12835:[[40,22235,41],256],12836:[[40,20116,41],256],12837:[[40,20845,41],256],12838:[[40,19971,41],256],12839:[[40,20843,41],256],12840:[[40,20061,41],256],12841:[[40,21313,41],256],12842:[[40,26376,41],256],12843:[[40,28779,41],256],12844:[[40,27700,41],256],12845:[[40,26408,41],256],12846:[[40,37329,41],256],12847:[[40,22303,41],256],12848:[[40,26085,41],256],12849:[[40,26666,41],256],12850:[[40,26377,41],256],12851:[[40,31038,41],256],12852:[[40,21517,41],256],12853:[[40,29305,41],256],12854:[[40,36001,41],256],12855:[[40,31069,41],256],12856:[[40,21172,41],256],12857:[[40,20195,41],256],12858:[[40,21628,41],256],12859:[[40,23398,41],256],12860:[[40,30435,41],256],12861:[[40,20225,41],256],12862:[[40,36039,41],256],12863:[[40,21332,41],256],12864:[[40,31085,41],256],12865:[[40,20241,41],256],12866:[[40,33258,41],256],12867:[[40,33267,41],256],12868:[[21839],256],12869:[[24188],256],12870:[[25991],256],12871:[[31631],256],12880:[[80,84,69],256],12881:[[50,49],256],12882:[[50,50],256],12883:[[50,51],256],12884:[[50,52],256],12885:[[50,53],256],12886:[[50,54],256],12887:[[50,55],256],12888:[[50,56],256],12889:[[50,57],256],12890:[[51,48],256],12891:[[51,49],256],12892:[[51,50],256],12893:[[51,51],256],12894:[[51,52],256],12895:[[51,53],256],12896:[[4352],256],12897:[[4354],256],12898:[[4355],256],12899:[[4357],256],12900:[[4358],256],12901:[[4359],256],12902:[[4361],256],12903:[[4363],256],12904:[[4364],256],12905:[[4366],256],12906:[[4367],256],12907:[[4368],256],12908:[[4369],256],12909:[[4370],256],12910:[[4352,4449],256],12911:[[4354,4449],256],12912:[[4355,4449],256],12913:[[4357,4449],256],12914:[[4358,4449],256],12915:[[4359,4449],256],12916:[[4361,4449],256],12917:[[4363,4449],256],12918:[[4364,4449],256],12919:[[4366,4449],256],12920:[[4367,4449],256],12921:[[4368,4449],256],12922:[[4369,4449],256],12923:[[4370,4449],256],12924:[[4366,4449,4535,4352,4457],256],12925:[[4364,4462,4363,4468],256],12926:[[4363,4462],256],12928:[[19968],256],12929:[[20108],256],12930:[[19977],256],12931:[[22235],256],12932:[[20116],256],12933:[[20845],256],12934:[[19971],256],12935:[[20843],256],12936:[[20061],256],12937:[[21313],256],12938:[[26376],256],12939:[[28779],256],12940:[[27700],256],12941:[[26408],256],12942:[[37329],256],12943:[[22303],256],12944:[[26085],256],12945:[[26666],256],12946:[[26377],256],12947:[[31038],256],12948:[[21517],256],12949:[[29305],256],12950:[[36001],256],12951:[[31069],256],12952:[[21172],256],12953:[[31192],256],12954:[[30007],256],12955:[[22899],256],12956:[[36969],256],12957:[[20778],256],12958:[[21360],256],12959:[[27880],256],12960:[[38917],256],12961:[[20241],256],12962:[[20889],256],12963:[[27491],256],12964:[[19978],256],12965:[[20013],256],12966:[[19979],256],12967:[[24038],256],12968:[[21491],256],12969:[[21307],256],12970:[[23447],256],12971:[[23398],256],12972:[[30435],256],12973:[[20225],256],12974:[[36039],256],12975:[[21332],256],12976:[[22812],256],12977:[[51,54],256],12978:[[51,55],256],12979:[[51,56],256],12980:[[51,57],256],12981:[[52,48],256],12982:[[52,49],256],12983:[[52,50],256],12984:[[52,51],256],12985:[[52,52],256],12986:[[52,53],256],12987:[[52,54],256],12988:[[52,55],256],12989:[[52,56],256],12990:[[52,57],256],12991:[[53,48],256],12992:[[49,26376],256],12993:[[50,26376],256],12994:[[51,26376],256],12995:[[52,26376],256],12996:[[53,26376],256],12997:[[54,26376],256],12998:[[55,26376],256],12999:[[56,26376],256],13000:[[57,26376],256],13001:[[49,48,26376],256],13002:[[49,49,26376],256],13003:[[49,50,26376],256],13004:[[72,103],256],13005:[[101,114,103],256],13006:[[101,86],256],13007:[[76,84,68],256],13008:[[12450],256],13009:[[12452],256],13010:[[12454],256],13011:[[12456],256],13012:[[12458],256],13013:[[12459],256],13014:[[12461],256],13015:[[12463],256],13016:[[12465],256],13017:[[12467],256],13018:[[12469],256],13019:[[12471],256],13020:[[12473],256],13021:[[12475],256],13022:[[12477],256],13023:[[12479],256],13024:[[12481],256],13025:[[12484],256],13026:[[12486],256],13027:[[12488],256],13028:[[12490],256],13029:[[12491],256],13030:[[12492],256],13031:[[12493],256],13032:[[12494],256],13033:[[12495],256],13034:[[12498],256],13035:[[12501],256],13036:[[12504],256],13037:[[12507],256],13038:[[12510],256],13039:[[12511],256],13040:[[12512],256],13041:[[12513],256],13042:[[12514],256],13043:[[12516],256],13044:[[12518],256],13045:[[12520],256],13046:[[12521],256],13047:[[12522],256],13048:[[12523],256],13049:[[12524],256],13050:[[12525],256],13051:[[12527],256],13052:[[12528],256],13053:[[12529],256],13054:[[12530],256]},
+13056:{13056:[[12450,12497,12540,12488],256],13057:[[12450,12523,12501,12449],256],13058:[[12450,12531,12506,12450],256],13059:[[12450,12540,12523],256],13060:[[12452,12491,12531,12464],256],13061:[[12452,12531,12481],256],13062:[[12454,12457,12531],256],13063:[[12456,12473,12463,12540,12489],256],13064:[[12456,12540,12459,12540],256],13065:[[12458,12531,12473],256],13066:[[12458,12540,12512],256],13067:[[12459,12452,12522],256],13068:[[12459,12521,12483,12488],256],13069:[[12459,12525,12522,12540],256],13070:[[12460,12525,12531],256],13071:[[12460,12531,12510],256],13072:[[12462,12460],256],13073:[[12462,12491,12540],256],13074:[[12461,12517,12522,12540],256],13075:[[12462,12523,12480,12540],256],13076:[[12461,12525],256],13077:[[12461,12525,12464,12521,12512],256],13078:[[12461,12525,12513,12540,12488,12523],256],13079:[[12461,12525,12527,12483,12488],256],13080:[[12464,12521,12512],256],13081:[[12464,12521,12512,12488,12531],256],13082:[[12463,12523,12476,12452,12525],256],13083:[[12463,12525,12540,12493],256],13084:[[12465,12540,12473],256],13085:[[12467,12523,12490],256],13086:[[12467,12540,12509],256],13087:[[12469,12452,12463,12523],256],13088:[[12469,12531,12481,12540,12512],256],13089:[[12471,12522,12531,12464],256],13090:[[12475,12531,12481],256],13091:[[12475,12531,12488],256],13092:[[12480,12540,12473],256],13093:[[12487,12471],256],13094:[[12489,12523],256],13095:[[12488,12531],256],13096:[[12490,12494],256],13097:[[12494,12483,12488],256],13098:[[12495,12452,12484],256],13099:[[12497,12540,12475,12531,12488],256],13100:[[12497,12540,12484],256],13101:[[12496,12540,12524,12523],256],13102:[[12500,12450,12473,12488,12523],256],13103:[[12500,12463,12523],256],13104:[[12500,12467],256],13105:[[12499,12523],256],13106:[[12501,12449,12521,12483,12489],256],13107:[[12501,12451,12540,12488],256],13108:[[12502,12483,12471,12455,12523],256],13109:[[12501,12521,12531],256],13110:[[12504,12463,12479,12540,12523],256],13111:[[12506,12477],256],13112:[[12506,12491,12498],256],13113:[[12504,12523,12484],256],13114:[[12506,12531,12473],256],13115:[[12506,12540,12472],256],13116:[[12505,12540,12479],256],13117:[[12509,12452,12531,12488],256],13118:[[12508,12523,12488],256],13119:[[12507,12531],256],13120:[[12509,12531,12489],256],13121:[[12507,12540,12523],256],13122:[[12507,12540,12531],256],13123:[[12510,12452,12463,12525],256],13124:[[12510,12452,12523],256],13125:[[12510,12483,12495],256],13126:[[12510,12523,12463],256],13127:[[12510,12531,12471,12519,12531],256],13128:[[12511,12463,12525,12531],256],13129:[[12511,12522],256],13130:[[12511,12522,12496,12540,12523],256],13131:[[12513,12460],256],13132:[[12513,12460,12488,12531],256],13133:[[12513,12540,12488,12523],256],13134:[[12516,12540,12489],256],13135:[[12516,12540,12523],256],13136:[[12518,12450,12531],256],13137:[[12522,12483,12488,12523],256],13138:[[12522,12521],256],13139:[[12523,12500,12540],256],13140:[[12523,12540,12502,12523],256],13141:[[12524,12512],256],13142:[[12524,12531,12488,12466,12531],256],13143:[[12527,12483,12488],256],13144:[[48,28857],256],13145:[[49,28857],256],13146:[[50,28857],256],13147:[[51,28857],256],13148:[[52,28857],256],13149:[[53,28857],256],13150:[[54,28857],256],13151:[[55,28857],256],13152:[[56,28857],256],13153:[[57,28857],256],13154:[[49,48,28857],256],13155:[[49,49,28857],256],13156:[[49,50,28857],256],13157:[[49,51,28857],256],13158:[[49,52,28857],256],13159:[[49,53,28857],256],13160:[[49,54,28857],256],13161:[[49,55,28857],256],13162:[[49,56,28857],256],13163:[[49,57,28857],256],13164:[[50,48,28857],256],13165:[[50,49,28857],256],13166:[[50,50,28857],256],13167:[[50,51,28857],256],13168:[[50,52,28857],256],13169:[[104,80,97],256],13170:[[100,97],256],13171:[[65,85],256],13172:[[98,97,114],256],13173:[[111,86],256],13174:[[112,99],256],13175:[[100,109],256],13176:[[100,109,178],256],13177:[[100,109,179],256],13178:[[73,85],256],13179:[[24179,25104],256],13180:[[26157,21644],256],13181:[[22823,27491],256],13182:[[26126,27835],256],13183:[[26666,24335,20250,31038],256],13184:[[112,65],256],13185:[[110,65],256],13186:[[956,65],256],13187:[[109,65],256],13188:[[107,65],256],13189:[[75,66],256],13190:[[77,66],256],13191:[[71,66],256],13192:[[99,97,108],256],13193:[[107,99,97,108],256],13194:[[112,70],256],13195:[[110,70],256],13196:[[956,70],256],13197:[[956,103],256],13198:[[109,103],256],13199:[[107,103],256],13200:[[72,122],256],13201:[[107,72,122],256],13202:[[77,72,122],256],13203:[[71,72,122],256],13204:[[84,72,122],256],13205:[[956,8467],256],13206:[[109,8467],256],13207:[[100,8467],256],13208:[[107,8467],256],13209:[[102,109],256],13210:[[110,109],256],13211:[[956,109],256],13212:[[109,109],256],13213:[[99,109],256],13214:[[107,109],256],13215:[[109,109,178],256],13216:[[99,109,178],256],13217:[[109,178],256],13218:[[107,109,178],256],13219:[[109,109,179],256],13220:[[99,109,179],256],13221:[[109,179],256],13222:[[107,109,179],256],13223:[[109,8725,115],256],13224:[[109,8725,115,178],256],13225:[[80,97],256],13226:[[107,80,97],256],13227:[[77,80,97],256],13228:[[71,80,97],256],13229:[[114,97,100],256],13230:[[114,97,100,8725,115],256],13231:[[114,97,100,8725,115,178],256],13232:[[112,115],256],13233:[[110,115],256],13234:[[956,115],256],13235:[[109,115],256],13236:[[112,86],256],13237:[[110,86],256],13238:[[956,86],256],13239:[[109,86],256],13240:[[107,86],256],13241:[[77,86],256],13242:[[112,87],256],13243:[[110,87],256],13244:[[956,87],256],13245:[[109,87],256],13246:[[107,87],256],13247:[[77,87],256],13248:[[107,937],256],13249:[[77,937],256],13250:[[97,46,109,46],256],13251:[[66,113],256],13252:[[99,99],256],13253:[[99,100],256],13254:[[67,8725,107,103],256],13255:[[67,111,46],256],13256:[[100,66],256],13257:[[71,121],256],13258:[[104,97],256],13259:[[72,80],256],13260:[[105,110],256],13261:[[75,75],256],13262:[[75,77],256],13263:[[107,116],256],13264:[[108,109],256],13265:[[108,110],256],13266:[[108,111,103],256],13267:[[108,120],256],13268:[[109,98],256],13269:[[109,105,108],256],13270:[[109,111,108],256],13271:[[80,72],256],13272:[[112,46,109,46],256],13273:[[80,80,77],256],13274:[[80,82],256],13275:[[115,114],256],13276:[[83,118],256],13277:[[87,98],256],13278:[[86,8725,109],256],13279:[[65,8725,109],256],13280:[[49,26085],256],13281:[[50,26085],256],13282:[[51,26085],256],13283:[[52,26085],256],13284:[[53,26085],256],13285:[[54,26085],256],13286:[[55,26085],256],13287:[[56,26085],256],13288:[[57,26085],256],13289:[[49,48,26085],256],13290:[[49,49,26085],256],13291:[[49,50,26085],256],13292:[[49,51,26085],256],13293:[[49,52,26085],256],13294:[[49,53,26085],256],13295:[[49,54,26085],256],13296:[[49,55,26085],256],13297:[[49,56,26085],256],13298:[[49,57,26085],256],13299:[[50,48,26085],256],13300:[[50,49,26085],256],13301:[[50,50,26085],256],13302:[[50,51,26085],256],13303:[[50,52,26085],256],13304:[[50,53,26085],256],13305:[[50,54,26085],256],13306:[[50,55,26085],256],13307:[[50,56,26085],256],13308:[[50,57,26085],256],13309:[[51,48,26085],256],13310:[[51,49,26085],256],13311:[[103,97,108],256]},
+27136:{92912:[,1],92913:[,1],92914:[,1],92915:[,1],92916:[,1]},
+27392:{92976:[,230],92977:[,230],92978:[,230],92979:[,230],92980:[,230],92981:[,230],92982:[,230]},
+42496:{42607:[,230],42612:[,230],42613:[,230],42614:[,230],42615:[,230],42616:[,230],42617:[,230],42618:[,230],42619:[,230],42620:[,230],42621:[,230],42652:[[1098],256],42653:[[1100],256],42655:[,230],42736:[,230],42737:[,230]},
+42752:{42864:[[42863],256],43000:[[294],256],43001:[[339],256]},
+43008:{43014:[,9],43204:[,9],43232:[,230],43233:[,230],43234:[,230],43235:[,230],43236:[,230],43237:[,230],43238:[,230],43239:[,230],43240:[,230],43241:[,230],43242:[,230],43243:[,230],43244:[,230],43245:[,230],43246:[,230],43247:[,230],43248:[,230],43249:[,230]},
+43264:{43307:[,220],43308:[,220],43309:[,220],43347:[,9],43443:[,7],43456:[,9]},
+43520:{43696:[,230],43698:[,230],43699:[,230],43700:[,220],43703:[,230],43704:[,230],43710:[,230],43711:[,230],43713:[,230],43766:[,9]},
+43776:{43868:[[42791],256],43869:[[43831],256],43870:[[619],256],43871:[[43858],256],44013:[,9]},
+48128:{113822:[,1]},
+53504:{119134:[[119127,119141],512],119135:[[119128,119141],512],119136:[[119135,119150],512],119137:[[119135,119151],512],119138:[[119135,119152],512],119139:[[119135,119153],512],119140:[[119135,119154],512],119141:[,216],119142:[,216],119143:[,1],119144:[,1],119145:[,1],119149:[,226],119150:[,216],119151:[,216],119152:[,216],119153:[,216],119154:[,216],119163:[,220],119164:[,220],119165:[,220],119166:[,220],119167:[,220],119168:[,220],119169:[,220],119170:[,220],119173:[,230],119174:[,230],119175:[,230],119176:[,230],119177:[,230],119178:[,220],119179:[,220],119210:[,230],119211:[,230],119212:[,230],119213:[,230],119227:[[119225,119141],512],119228:[[119226,119141],512],119229:[[119227,119150],512],119230:[[119228,119150],512],119231:[[119227,119151],512],119232:[[119228,119151],512]},
+53760:{119362:[,230],119363:[,230],119364:[,230]},
+54272:{119808:[[65],256],119809:[[66],256],119810:[[67],256],119811:[[68],256],119812:[[69],256],119813:[[70],256],119814:[[71],256],119815:[[72],256],119816:[[73],256],119817:[[74],256],119818:[[75],256],119819:[[76],256],119820:[[77],256],119821:[[78],256],119822:[[79],256],119823:[[80],256],119824:[[81],256],119825:[[82],256],119826:[[83],256],119827:[[84],256],119828:[[85],256],119829:[[86],256],119830:[[87],256],119831:[[88],256],119832:[[89],256],119833:[[90],256],119834:[[97],256],119835:[[98],256],119836:[[99],256],119837:[[100],256],119838:[[101],256],119839:[[102],256],119840:[[103],256],119841:[[104],256],119842:[[105],256],119843:[[106],256],119844:[[107],256],119845:[[108],256],119846:[[109],256],119847:[[110],256],119848:[[111],256],119849:[[112],256],119850:[[113],256],119851:[[114],256],119852:[[115],256],119853:[[116],256],119854:[[117],256],119855:[[118],256],119856:[[119],256],119857:[[120],256],119858:[[121],256],119859:[[122],256],119860:[[65],256],119861:[[66],256],119862:[[67],256],119863:[[68],256],119864:[[69],256],119865:[[70],256],119866:[[71],256],119867:[[72],256],119868:[[73],256],119869:[[74],256],119870:[[75],256],119871:[[76],256],119872:[[77],256],119873:[[78],256],119874:[[79],256],119875:[[80],256],119876:[[81],256],119877:[[82],256],119878:[[83],256],119879:[[84],256],119880:[[85],256],119881:[[86],256],119882:[[87],256],119883:[[88],256],119884:[[89],256],119885:[[90],256],119886:[[97],256],119887:[[98],256],119888:[[99],256],119889:[[100],256],119890:[[101],256],119891:[[102],256],119892:[[103],256],119894:[[105],256],119895:[[106],256],119896:[[107],256],119897:[[108],256],119898:[[109],256],119899:[[110],256],119900:[[111],256],119901:[[112],256],119902:[[113],256],119903:[[114],256],119904:[[115],256],119905:[[116],256],119906:[[117],256],119907:[[118],256],119908:[[119],256],119909:[[120],256],119910:[[121],256],119911:[[122],256],119912:[[65],256],119913:[[66],256],119914:[[67],256],119915:[[68],256],119916:[[69],256],119917:[[70],256],119918:[[71],256],119919:[[72],256],119920:[[73],256],119921:[[74],256],119922:[[75],256],119923:[[76],256],119924:[[77],256],119925:[[78],256],119926:[[79],256],119927:[[80],256],119928:[[81],256],119929:[[82],256],119930:[[83],256],119931:[[84],256],119932:[[85],256],119933:[[86],256],119934:[[87],256],119935:[[88],256],119936:[[89],256],119937:[[90],256],119938:[[97],256],119939:[[98],256],119940:[[99],256],119941:[[100],256],119942:[[101],256],119943:[[102],256],119944:[[103],256],119945:[[104],256],119946:[[105],256],119947:[[106],256],119948:[[107],256],119949:[[108],256],119950:[[109],256],119951:[[110],256],119952:[[111],256],119953:[[112],256],119954:[[113],256],119955:[[114],256],119956:[[115],256],119957:[[116],256],119958:[[117],256],119959:[[118],256],119960:[[119],256],119961:[[120],256],119962:[[121],256],119963:[[122],256],119964:[[65],256],119966:[[67],256],119967:[[68],256],119970:[[71],256],119973:[[74],256],119974:[[75],256],119977:[[78],256],119978:[[79],256],119979:[[80],256],119980:[[81],256],119982:[[83],256],119983:[[84],256],119984:[[85],256],119985:[[86],256],119986:[[87],256],119987:[[88],256],119988:[[89],256],119989:[[90],256],119990:[[97],256],119991:[[98],256],119992:[[99],256],119993:[[100],256],119995:[[102],256],119997:[[104],256],119998:[[105],256],119999:[[106],256],120000:[[107],256],120001:[[108],256],120002:[[109],256],120003:[[110],256],120005:[[112],256],120006:[[113],256],120007:[[114],256],120008:[[115],256],120009:[[116],256],120010:[[117],256],120011:[[118],256],120012:[[119],256],120013:[[120],256],120014:[[121],256],120015:[[122],256],120016:[[65],256],120017:[[66],256],120018:[[67],256],120019:[[68],256],120020:[[69],256],120021:[[70],256],120022:[[71],256],120023:[[72],256],120024:[[73],256],120025:[[74],256],120026:[[75],256],120027:[[76],256],120028:[[77],256],120029:[[78],256],120030:[[79],256],120031:[[80],256],120032:[[81],256],120033:[[82],256],120034:[[83],256],120035:[[84],256],120036:[[85],256],120037:[[86],256],120038:[[87],256],120039:[[88],256],120040:[[89],256],120041:[[90],256],120042:[[97],256],120043:[[98],256],120044:[[99],256],120045:[[100],256],120046:[[101],256],120047:[[102],256],120048:[[103],256],120049:[[104],256],120050:[[105],256],120051:[[106],256],120052:[[107],256],120053:[[108],256],120054:[[109],256],120055:[[110],256],120056:[[111],256],120057:[[112],256],120058:[[113],256],120059:[[114],256],120060:[[115],256],120061:[[116],256],120062:[[117],256],120063:[[118],256]},
+54528:{120064:[[119],256],120065:[[120],256],120066:[[121],256],120067:[[122],256],120068:[[65],256],120069:[[66],256],120071:[[68],256],120072:[[69],256],120073:[[70],256],120074:[[71],256],120077:[[74],256],120078:[[75],256],120079:[[76],256],120080:[[77],256],120081:[[78],256],120082:[[79],256],120083:[[80],256],120084:[[81],256],120086:[[83],256],120087:[[84],256],120088:[[85],256],120089:[[86],256],120090:[[87],256],120091:[[88],256],120092:[[89],256],120094:[[97],256],120095:[[98],256],120096:[[99],256],120097:[[100],256],120098:[[101],256],120099:[[102],256],120100:[[103],256],120101:[[104],256],120102:[[105],256],120103:[[106],256],120104:[[107],256],120105:[[108],256],120106:[[109],256],120107:[[110],256],120108:[[111],256],120109:[[112],256],120110:[[113],256],120111:[[114],256],120112:[[115],256],120113:[[116],256],120114:[[117],256],120115:[[118],256],120116:[[119],256],120117:[[120],256],120118:[[121],256],120119:[[122],256],120120:[[65],256],120121:[[66],256],120123:[[68],256],120124:[[69],256],120125:[[70],256],120126:[[71],256],120128:[[73],256],120129:[[74],256],120130:[[75],256],120131:[[76],256],120132:[[77],256],120134:[[79],256],120138:[[83],256],120139:[[84],256],120140:[[85],256],120141:[[86],256],120142:[[87],256],120143:[[88],256],120144:[[89],256],120146:[[97],256],120147:[[98],256],120148:[[99],256],120149:[[100],256],120150:[[101],256],120151:[[102],256],120152:[[103],256],120153:[[104],256],120154:[[105],256],120155:[[106],256],120156:[[107],256],120157:[[108],256],120158:[[109],256],120159:[[110],256],120160:[[111],256],120161:[[112],256],120162:[[113],256],120163:[[114],256],120164:[[115],256],120165:[[116],256],120166:[[117],256],120167:[[118],256],120168:[[119],256],120169:[[120],256],120170:[[121],256],120171:[[122],256],120172:[[65],256],120173:[[66],256],120174:[[67],256],120175:[[68],256],120176:[[69],256],120177:[[70],256],120178:[[71],256],120179:[[72],256],120180:[[73],256],120181:[[74],256],120182:[[75],256],120183:[[76],256],120184:[[77],256],120185:[[78],256],120186:[[79],256],120187:[[80],256],120188:[[81],256],120189:[[82],256],120190:[[83],256],120191:[[84],256],120192:[[85],256],120193:[[86],256],120194:[[87],256],120195:[[88],256],120196:[[89],256],120197:[[90],256],120198:[[97],256],120199:[[98],256],120200:[[99],256],120201:[[100],256],120202:[[101],256],120203:[[102],256],120204:[[103],256],120205:[[104],256],120206:[[105],256],120207:[[106],256],120208:[[107],256],120209:[[108],256],120210:[[109],256],120211:[[110],256],120212:[[111],256],120213:[[112],256],120214:[[113],256],120215:[[114],256],120216:[[115],256],120217:[[116],256],120218:[[117],256],120219:[[118],256],120220:[[119],256],120221:[[120],256],120222:[[121],256],120223:[[122],256],120224:[[65],256],120225:[[66],256],120226:[[67],256],120227:[[68],256],120228:[[69],256],120229:[[70],256],120230:[[71],256],120231:[[72],256],120232:[[73],256],120233:[[74],256],120234:[[75],256],120235:[[76],256],120236:[[77],256],120237:[[78],256],120238:[[79],256],120239:[[80],256],120240:[[81],256],120241:[[82],256],120242:[[83],256],120243:[[84],256],120244:[[85],256],120245:[[86],256],120246:[[87],256],120247:[[88],256],120248:[[89],256],120249:[[90],256],120250:[[97],256],120251:[[98],256],120252:[[99],256],120253:[[100],256],120254:[[101],256],120255:[[102],256],120256:[[103],256],120257:[[104],256],120258:[[105],256],120259:[[106],256],120260:[[107],256],120261:[[108],256],120262:[[109],256],120263:[[110],256],120264:[[111],256],120265:[[112],256],120266:[[113],256],120267:[[114],256],120268:[[115],256],120269:[[116],256],120270:[[117],256],120271:[[118],256],120272:[[119],256],120273:[[120],256],120274:[[121],256],120275:[[122],256],120276:[[65],256],120277:[[66],256],120278:[[67],256],120279:[[68],256],120280:[[69],256],120281:[[70],256],120282:[[71],256],120283:[[72],256],120284:[[73],256],120285:[[74],256],120286:[[75],256],120287:[[76],256],120288:[[77],256],120289:[[78],256],120290:[[79],256],120291:[[80],256],120292:[[81],256],120293:[[82],256],120294:[[83],256],120295:[[84],256],120296:[[85],256],120297:[[86],256],120298:[[87],256],120299:[[88],256],120300:[[89],256],120301:[[90],256],120302:[[97],256],120303:[[98],256],120304:[[99],256],120305:[[100],256],120306:[[101],256],120307:[[102],256],120308:[[103],256],120309:[[104],256],120310:[[105],256],120311:[[106],256],120312:[[107],256],120313:[[108],256],120314:[[109],256],120315:[[110],256],120316:[[111],256],120317:[[112],256],120318:[[113],256],120319:[[114],256]},
+54784:{120320:[[115],256],120321:[[116],256],120322:[[117],256],120323:[[118],256],120324:[[119],256],120325:[[120],256],120326:[[121],256],120327:[[122],256],120328:[[65],256],120329:[[66],256],120330:[[67],256],120331:[[68],256],120332:[[69],256],120333:[[70],256],120334:[[71],256],120335:[[72],256],120336:[[73],256],120337:[[74],256],120338:[[75],256],120339:[[76],256],120340:[[77],256],120341:[[78],256],120342:[[79],256],120343:[[80],256],120344:[[81],256],120345:[[82],256],120346:[[83],256],120347:[[84],256],120348:[[85],256],120349:[[86],256],120350:[[87],256],120351:[[88],256],120352:[[89],256],120353:[[90],256],120354:[[97],256],120355:[[98],256],120356:[[99],256],120357:[[100],256],120358:[[101],256],120359:[[102],256],120360:[[103],256],120361:[[104],256],120362:[[105],256],120363:[[106],256],120364:[[107],256],120365:[[108],256],120366:[[109],256],120367:[[110],256],120368:[[111],256],120369:[[112],256],120370:[[113],256],120371:[[114],256],120372:[[115],256],120373:[[116],256],120374:[[117],256],120375:[[118],256],120376:[[119],256],120377:[[120],256],120378:[[121],256],120379:[[122],256],120380:[[65],256],120381:[[66],256],120382:[[67],256],120383:[[68],256],120384:[[69],256],120385:[[70],256],120386:[[71],256],120387:[[72],256],120388:[[73],256],120389:[[74],256],120390:[[75],256],120391:[[76],256],120392:[[77],256],120393:[[78],256],120394:[[79],256],120395:[[80],256],120396:[[81],256],120397:[[82],256],120398:[[83],256],120399:[[84],256],120400:[[85],256],120401:[[86],256],120402:[[87],256],120403:[[88],256],120404:[[89],256],120405:[[90],256],120406:[[97],256],120407:[[98],256],120408:[[99],256],120409:[[100],256],120410:[[101],256],120411:[[102],256],120412:[[103],256],120413:[[104],256],120414:[[105],256],120415:[[106],256],120416:[[107],256],120417:[[108],256],120418:[[109],256],120419:[[110],256],120420:[[111],256],120421:[[112],256],120422:[[113],256],120423:[[114],256],120424:[[115],256],120425:[[116],256],120426:[[117],256],120427:[[118],256],120428:[[119],256],120429:[[120],256],120430:[[121],256],120431:[[122],256],120432:[[65],256],120433:[[66],256],120434:[[67],256],120435:[[68],256],120436:[[69],256],120437:[[70],256],120438:[[71],256],120439:[[72],256],120440:[[73],256],120441:[[74],256],120442:[[75],256],120443:[[76],256],120444:[[77],256],120445:[[78],256],120446:[[79],256],120447:[[80],256],120448:[[81],256],120449:[[82],256],120450:[[83],256],120451:[[84],256],120452:[[85],256],120453:[[86],256],120454:[[87],256],120455:[[88],256],120456:[[89],256],120457:[[90],256],120458:[[97],256],120459:[[98],256],120460:[[99],256],120461:[[100],256],120462:[[101],256],120463:[[102],256],120464:[[103],256],120465:[[104],256],120466:[[105],256],120467:[[106],256],120468:[[107],256],120469:[[108],256],120470:[[109],256],120471:[[110],256],120472:[[111],256],120473:[[112],256],120474:[[113],256],120475:[[114],256],120476:[[115],256],120477:[[116],256],120478:[[117],256],120479:[[118],256],120480:[[119],256],120481:[[120],256],120482:[[121],256],120483:[[122],256],120484:[[305],256],120485:[[567],256],120488:[[913],256],120489:[[914],256],120490:[[915],256],120491:[[916],256],120492:[[917],256],120493:[[918],256],120494:[[919],256],120495:[[920],256],120496:[[921],256],120497:[[922],256],120498:[[923],256],120499:[[924],256],120500:[[925],256],120501:[[926],256],120502:[[927],256],120503:[[928],256],120504:[[929],256],120505:[[1012],256],120506:[[931],256],120507:[[932],256],120508:[[933],256],120509:[[934],256],120510:[[935],256],120511:[[936],256],120512:[[937],256],120513:[[8711],256],120514:[[945],256],120515:[[946],256],120516:[[947],256],120517:[[948],256],120518:[[949],256],120519:[[950],256],120520:[[951],256],120521:[[952],256],120522:[[953],256],120523:[[954],256],120524:[[955],256],120525:[[956],256],120526:[[957],256],120527:[[958],256],120528:[[959],256],120529:[[960],256],120530:[[961],256],120531:[[962],256],120532:[[963],256],120533:[[964],256],120534:[[965],256],120535:[[966],256],120536:[[967],256],120537:[[968],256],120538:[[969],256],120539:[[8706],256],120540:[[1013],256],120541:[[977],256],120542:[[1008],256],120543:[[981],256],120544:[[1009],256],120545:[[982],256],120546:[[913],256],120547:[[914],256],120548:[[915],256],120549:[[916],256],120550:[[917],256],120551:[[918],256],120552:[[919],256],120553:[[920],256],120554:[[921],256],120555:[[922],256],120556:[[923],256],120557:[[924],256],120558:[[925],256],120559:[[926],256],120560:[[927],256],120561:[[928],256],120562:[[929],256],120563:[[1012],256],120564:[[931],256],120565:[[932],256],120566:[[933],256],120567:[[934],256],120568:[[935],256],120569:[[936],256],120570:[[937],256],120571:[[8711],256],120572:[[945],256],120573:[[946],256],120574:[[947],256],120575:[[948],256]},
+55040:{120576:[[949],256],120577:[[950],256],120578:[[951],256],120579:[[952],256],120580:[[953],256],120581:[[954],256],120582:[[955],256],120583:[[956],256],120584:[[957],256],120585:[[958],256],120586:[[959],256],120587:[[960],256],120588:[[961],256],120589:[[962],256],120590:[[963],256],120591:[[964],256],120592:[[965],256],120593:[[966],256],120594:[[967],256],120595:[[968],256],120596:[[969],256],120597:[[8706],256],120598:[[1013],256],120599:[[977],256],120600:[[1008],256],120601:[[981],256],120602:[[1009],256],120603:[[982],256],120604:[[913],256],120605:[[914],256],120606:[[915],256],120607:[[916],256],120608:[[917],256],120609:[[918],256],120610:[[919],256],120611:[[920],256],120612:[[921],256],120613:[[922],256],120614:[[923],256],120615:[[924],256],120616:[[925],256],120617:[[926],256],120618:[[927],256],120619:[[928],256],120620:[[929],256],120621:[[1012],256],120622:[[931],256],120623:[[932],256],120624:[[933],256],120625:[[934],256],120626:[[935],256],120627:[[936],256],120628:[[937],256],120629:[[8711],256],120630:[[945],256],120631:[[946],256],120632:[[947],256],120633:[[948],256],120634:[[949],256],120635:[[950],256],120636:[[951],256],120637:[[952],256],120638:[[953],256],120639:[[954],256],120640:[[955],256],120641:[[956],256],120642:[[957],256],120643:[[958],256],120644:[[959],256],120645:[[960],256],120646:[[961],256],120647:[[962],256],120648:[[963],256],120649:[[964],256],120650:[[965],256],120651:[[966],256],120652:[[967],256],120653:[[968],256],120654:[[969],256],120655:[[8706],256],120656:[[1013],256],120657:[[977],256],120658:[[1008],256],120659:[[981],256],120660:[[1009],256],120661:[[982],256],120662:[[913],256],120663:[[914],256],120664:[[915],256],120665:[[916],256],120666:[[917],256],120667:[[918],256],120668:[[919],256],120669:[[920],256],120670:[[921],256],120671:[[922],256],120672:[[923],256],120673:[[924],256],120674:[[925],256],120675:[[926],256],120676:[[927],256],120677:[[928],256],120678:[[929],256],120679:[[1012],256],120680:[[931],256],120681:[[932],256],120682:[[933],256],120683:[[934],256],120684:[[935],256],120685:[[936],256],120686:[[937],256],120687:[[8711],256],120688:[[945],256],120689:[[946],256],120690:[[947],256],120691:[[948],256],120692:[[949],256],120693:[[950],256],120694:[[951],256],120695:[[952],256],120696:[[953],256],120697:[[954],256],120698:[[955],256],120699:[[956],256],120700:[[957],256],120701:[[958],256],120702:[[959],256],120703:[[960],256],120704:[[961],256],120705:[[962],256],120706:[[963],256],120707:[[964],256],120708:[[965],256],120709:[[966],256],120710:[[967],256],120711:[[968],256],120712:[[969],256],120713:[[8706],256],120714:[[1013],256],120715:[[977],256],120716:[[1008],256],120717:[[981],256],120718:[[1009],256],120719:[[982],256],120720:[[913],256],120721:[[914],256],120722:[[915],256],120723:[[916],256],120724:[[917],256],120725:[[918],256],120726:[[919],256],120727:[[920],256],120728:[[921],256],120729:[[922],256],120730:[[923],256],120731:[[924],256],120732:[[925],256],120733:[[926],256],120734:[[927],256],120735:[[928],256],120736:[[929],256],120737:[[1012],256],120738:[[931],256],120739:[[932],256],120740:[[933],256],120741:[[934],256],120742:[[935],256],120743:[[936],256],120744:[[937],256],120745:[[8711],256],120746:[[945],256],120747:[[946],256],120748:[[947],256],120749:[[948],256],120750:[[949],256],120751:[[950],256],120752:[[951],256],120753:[[952],256],120754:[[953],256],120755:[[954],256],120756:[[955],256],120757:[[956],256],120758:[[957],256],120759:[[958],256],120760:[[959],256],120761:[[960],256],120762:[[961],256],120763:[[962],256],120764:[[963],256],120765:[[964],256],120766:[[965],256],120767:[[966],256],120768:[[967],256],120769:[[968],256],120770:[[969],256],120771:[[8706],256],120772:[[1013],256],120773:[[977],256],120774:[[1008],256],120775:[[981],256],120776:[[1009],256],120777:[[982],256],120778:[[988],256],120779:[[989],256],120782:[[48],256],120783:[[49],256],120784:[[50],256],120785:[[51],256],120786:[[52],256],120787:[[53],256],120788:[[54],256],120789:[[55],256],120790:[[56],256],120791:[[57],256],120792:[[48],256],120793:[[49],256],120794:[[50],256],120795:[[51],256],120796:[[52],256],120797:[[53],256],120798:[[54],256],120799:[[55],256],120800:[[56],256],120801:[[57],256],120802:[[48],256],120803:[[49],256],120804:[[50],256],120805:[[51],256],120806:[[52],256],120807:[[53],256],120808:[[54],256],120809:[[55],256],120810:[[56],256],120811:[[57],256],120812:[[48],256],120813:[[49],256],120814:[[50],256],120815:[[51],256],120816:[[52],256],120817:[[53],256],120818:[[54],256],120819:[[55],256],120820:[[56],256],120821:[[57],256],120822:[[48],256],120823:[[49],256],120824:[[50],256],120825:[[51],256],120826:[[52],256],120827:[[53],256],120828:[[54],256],120829:[[55],256],120830:[[56],256],120831:[[57],256]},
+59392:{125136:[,220],125137:[,220],125138:[,220],125139:[,220],125140:[,220],125141:[,220],125142:[,220]},
+60928:{126464:[[1575],256],126465:[[1576],256],126466:[[1580],256],126467:[[1583],256],126469:[[1608],256],126470:[[1586],256],126471:[[1581],256],126472:[[1591],256],126473:[[1610],256],126474:[[1603],256],126475:[[1604],256],126476:[[1605],256],126477:[[1606],256],126478:[[1587],256],126479:[[1593],256],126480:[[1601],256],126481:[[1589],256],126482:[[1602],256],126483:[[1585],256],126484:[[1588],256],126485:[[1578],256],126486:[[1579],256],126487:[[1582],256],126488:[[1584],256],126489:[[1590],256],126490:[[1592],256],126491:[[1594],256],126492:[[1646],256],126493:[[1722],256],126494:[[1697],256],126495:[[1647],256],126497:[[1576],256],126498:[[1580],256],126500:[[1607],256],126503:[[1581],256],126505:[[1610],256],126506:[[1603],256],126507:[[1604],256],126508:[[1605],256],126509:[[1606],256],126510:[[1587],256],126511:[[1593],256],126512:[[1601],256],126513:[[1589],256],126514:[[1602],256],126516:[[1588],256],126517:[[1578],256],126518:[[1579],256],126519:[[1582],256],126521:[[1590],256],126523:[[1594],256],126530:[[1580],256],126535:[[1581],256],126537:[[1610],256],126539:[[1604],256],126541:[[1606],256],126542:[[1587],256],126543:[[1593],256],126545:[[1589],256],126546:[[1602],256],126548:[[1588],256],126551:[[1582],256],126553:[[1590],256],126555:[[1594],256],126557:[[1722],256],126559:[[1647],256],126561:[[1576],256],126562:[[1580],256],126564:[[1607],256],126567:[[1581],256],126568:[[1591],256],126569:[[1610],256],126570:[[1603],256],126572:[[1605],256],126573:[[1606],256],126574:[[1587],256],126575:[[1593],256],126576:[[1601],256],126577:[[1589],256],126578:[[1602],256],126580:[[1588],256],126581:[[1578],256],126582:[[1579],256],126583:[[1582],256],126585:[[1590],256],126586:[[1592],256],126587:[[1594],256],126588:[[1646],256],126590:[[1697],256],126592:[[1575],256],126593:[[1576],256],126594:[[1580],256],126595:[[1583],256],126596:[[1607],256],126597:[[1608],256],126598:[[1586],256],126599:[[1581],256],126600:[[1591],256],126601:[[1610],256],126603:[[1604],256],126604:[[1605],256],126605:[[1606],256],126606:[[1587],256],126607:[[1593],256],126608:[[1601],256],126609:[[1589],256],126610:[[1602],256],126611:[[1585],256],126612:[[1588],256],126613:[[1578],256],126614:[[1579],256],126615:[[1582],256],126616:[[1584],256],126617:[[1590],256],126618:[[1592],256],126619:[[1594],256],126625:[[1576],256],126626:[[1580],256],126627:[[1583],256],126629:[[1608],256],126630:[[1586],256],126631:[[1581],256],126632:[[1591],256],126633:[[1610],256],126635:[[1604],256],126636:[[1605],256],126637:[[1606],256],126638:[[1587],256],126639:[[1593],256],126640:[[1601],256],126641:[[1589],256],126642:[[1602],256],126643:[[1585],256],126644:[[1588],256],126645:[[1578],256],126646:[[1579],256],126647:[[1582],256],126648:[[1584],256],126649:[[1590],256],126650:[[1592],256],126651:[[1594],256]},
+61696:{127232:[[48,46],256],127233:[[48,44],256],127234:[[49,44],256],127235:[[50,44],256],127236:[[51,44],256],127237:[[52,44],256],127238:[[53,44],256],127239:[[54,44],256],127240:[[55,44],256],127241:[[56,44],256],127242:[[57,44],256],127248:[[40,65,41],256],127249:[[40,66,41],256],127250:[[40,67,41],256],127251:[[40,68,41],256],127252:[[40,69,41],256],127253:[[40,70,41],256],127254:[[40,71,41],256],127255:[[40,72,41],256],127256:[[40,73,41],256],127257:[[40,74,41],256],127258:[[40,75,41],256],127259:[[40,76,41],256],127260:[[40,77,41],256],127261:[[40,78,41],256],127262:[[40,79,41],256],127263:[[40,80,41],256],127264:[[40,81,41],256],127265:[[40,82,41],256],127266:[[40,83,41],256],127267:[[40,84,41],256],127268:[[40,85,41],256],127269:[[40,86,41],256],127270:[[40,87,41],256],127271:[[40,88,41],256],127272:[[40,89,41],256],127273:[[40,90,41],256],127274:[[12308,83,12309],256],127275:[[67],256],127276:[[82],256],127277:[[67,68],256],127278:[[87,90],256],127280:[[65],256],127281:[[66],256],127282:[[67],256],127283:[[68],256],127284:[[69],256],127285:[[70],256],127286:[[71],256],127287:[[72],256],127288:[[73],256],127289:[[74],256],127290:[[75],256],127291:[[76],256],127292:[[77],256],127293:[[78],256],127294:[[79],256],127295:[[80],256],127296:[[81],256],127297:[[82],256],127298:[[83],256],127299:[[84],256],127300:[[85],256],127301:[[86],256],127302:[[87],256],127303:[[88],256],127304:[[89],256],127305:[[90],256],127306:[[72,86],256],127307:[[77,86],256],127308:[[83,68],256],127309:[[83,83],256],127310:[[80,80,86],256],127311:[[87,67],256],127338:[[77,67],256],127339:[[77,68],256],127376:[[68,74],256]},
+61952:{127488:[[12411,12363],256],127489:[[12467,12467],256],127490:[[12469],256],127504:[[25163],256],127505:[[23383],256],127506:[[21452],256],127507:[[12487],256],127508:[[20108],256],127509:[[22810],256],127510:[[35299],256],127511:[[22825],256],127512:[[20132],256],127513:[[26144],256],127514:[[28961],256],127515:[[26009],256],127516:[[21069],256],127517:[[24460],256],127518:[[20877],256],127519:[[26032],256],127520:[[21021],256],127521:[[32066],256],127522:[[29983],256],127523:[[36009],256],127524:[[22768],256],127525:[[21561],256],127526:[[28436],256],127527:[[25237],256],127528:[[25429],256],127529:[[19968],256],127530:[[19977],256],127531:[[36938],256],127532:[[24038],256],127533:[[20013],256],127534:[[21491],256],127535:[[25351],256],127536:[[36208],256],127537:[[25171],256],127538:[[31105],256],127539:[[31354],256],127540:[[21512],256],127541:[[28288],256],127542:[[26377],256],127543:[[26376],256],127544:[[30003],256],127545:[[21106],256],127546:[[21942],256],127552:[[12308,26412,12309],256],127553:[[12308,19977,12309],256],127554:[[12308,20108,12309],256],127555:[[12308,23433,12309],256],127556:[[12308,28857,12309],256],127557:[[12308,25171,12309],256],127558:[[12308,30423,12309],256],127559:[[12308,21213,12309],256],127560:[[12308,25943,12309],256],127568:[[24471],256],127569:[[21487],256]},
+63488:{194560:[[20029]],194561:[[20024]],194562:[[20033]],194563:[[131362]],194564:[[20320]],194565:[[20398]],194566:[[20411]],194567:[[20482]],194568:[[20602]],194569:[[20633]],194570:[[20711]],194571:[[20687]],194572:[[13470]],194573:[[132666]],194574:[[20813]],194575:[[20820]],194576:[[20836]],194577:[[20855]],194578:[[132380]],194579:[[13497]],194580:[[20839]],194581:[[20877]],194582:[[132427]],194583:[[20887]],194584:[[20900]],194585:[[20172]],194586:[[20908]],194587:[[20917]],194588:[[168415]],194589:[[20981]],194590:[[20995]],194591:[[13535]],194592:[[21051]],194593:[[21062]],194594:[[21106]],194595:[[21111]],194596:[[13589]],194597:[[21191]],194598:[[21193]],194599:[[21220]],194600:[[21242]],194601:[[21253]],194602:[[21254]],194603:[[21271]],194604:[[21321]],194605:[[21329]],194606:[[21338]],194607:[[21363]],194608:[[21373]],194609:[[21375]],194610:[[21375]],194611:[[21375]],194612:[[133676]],194613:[[28784]],194614:[[21450]],194615:[[21471]],194616:[[133987]],194617:[[21483]],194618:[[21489]],194619:[[21510]],194620:[[21662]],194621:[[21560]],194622:[[21576]],194623:[[21608]],194624:[[21666]],194625:[[21750]],194626:[[21776]],194627:[[21843]],194628:[[21859]],194629:[[21892]],194630:[[21892]],194631:[[21913]],194632:[[21931]],194633:[[21939]],194634:[[21954]],194635:[[22294]],194636:[[22022]],194637:[[22295]],194638:[[22097]],194639:[[22132]],194640:[[20999]],194641:[[22766]],194642:[[22478]],194643:[[22516]],194644:[[22541]],194645:[[22411]],194646:[[22578]],194647:[[22577]],194648:[[22700]],194649:[[136420]],194650:[[22770]],194651:[[22775]],194652:[[22790]],194653:[[22810]],194654:[[22818]],194655:[[22882]],194656:[[136872]],194657:[[136938]],194658:[[23020]],194659:[[23067]],194660:[[23079]],194661:[[23000]],194662:[[23142]],194663:[[14062]],194664:[[14076]],194665:[[23304]],194666:[[23358]],194667:[[23358]],194668:[[137672]],194669:[[23491]],194670:[[23512]],194671:[[23527]],194672:[[23539]],194673:[[138008]],194674:[[23551]],194675:[[23558]],194676:[[24403]],194677:[[23586]],194678:[[14209]],194679:[[23648]],194680:[[23662]],194681:[[23744]],194682:[[23693]],194683:[[138724]],194684:[[23875]],194685:[[138726]],194686:[[23918]],194687:[[23915]],194688:[[23932]],194689:[[24033]],194690:[[24034]],194691:[[14383]],194692:[[24061]],194693:[[24104]],194694:[[24125]],194695:[[24169]],194696:[[14434]],194697:[[139651]],194698:[[14460]],194699:[[24240]],194700:[[24243]],194701:[[24246]],194702:[[24266]],194703:[[172946]],194704:[[24318]],194705:[[140081]],194706:[[140081]],194707:[[33281]],194708:[[24354]],194709:[[24354]],194710:[[14535]],194711:[[144056]],194712:[[156122]],194713:[[24418]],194714:[[24427]],194715:[[14563]],194716:[[24474]],194717:[[24525]],194718:[[24535]],194719:[[24569]],194720:[[24705]],194721:[[14650]],194722:[[14620]],194723:[[24724]],194724:[[141012]],194725:[[24775]],194726:[[24904]],194727:[[24908]],194728:[[24910]],194729:[[24908]],194730:[[24954]],194731:[[24974]],194732:[[25010]],194733:[[24996]],194734:[[25007]],194735:[[25054]],194736:[[25074]],194737:[[25078]],194738:[[25104]],194739:[[25115]],194740:[[25181]],194741:[[25265]],194742:[[25300]],194743:[[25424]],194744:[[142092]],194745:[[25405]],194746:[[25340]],194747:[[25448]],194748:[[25475]],194749:[[25572]],194750:[[142321]],194751:[[25634]],194752:[[25541]],194753:[[25513]],194754:[[14894]],194755:[[25705]],194756:[[25726]],194757:[[25757]],194758:[[25719]],194759:[[14956]],194760:[[25935]],194761:[[25964]],194762:[[143370]],194763:[[26083]],194764:[[26360]],194765:[[26185]],194766:[[15129]],194767:[[26257]],194768:[[15112]],194769:[[15076]],194770:[[20882]],194771:[[20885]],194772:[[26368]],194773:[[26268]],194774:[[32941]],194775:[[17369]],194776:[[26391]],194777:[[26395]],194778:[[26401]],194779:[[26462]],194780:[[26451]],194781:[[144323]],194782:[[15177]],194783:[[26618]],194784:[[26501]],194785:[[26706]],194786:[[26757]],194787:[[144493]],194788:[[26766]],194789:[[26655]],194790:[[26900]],194791:[[15261]],194792:[[26946]],194793:[[27043]],194794:[[27114]],194795:[[27304]],194796:[[145059]],194797:[[27355]],194798:[[15384]],194799:[[27425]],194800:[[145575]],194801:[[27476]],194802:[[15438]],194803:[[27506]],194804:[[27551]],194805:[[27578]],194806:[[27579]],194807:[[146061]],194808:[[138507]],194809:[[146170]],194810:[[27726]],194811:[[146620]],194812:[[27839]],194813:[[27853]],194814:[[27751]],194815:[[27926]]},
+63744:{63744:[[35912]],63745:[[26356]],63746:[[36554]],63747:[[36040]],63748:[[28369]],63749:[[20018]],63750:[[21477]],63751:[[40860]],63752:[[40860]],63753:[[22865]],63754:[[37329]],63755:[[21895]],63756:[[22856]],63757:[[25078]],63758:[[30313]],63759:[[32645]],63760:[[34367]],63761:[[34746]],63762:[[35064]],63763:[[37007]],63764:[[27138]],63765:[[27931]],63766:[[28889]],63767:[[29662]],63768:[[33853]],63769:[[37226]],63770:[[39409]],63771:[[20098]],63772:[[21365]],63773:[[27396]],63774:[[29211]],63775:[[34349]],63776:[[40478]],63777:[[23888]],63778:[[28651]],63779:[[34253]],63780:[[35172]],63781:[[25289]],63782:[[33240]],63783:[[34847]],63784:[[24266]],63785:[[26391]],63786:[[28010]],63787:[[29436]],63788:[[37070]],63789:[[20358]],63790:[[20919]],63791:[[21214]],63792:[[25796]],63793:[[27347]],63794:[[29200]],63795:[[30439]],63796:[[32769]],63797:[[34310]],63798:[[34396]],63799:[[36335]],63800:[[38706]],63801:[[39791]],63802:[[40442]],63803:[[30860]],63804:[[31103]],63805:[[32160]],63806:[[33737]],63807:[[37636]],63808:[[40575]],63809:[[35542]],63810:[[22751]],63811:[[24324]],63812:[[31840]],63813:[[32894]],63814:[[29282]],63815:[[30922]],63816:[[36034]],63817:[[38647]],63818:[[22744]],63819:[[23650]],63820:[[27155]],63821:[[28122]],63822:[[28431]],63823:[[32047]],63824:[[32311]],63825:[[38475]],63826:[[21202]],63827:[[32907]],63828:[[20956]],63829:[[20940]],63830:[[31260]],63831:[[32190]],63832:[[33777]],63833:[[38517]],63834:[[35712]],63835:[[25295]],63836:[[27138]],63837:[[35582]],63838:[[20025]],63839:[[23527]],63840:[[24594]],63841:[[29575]],63842:[[30064]],63843:[[21271]],63844:[[30971]],63845:[[20415]],63846:[[24489]],63847:[[19981]],63848:[[27852]],63849:[[25976]],63850:[[32034]],63851:[[21443]],63852:[[22622]],63853:[[30465]],63854:[[33865]],63855:[[35498]],63856:[[27578]],63857:[[36784]],63858:[[27784]],63859:[[25342]],63860:[[33509]],63861:[[25504]],63862:[[30053]],63863:[[20142]],63864:[[20841]],63865:[[20937]],63866:[[26753]],63867:[[31975]],63868:[[33391]],63869:[[35538]],63870:[[37327]],63871:[[21237]],63872:[[21570]],63873:[[22899]],63874:[[24300]],63875:[[26053]],63876:[[28670]],63877:[[31018]],63878:[[38317]],63879:[[39530]],63880:[[40599]],63881:[[40654]],63882:[[21147]],63883:[[26310]],63884:[[27511]],63885:[[36706]],63886:[[24180]],63887:[[24976]],63888:[[25088]],63889:[[25754]],63890:[[28451]],63891:[[29001]],63892:[[29833]],63893:[[31178]],63894:[[32244]],63895:[[32879]],63896:[[36646]],63897:[[34030]],63898:[[36899]],63899:[[37706]],63900:[[21015]],63901:[[21155]],63902:[[21693]],63903:[[28872]],63904:[[35010]],63905:[[35498]],63906:[[24265]],63907:[[24565]],63908:[[25467]],63909:[[27566]],63910:[[31806]],63911:[[29557]],63912:[[20196]],63913:[[22265]],63914:[[23527]],63915:[[23994]],63916:[[24604]],63917:[[29618]],63918:[[29801]],63919:[[32666]],63920:[[32838]],63921:[[37428]],63922:[[38646]],63923:[[38728]],63924:[[38936]],63925:[[20363]],63926:[[31150]],63927:[[37300]],63928:[[38584]],63929:[[24801]],63930:[[20102]],63931:[[20698]],63932:[[23534]],63933:[[23615]],63934:[[26009]],63935:[[27138]],63936:[[29134]],63937:[[30274]],63938:[[34044]],63939:[[36988]],63940:[[40845]],63941:[[26248]],63942:[[38446]],63943:[[21129]],63944:[[26491]],63945:[[26611]],63946:[[27969]],63947:[[28316]],63948:[[29705]],63949:[[30041]],63950:[[30827]],63951:[[32016]],63952:[[39006]],63953:[[20845]],63954:[[25134]],63955:[[38520]],63956:[[20523]],63957:[[23833]],63958:[[28138]],63959:[[36650]],63960:[[24459]],63961:[[24900]],63962:[[26647]],63963:[[29575]],63964:[[38534]],63965:[[21033]],63966:[[21519]],63967:[[23653]],63968:[[26131]],63969:[[26446]],63970:[[26792]],63971:[[27877]],63972:[[29702]],63973:[[30178]],63974:[[32633]],63975:[[35023]],63976:[[35041]],63977:[[37324]],63978:[[38626]],63979:[[21311]],63980:[[28346]],63981:[[21533]],63982:[[29136]],63983:[[29848]],63984:[[34298]],63985:[[38563]],63986:[[40023]],63987:[[40607]],63988:[[26519]],63989:[[28107]],63990:[[33256]],63991:[[31435]],63992:[[31520]],63993:[[31890]],63994:[[29376]],63995:[[28825]],63996:[[35672]],63997:[[20160]],63998:[[33590]],63999:[[21050]],194816:[[27966]],194817:[[28023]],194818:[[27969]],194819:[[28009]],194820:[[28024]],194821:[[28037]],194822:[[146718]],194823:[[27956]],194824:[[28207]],194825:[[28270]],194826:[[15667]],194827:[[28363]],194828:[[28359]],194829:[[147153]],194830:[[28153]],194831:[[28526]],194832:[[147294]],194833:[[147342]],194834:[[28614]],194835:[[28729]],194836:[[28702]],194837:[[28699]],194838:[[15766]],194839:[[28746]],194840:[[28797]],194841:[[28791]],194842:[[28845]],194843:[[132389]],194844:[[28997]],194845:[[148067]],194846:[[29084]],194847:[[148395]],194848:[[29224]],194849:[[29237]],194850:[[29264]],194851:[[149000]],194852:[[29312]],194853:[[29333]],194854:[[149301]],194855:[[149524]],194856:[[29562]],194857:[[29579]],194858:[[16044]],194859:[[29605]],194860:[[16056]],194861:[[16056]],194862:[[29767]],194863:[[29788]],194864:[[29809]],194865:[[29829]],194866:[[29898]],194867:[[16155]],194868:[[29988]],194869:[[150582]],194870:[[30014]],194871:[[150674]],194872:[[30064]],194873:[[139679]],194874:[[30224]],194875:[[151457]],194876:[[151480]],194877:[[151620]],194878:[[16380]],194879:[[16392]],194880:[[30452]],194881:[[151795]],194882:[[151794]],194883:[[151833]],194884:[[151859]],194885:[[30494]],194886:[[30495]],194887:[[30495]],194888:[[30538]],194889:[[16441]],194890:[[30603]],194891:[[16454]],194892:[[16534]],194893:[[152605]],194894:[[30798]],194895:[[30860]],194896:[[30924]],194897:[[16611]],194898:[[153126]],194899:[[31062]],194900:[[153242]],194901:[[153285]],194902:[[31119]],194903:[[31211]],194904:[[16687]],194905:[[31296]],194906:[[31306]],194907:[[31311]],194908:[[153980]],194909:[[154279]],194910:[[154279]],194911:[[31470]],194912:[[16898]],194913:[[154539]],194914:[[31686]],194915:[[31689]],194916:[[16935]],194917:[[154752]],194918:[[31954]],194919:[[17056]],194920:[[31976]],194921:[[31971]],194922:[[32000]],194923:[[155526]],194924:[[32099]],194925:[[17153]],194926:[[32199]],194927:[[32258]],194928:[[32325]],194929:[[17204]],194930:[[156200]],194931:[[156231]],194932:[[17241]],194933:[[156377]],194934:[[32634]],194935:[[156478]],194936:[[32661]],194937:[[32762]],194938:[[32773]],194939:[[156890]],194940:[[156963]],194941:[[32864]],194942:[[157096]],194943:[[32880]],194944:[[144223]],194945:[[17365]],194946:[[32946]],194947:[[33027]],194948:[[17419]],194949:[[33086]],194950:[[23221]],194951:[[157607]],194952:[[157621]],194953:[[144275]],194954:[[144284]],194955:[[33281]],194956:[[33284]],194957:[[36766]],194958:[[17515]],194959:[[33425]],194960:[[33419]],194961:[[33437]],194962:[[21171]],194963:[[33457]],194964:[[33459]],194965:[[33469]],194966:[[33510]],194967:[[158524]],194968:[[33509]],194969:[[33565]],194970:[[33635]],194971:[[33709]],194972:[[33571]],194973:[[33725]],194974:[[33767]],194975:[[33879]],194976:[[33619]],194977:[[33738]],194978:[[33740]],194979:[[33756]],194980:[[158774]],194981:[[159083]],194982:[[158933]],194983:[[17707]],194984:[[34033]],194985:[[34035]],194986:[[34070]],194987:[[160714]],194988:[[34148]],194989:[[159532]],194990:[[17757]],194991:[[17761]],194992:[[159665]],194993:[[159954]],194994:[[17771]],194995:[[34384]],194996:[[34396]],194997:[[34407]],194998:[[34409]],194999:[[34473]],195000:[[34440]],195001:[[34574]],195002:[[34530]],195003:[[34681]],195004:[[34600]],195005:[[34667]],195006:[[34694]],195007:[[17879]],195008:[[34785]],195009:[[34817]],195010:[[17913]],195011:[[34912]],195012:[[34915]],195013:[[161383]],195014:[[35031]],195015:[[35038]],195016:[[17973]],195017:[[35066]],195018:[[13499]],195019:[[161966]],195020:[[162150]],195021:[[18110]],195022:[[18119]],195023:[[35488]],195024:[[35565]],195025:[[35722]],195026:[[35925]],195027:[[162984]],195028:[[36011]],195029:[[36033]],195030:[[36123]],195031:[[36215]],195032:[[163631]],195033:[[133124]],195034:[[36299]],195035:[[36284]],195036:[[36336]],195037:[[133342]],195038:[[36564]],195039:[[36664]],195040:[[165330]],195041:[[165357]],195042:[[37012]],195043:[[37105]],195044:[[37137]],195045:[[165678]],195046:[[37147]],195047:[[37432]],195048:[[37591]],195049:[[37592]],195050:[[37500]],195051:[[37881]],195052:[[37909]],195053:[[166906]],195054:[[38283]],195055:[[18837]],195056:[[38327]],195057:[[167287]],195058:[[18918]],195059:[[38595]],195060:[[23986]],195061:[[38691]],195062:[[168261]],195063:[[168474]],195064:[[19054]],195065:[[19062]],195066:[[38880]],195067:[[168970]],195068:[[19122]],195069:[[169110]],195070:[[38923]],195071:[[38923]]},
+64000:{64000:[[20999]],64001:[[24230]],64002:[[25299]],64003:[[31958]],64004:[[23429]],64005:[[27934]],64006:[[26292]],64007:[[36667]],64008:[[34892]],64009:[[38477]],64010:[[35211]],64011:[[24275]],64012:[[20800]],64013:[[21952]],64016:[[22618]],64018:[[26228]],64021:[[20958]],64022:[[29482]],64023:[[30410]],64024:[[31036]],64025:[[31070]],64026:[[31077]],64027:[[31119]],64028:[[38742]],64029:[[31934]],64030:[[32701]],64032:[[34322]],64034:[[35576]],64037:[[36920]],64038:[[37117]],64042:[[39151]],64043:[[39164]],64044:[[39208]],64045:[[40372]],64046:[[37086]],64047:[[38583]],64048:[[20398]],64049:[[20711]],64050:[[20813]],64051:[[21193]],64052:[[21220]],64053:[[21329]],64054:[[21917]],64055:[[22022]],64056:[[22120]],64057:[[22592]],64058:[[22696]],64059:[[23652]],64060:[[23662]],64061:[[24724]],64062:[[24936]],64063:[[24974]],64064:[[25074]],64065:[[25935]],64066:[[26082]],64067:[[26257]],64068:[[26757]],64069:[[28023]],64070:[[28186]],64071:[[28450]],64072:[[29038]],64073:[[29227]],64074:[[29730]],64075:[[30865]],64076:[[31038]],64077:[[31049]],64078:[[31048]],64079:[[31056]],64080:[[31062]],64081:[[31069]],64082:[[31117]],64083:[[31118]],64084:[[31296]],64085:[[31361]],64086:[[31680]],64087:[[32244]],64088:[[32265]],64089:[[32321]],64090:[[32626]],64091:[[32773]],64092:[[33261]],64093:[[33401]],64094:[[33401]],64095:[[33879]],64096:[[35088]],64097:[[35222]],64098:[[35585]],64099:[[35641]],64100:[[36051]],64101:[[36104]],64102:[[36790]],64103:[[36920]],64104:[[38627]],64105:[[38911]],64106:[[38971]],64107:[[24693]],64108:[[148206]],64109:[[33304]],64112:[[20006]],64113:[[20917]],64114:[[20840]],64115:[[20352]],64116:[[20805]],64117:[[20864]],64118:[[21191]],64119:[[21242]],64120:[[21917]],64121:[[21845]],64122:[[21913]],64123:[[21986]],64124:[[22618]],64125:[[22707]],64126:[[22852]],64127:[[22868]],64128:[[23138]],64129:[[23336]],64130:[[24274]],64131:[[24281]],64132:[[24425]],64133:[[24493]],64134:[[24792]],64135:[[24910]],64136:[[24840]],64137:[[24974]],64138:[[24928]],64139:[[25074]],64140:[[25140]],64141:[[25540]],64142:[[25628]],64143:[[25682]],64144:[[25942]],64145:[[26228]],64146:[[26391]],64147:[[26395]],64148:[[26454]],64149:[[27513]],64150:[[27578]],64151:[[27969]],64152:[[28379]],64153:[[28363]],64154:[[28450]],64155:[[28702]],64156:[[29038]],64157:[[30631]],64158:[[29237]],64159:[[29359]],64160:[[29482]],64161:[[29809]],64162:[[29958]],64163:[[30011]],64164:[[30237]],64165:[[30239]],64166:[[30410]],64167:[[30427]],64168:[[30452]],64169:[[30538]],64170:[[30528]],64171:[[30924]],64172:[[31409]],64173:[[31680]],64174:[[31867]],64175:[[32091]],64176:[[32244]],64177:[[32574]],64178:[[32773]],64179:[[33618]],64180:[[33775]],64181:[[34681]],64182:[[35137]],64183:[[35206]],64184:[[35222]],64185:[[35519]],64186:[[35576]],64187:[[35531]],64188:[[35585]],64189:[[35582]],64190:[[35565]],64191:[[35641]],64192:[[35722]],64193:[[36104]],64194:[[36664]],64195:[[36978]],64196:[[37273]],64197:[[37494]],64198:[[38524]],64199:[[38627]],64200:[[38742]],64201:[[38875]],64202:[[38911]],64203:[[38923]],64204:[[38971]],64205:[[39698]],64206:[[40860]],64207:[[141386]],64208:[[141380]],64209:[[144341]],64210:[[15261]],64211:[[16408]],64212:[[16441]],64213:[[152137]],64214:[[154832]],64215:[[163539]],64216:[[40771]],64217:[[40846]],195072:[[38953]],195073:[[169398]],195074:[[39138]],195075:[[19251]],195076:[[39209]],195077:[[39335]],195078:[[39362]],195079:[[39422]],195080:[[19406]],195081:[[170800]],195082:[[39698]],195083:[[40000]],195084:[[40189]],195085:[[19662]],195086:[[19693]],195087:[[40295]],195088:[[172238]],195089:[[19704]],195090:[[172293]],195091:[[172558]],195092:[[172689]],195093:[[40635]],195094:[[19798]],195095:[[40697]],195096:[[40702]],195097:[[40709]],195098:[[40719]],195099:[[40726]],195100:[[40763]],195101:[[173568]]},
+64256:{64256:[[102,102],256],64257:[[102,105],256],64258:[[102,108],256],64259:[[102,102,105],256],64260:[[102,102,108],256],64261:[[383,116],256],64262:[[115,116],256],64275:[[1396,1398],256],64276:[[1396,1381],256],64277:[[1396,1387],256],64278:[[1406,1398],256],64279:[[1396,1389],256],64285:[[1497,1460],512],64286:[,26],64287:[[1522,1463],512],64288:[[1506],256],64289:[[1488],256],64290:[[1491],256],64291:[[1492],256],64292:[[1499],256],64293:[[1500],256],64294:[[1501],256],64295:[[1512],256],64296:[[1514],256],64297:[[43],256],64298:[[1513,1473],512],64299:[[1513,1474],512],64300:[[64329,1473],512],64301:[[64329,1474],512],64302:[[1488,1463],512],64303:[[1488,1464],512],64304:[[1488,1468],512],64305:[[1489,1468],512],64306:[[1490,1468],512],64307:[[1491,1468],512],64308:[[1492,1468],512],64309:[[1493,1468],512],64310:[[1494,1468],512],64312:[[1496,1468],512],64313:[[1497,1468],512],64314:[[1498,1468],512],64315:[[1499,1468],512],64316:[[1500,1468],512],64318:[[1502,1468],512],64320:[[1504,1468],512],64321:[[1505,1468],512],64323:[[1507,1468],512],64324:[[1508,1468],512],64326:[[1510,1468],512],64327:[[1511,1468],512],64328:[[1512,1468],512],64329:[[1513,1468],512],64330:[[1514,1468],512],64331:[[1493,1465],512],64332:[[1489,1471],512],64333:[[1499,1471],512],64334:[[1508,1471],512],64335:[[1488,1500],256],64336:[[1649],256],64337:[[1649],256],64338:[[1659],256],64339:[[1659],256],64340:[[1659],256],64341:[[1659],256],64342:[[1662],256],64343:[[1662],256],64344:[[1662],256],64345:[[1662],256],64346:[[1664],256],64347:[[1664],256],64348:[[1664],256],64349:[[1664],256],64350:[[1658],256],64351:[[1658],256],64352:[[1658],256],64353:[[1658],256],64354:[[1663],256],64355:[[1663],256],64356:[[1663],256],64357:[[1663],256],64358:[[1657],256],64359:[[1657],256],64360:[[1657],256],64361:[[1657],256],64362:[[1700],256],64363:[[1700],256],64364:[[1700],256],64365:[[1700],256],64366:[[1702],256],64367:[[1702],256],64368:[[1702],256],64369:[[1702],256],64370:[[1668],256],64371:[[1668],256],64372:[[1668],256],64373:[[1668],256],64374:[[1667],256],64375:[[1667],256],64376:[[1667],256],64377:[[1667],256],64378:[[1670],256],64379:[[1670],256],64380:[[1670],256],64381:[[1670],256],64382:[[1671],256],64383:[[1671],256],64384:[[1671],256],64385:[[1671],256],64386:[[1677],256],64387:[[1677],256],64388:[[1676],256],64389:[[1676],256],64390:[[1678],256],64391:[[1678],256],64392:[[1672],256],64393:[[1672],256],64394:[[1688],256],64395:[[1688],256],64396:[[1681],256],64397:[[1681],256],64398:[[1705],256],64399:[[1705],256],64400:[[1705],256],64401:[[1705],256],64402:[[1711],256],64403:[[1711],256],64404:[[1711],256],64405:[[1711],256],64406:[[1715],256],64407:[[1715],256],64408:[[1715],256],64409:[[1715],256],64410:[[1713],256],64411:[[1713],256],64412:[[1713],256],64413:[[1713],256],64414:[[1722],256],64415:[[1722],256],64416:[[1723],256],64417:[[1723],256],64418:[[1723],256],64419:[[1723],256],64420:[[1728],256],64421:[[1728],256],64422:[[1729],256],64423:[[1729],256],64424:[[1729],256],64425:[[1729],256],64426:[[1726],256],64427:[[1726],256],64428:[[1726],256],64429:[[1726],256],64430:[[1746],256],64431:[[1746],256],64432:[[1747],256],64433:[[1747],256],64467:[[1709],256],64468:[[1709],256],64469:[[1709],256],64470:[[1709],256],64471:[[1735],256],64472:[[1735],256],64473:[[1734],256],64474:[[1734],256],64475:[[1736],256],64476:[[1736],256],64477:[[1655],256],64478:[[1739],256],64479:[[1739],256],64480:[[1733],256],64481:[[1733],256],64482:[[1737],256],64483:[[1737],256],64484:[[1744],256],64485:[[1744],256],64486:[[1744],256],64487:[[1744],256],64488:[[1609],256],64489:[[1609],256],64490:[[1574,1575],256],64491:[[1574,1575],256],64492:[[1574,1749],256],64493:[[1574,1749],256],64494:[[1574,1608],256],64495:[[1574,1608],256],64496:[[1574,1735],256],64497:[[1574,1735],256],64498:[[1574,1734],256],64499:[[1574,1734],256],64500:[[1574,1736],256],64501:[[1574,1736],256],64502:[[1574,1744],256],64503:[[1574,1744],256],64504:[[1574,1744],256],64505:[[1574,1609],256],64506:[[1574,1609],256],64507:[[1574,1609],256],64508:[[1740],256],64509:[[1740],256],64510:[[1740],256],64511:[[1740],256]},
+64512:{64512:[[1574,1580],256],64513:[[1574,1581],256],64514:[[1574,1605],256],64515:[[1574,1609],256],64516:[[1574,1610],256],64517:[[1576,1580],256],64518:[[1576,1581],256],64519:[[1576,1582],256],64520:[[1576,1605],256],64521:[[1576,1609],256],64522:[[1576,1610],256],64523:[[1578,1580],256],64524:[[1578,1581],256],64525:[[1578,1582],256],64526:[[1578,1605],256],64527:[[1578,1609],256],64528:[[1578,1610],256],64529:[[1579,1580],256],64530:[[1579,1605],256],64531:[[1579,1609],256],64532:[[1579,1610],256],64533:[[1580,1581],256],64534:[[1580,1605],256],64535:[[1581,1580],256],64536:[[1581,1605],256],64537:[[1582,1580],256],64538:[[1582,1581],256],64539:[[1582,1605],256],64540:[[1587,1580],256],64541:[[1587,1581],256],64542:[[1587,1582],256],64543:[[1587,1605],256],64544:[[1589,1581],256],64545:[[1589,1605],256],64546:[[1590,1580],256],64547:[[1590,1581],256],64548:[[1590,1582],256],64549:[[1590,1605],256],64550:[[1591,1581],256],64551:[[1591,1605],256],64552:[[1592,1605],256],64553:[[1593,1580],256],64554:[[1593,1605],256],64555:[[1594,1580],256],64556:[[1594,1605],256],64557:[[1601,1580],256],64558:[[1601,1581],256],64559:[[1601,1582],256],64560:[[1601,1605],256],64561:[[1601,1609],256],64562:[[1601,1610],256],64563:[[1602,1581],256],64564:[[1602,1605],256],64565:[[1602,1609],256],64566:[[1602,1610],256],64567:[[1603,1575],256],64568:[[1603,1580],256],64569:[[1603,1581],256],64570:[[1603,1582],256],64571:[[1603,1604],256],64572:[[1603,1605],256],64573:[[1603,1609],256],64574:[[1603,1610],256],64575:[[1604,1580],256],64576:[[1604,1581],256],64577:[[1604,1582],256],64578:[[1604,1605],256],64579:[[1604,1609],256],64580:[[1604,1610],256],64581:[[1605,1580],256],64582:[[1605,1581],256],64583:[[1605,1582],256],64584:[[1605,1605],256],64585:[[1605,1609],256],64586:[[1605,1610],256],64587:[[1606,1580],256],64588:[[1606,1581],256],64589:[[1606,1582],256],64590:[[1606,1605],256],64591:[[1606,1609],256],64592:[[1606,1610],256],64593:[[1607,1580],256],64594:[[1607,1605],256],64595:[[1607,1609],256],64596:[[1607,1610],256],64597:[[1610,1580],256],64598:[[1610,1581],256],64599:[[1610,1582],256],64600:[[1610,1605],256],64601:[[1610,1609],256],64602:[[1610,1610],256],64603:[[1584,1648],256],64604:[[1585,1648],256],64605:[[1609,1648],256],64606:[[32,1612,1617],256],64607:[[32,1613,1617],256],64608:[[32,1614,1617],256],64609:[[32,1615,1617],256],64610:[[32,1616,1617],256],64611:[[32,1617,1648],256],64612:[[1574,1585],256],64613:[[1574,1586],256],64614:[[1574,1605],256],64615:[[1574,1606],256],64616:[[1574,1609],256],64617:[[1574,1610],256],64618:[[1576,1585],256],64619:[[1576,1586],256],64620:[[1576,1605],256],64621:[[1576,1606],256],64622:[[1576,1609],256],64623:[[1576,1610],256],64624:[[1578,1585],256],64625:[[1578,1586],256],64626:[[1578,1605],256],64627:[[1578,1606],256],64628:[[1578,1609],256],64629:[[1578,1610],256],64630:[[1579,1585],256],64631:[[1579,1586],256],64632:[[1579,1605],256],64633:[[1579,1606],256],64634:[[1579,1609],256],64635:[[1579,1610],256],64636:[[1601,1609],256],64637:[[1601,1610],256],64638:[[1602,1609],256],64639:[[1602,1610],256],64640:[[1603,1575],256],64641:[[1603,1604],256],64642:[[1603,1605],256],64643:[[1603,1609],256],64644:[[1603,1610],256],64645:[[1604,1605],256],64646:[[1604,1609],256],64647:[[1604,1610],256],64648:[[1605,1575],256],64649:[[1605,1605],256],64650:[[1606,1585],256],64651:[[1606,1586],256],64652:[[1606,1605],256],64653:[[1606,1606],256],64654:[[1606,1609],256],64655:[[1606,1610],256],64656:[[1609,1648],256],64657:[[1610,1585],256],64658:[[1610,1586],256],64659:[[1610,1605],256],64660:[[1610,1606],256],64661:[[1610,1609],256],64662:[[1610,1610],256],64663:[[1574,1580],256],64664:[[1574,1581],256],64665:[[1574,1582],256],64666:[[1574,1605],256],64667:[[1574,1607],256],64668:[[1576,1580],256],64669:[[1576,1581],256],64670:[[1576,1582],256],64671:[[1576,1605],256],64672:[[1576,1607],256],64673:[[1578,1580],256],64674:[[1578,1581],256],64675:[[1578,1582],256],64676:[[1578,1605],256],64677:[[1578,1607],256],64678:[[1579,1605],256],64679:[[1580,1581],256],64680:[[1580,1605],256],64681:[[1581,1580],256],64682:[[1581,1605],256],64683:[[1582,1580],256],64684:[[1582,1605],256],64685:[[1587,1580],256],64686:[[1587,1581],256],64687:[[1587,1582],256],64688:[[1587,1605],256],64689:[[1589,1581],256],64690:[[1589,1582],256],64691:[[1589,1605],256],64692:[[1590,1580],256],64693:[[1590,1581],256],64694:[[1590,1582],256],64695:[[1590,1605],256],64696:[[1591,1581],256],64697:[[1592,1605],256],64698:[[1593,1580],256],64699:[[1593,1605],256],64700:[[1594,1580],256],64701:[[1594,1605],256],64702:[[1601,1580],256],64703:[[1601,1581],256],64704:[[1601,1582],256],64705:[[1601,1605],256],64706:[[1602,1581],256],64707:[[1602,1605],256],64708:[[1603,1580],256],64709:[[1603,1581],256],64710:[[1603,1582],256],64711:[[1603,1604],256],64712:[[1603,1605],256],64713:[[1604,1580],256],64714:[[1604,1581],256],64715:[[1604,1582],256],64716:[[1604,1605],256],64717:[[1604,1607],256],64718:[[1605,1580],256],64719:[[1605,1581],256],64720:[[1605,1582],256],64721:[[1605,1605],256],64722:[[1606,1580],256],64723:[[1606,1581],256],64724:[[1606,1582],256],64725:[[1606,1605],256],64726:[[1606,1607],256],64727:[[1607,1580],256],64728:[[1607,1605],256],64729:[[1607,1648],256],64730:[[1610,1580],256],64731:[[1610,1581],256],64732:[[1610,1582],256],64733:[[1610,1605],256],64734:[[1610,1607],256],64735:[[1574,1605],256],64736:[[1574,1607],256],64737:[[1576,1605],256],64738:[[1576,1607],256],64739:[[1578,1605],256],64740:[[1578,1607],256],64741:[[1579,1605],256],64742:[[1579,1607],256],64743:[[1587,1605],256],64744:[[1587,1607],256],64745:[[1588,1605],256],64746:[[1588,1607],256],64747:[[1603,1604],256],64748:[[1603,1605],256],64749:[[1604,1605],256],64750:[[1606,1605],256],64751:[[1606,1607],256],64752:[[1610,1605],256],64753:[[1610,1607],256],64754:[[1600,1614,1617],256],64755:[[1600,1615,1617],256],64756:[[1600,1616,1617],256],64757:[[1591,1609],256],64758:[[1591,1610],256],64759:[[1593,1609],256],64760:[[1593,1610],256],64761:[[1594,1609],256],64762:[[1594,1610],256],64763:[[1587,1609],256],64764:[[1587,1610],256],64765:[[1588,1609],256],64766:[[1588,1610],256],64767:[[1581,1609],256]},
+64768:{64768:[[1581,1610],256],64769:[[1580,1609],256],64770:[[1580,1610],256],64771:[[1582,1609],256],64772:[[1582,1610],256],64773:[[1589,1609],256],64774:[[1589,1610],256],64775:[[1590,1609],256],64776:[[1590,1610],256],64777:[[1588,1580],256],64778:[[1588,1581],256],64779:[[1588,1582],256],64780:[[1588,1605],256],64781:[[1588,1585],256],64782:[[1587,1585],256],64783:[[1589,1585],256],64784:[[1590,1585],256],64785:[[1591,1609],256],64786:[[1591,1610],256],64787:[[1593,1609],256],64788:[[1593,1610],256],64789:[[1594,1609],256],64790:[[1594,1610],256],64791:[[1587,1609],256],64792:[[1587,1610],256],64793:[[1588,1609],256],64794:[[1588,1610],256],64795:[[1581,1609],256],64796:[[1581,1610],256],64797:[[1580,1609],256],64798:[[1580,1610],256],64799:[[1582,1609],256],64800:[[1582,1610],256],64801:[[1589,1609],256],64802:[[1589,1610],256],64803:[[1590,1609],256],64804:[[1590,1610],256],64805:[[1588,1580],256],64806:[[1588,1581],256],64807:[[1588,1582],256],64808:[[1588,1605],256],64809:[[1588,1585],256],64810:[[1587,1585],256],64811:[[1589,1585],256],64812:[[1590,1585],256],64813:[[1588,1580],256],64814:[[1588,1581],256],64815:[[1588,1582],256],64816:[[1588,1605],256],64817:[[1587,1607],256],64818:[[1588,1607],256],64819:[[1591,1605],256],64820:[[1587,1580],256],64821:[[1587,1581],256],64822:[[1587,1582],256],64823:[[1588,1580],256],64824:[[1588,1581],256],64825:[[1588,1582],256],64826:[[1591,1605],256],64827:[[1592,1605],256],64828:[[1575,1611],256],64829:[[1575,1611],256],64848:[[1578,1580,1605],256],64849:[[1578,1581,1580],256],64850:[[1578,1581,1580],256],64851:[[1578,1581,1605],256],64852:[[1578,1582,1605],256],64853:[[1578,1605,1580],256],64854:[[1578,1605,1581],256],64855:[[1578,1605,1582],256],64856:[[1580,1605,1581],256],64857:[[1580,1605,1581],256],64858:[[1581,1605,1610],256],64859:[[1581,1605,1609],256],64860:[[1587,1581,1580],256],64861:[[1587,1580,1581],256],64862:[[1587,1580,1609],256],64863:[[1587,1605,1581],256],64864:[[1587,1605,1581],256],64865:[[1587,1605,1580],256],64866:[[1587,1605,1605],256],64867:[[1587,1605,1605],256],64868:[[1589,1581,1581],256],64869:[[1589,1581,1581],256],64870:[[1589,1605,1605],256],64871:[[1588,1581,1605],256],64872:[[1588,1581,1605],256],64873:[[1588,1580,1610],256],64874:[[1588,1605,1582],256],64875:[[1588,1605,1582],256],64876:[[1588,1605,1605],256],64877:[[1588,1605,1605],256],64878:[[1590,1581,1609],256],64879:[[1590,1582,1605],256],64880:[[1590,1582,1605],256],64881:[[1591,1605,1581],256],64882:[[1591,1605,1581],256],64883:[[1591,1605,1605],256],64884:[[1591,1605,1610],256],64885:[[1593,1580,1605],256],64886:[[1593,1605,1605],256],64887:[[1593,1605,1605],256],64888:[[1593,1605,1609],256],64889:[[1594,1605,1605],256],64890:[[1594,1605,1610],256],64891:[[1594,1605,1609],256],64892:[[1601,1582,1605],256],64893:[[1601,1582,1605],256],64894:[[1602,1605,1581],256],64895:[[1602,1605,1605],256],64896:[[1604,1581,1605],256],64897:[[1604,1581,1610],256],64898:[[1604,1581,1609],256],64899:[[1604,1580,1580],256],64900:[[1604,1580,1580],256],64901:[[1604,1582,1605],256],64902:[[1604,1582,1605],256],64903:[[1604,1605,1581],256],64904:[[1604,1605,1581],256],64905:[[1605,1581,1580],256],64906:[[1605,1581,1605],256],64907:[[1605,1581,1610],256],64908:[[1605,1580,1581],256],64909:[[1605,1580,1605],256],64910:[[1605,1582,1580],256],64911:[[1605,1582,1605],256],64914:[[1605,1580,1582],256],64915:[[1607,1605,1580],256],64916:[[1607,1605,1605],256],64917:[[1606,1581,1605],256],64918:[[1606,1581,1609],256],64919:[[1606,1580,1605],256],64920:[[1606,1580,1605],256],64921:[[1606,1580,1609],256],64922:[[1606,1605,1610],256],64923:[[1606,1605,1609],256],64924:[[1610,1605,1605],256],64925:[[1610,1605,1605],256],64926:[[1576,1582,1610],256],64927:[[1578,1580,1610],256],64928:[[1578,1580,1609],256],64929:[[1578,1582,1610],256],64930:[[1578,1582,1609],256],64931:[[1578,1605,1610],256],64932:[[1578,1605,1609],256],64933:[[1580,1605,1610],256],64934:[[1580,1581,1609],256],64935:[[1580,1605,1609],256],64936:[[1587,1582,1609],256],64937:[[1589,1581,1610],256],64938:[[1588,1581,1610],256],64939:[[1590,1581,1610],256],64940:[[1604,1580,1610],256],64941:[[1604,1605,1610],256],64942:[[1610,1581,1610],256],64943:[[1610,1580,1610],256],64944:[[1610,1605,1610],256],64945:[[1605,1605,1610],256],64946:[[1602,1605,1610],256],64947:[[1606,1581,1610],256],64948:[[1602,1605,1581],256],64949:[[1604,1581,1605],256],64950:[[1593,1605,1610],256],64951:[[1603,1605,1610],256],64952:[[1606,1580,1581],256],64953:[[1605,1582,1610],256],64954:[[1604,1580,1605],256],64955:[[1603,1605,1605],256],64956:[[1604,1580,1605],256],64957:[[1606,1580,1581],256],64958:[[1580,1581,1610],256],64959:[[1581,1580,1610],256],64960:[[1605,1580,1610],256],64961:[[1601,1605,1610],256],64962:[[1576,1581,1610],256],64963:[[1603,1605,1605],256],64964:[[1593,1580,1605],256],64965:[[1589,1605,1605],256],64966:[[1587,1582,1610],256],64967:[[1606,1580,1610],256],65008:[[1589,1604,1746],256],65009:[[1602,1604,1746],256],65010:[[1575,1604,1604,1607],256],65011:[[1575,1603,1576,1585],256],65012:[[1605,1581,1605,1583],256],65013:[[1589,1604,1593,1605],256],65014:[[1585,1587,1608,1604],256],65015:[[1593,1604,1610,1607],256],65016:[[1608,1587,1604,1605],256],65017:[[1589,1604,1609],256],65018:[[1589,1604,1609,32,1575,1604,1604,1607,32,1593,1604,1610,1607,32,1608,1587,1604,1605],256],65019:[[1580,1604,32,1580,1604,1575,1604,1607],256],65020:[[1585,1740,1575,1604],256]},
+65024:{65040:[[44],256],65041:[[12289],256],65042:[[12290],256],65043:[[58],256],65044:[[59],256],65045:[[33],256],65046:[[63],256],65047:[[12310],256],65048:[[12311],256],65049:[[8230],256],65056:[,230],65057:[,230],65058:[,230],65059:[,230],65060:[,230],65061:[,230],65062:[,230],65063:[,220],65064:[,220],65065:[,220],65066:[,220],65067:[,220],65068:[,220],65069:[,220],65072:[[8229],256],65073:[[8212],256],65074:[[8211],256],65075:[[95],256],65076:[[95],256],65077:[[40],256],65078:[[41],256],65079:[[123],256],65080:[[125],256],65081:[[12308],256],65082:[[12309],256],65083:[[12304],256],65084:[[12305],256],65085:[[12298],256],65086:[[12299],256],65087:[[12296],256],65088:[[12297],256],65089:[[12300],256],65090:[[12301],256],65091:[[12302],256],65092:[[12303],256],65095:[[91],256],65096:[[93],256],65097:[[8254],256],65098:[[8254],256],65099:[[8254],256],65100:[[8254],256],65101:[[95],256],65102:[[95],256],65103:[[95],256],65104:[[44],256],65105:[[12289],256],65106:[[46],256],65108:[[59],256],65109:[[58],256],65110:[[63],256],65111:[[33],256],65112:[[8212],256],65113:[[40],256],65114:[[41],256],65115:[[123],256],65116:[[125],256],65117:[[12308],256],65118:[[12309],256],65119:[[35],256],65120:[[38],256],65121:[[42],256],65122:[[43],256],65123:[[45],256],65124:[[60],256],65125:[[62],256],65126:[[61],256],65128:[[92],256],65129:[[36],256],65130:[[37],256],65131:[[64],256],65136:[[32,1611],256],65137:[[1600,1611],256],65138:[[32,1612],256],65140:[[32,1613],256],65142:[[32,1614],256],65143:[[1600,1614],256],65144:[[32,1615],256],65145:[[1600,1615],256],65146:[[32,1616],256],65147:[[1600,1616],256],65148:[[32,1617],256],65149:[[1600,1617],256],65150:[[32,1618],256],65151:[[1600,1618],256],65152:[[1569],256],65153:[[1570],256],65154:[[1570],256],65155:[[1571],256],65156:[[1571],256],65157:[[1572],256],65158:[[1572],256],65159:[[1573],256],65160:[[1573],256],65161:[[1574],256],65162:[[1574],256],65163:[[1574],256],65164:[[1574],256],65165:[[1575],256],65166:[[1575],256],65167:[[1576],256],65168:[[1576],256],65169:[[1576],256],65170:[[1576],256],65171:[[1577],256],65172:[[1577],256],65173:[[1578],256],65174:[[1578],256],65175:[[1578],256],65176:[[1578],256],65177:[[1579],256],65178:[[1579],256],65179:[[1579],256],65180:[[1579],256],65181:[[1580],256],65182:[[1580],256],65183:[[1580],256],65184:[[1580],256],65185:[[1581],256],65186:[[1581],256],65187:[[1581],256],65188:[[1581],256],65189:[[1582],256],65190:[[1582],256],65191:[[1582],256],65192:[[1582],256],65193:[[1583],256],65194:[[1583],256],65195:[[1584],256],65196:[[1584],256],65197:[[1585],256],65198:[[1585],256],65199:[[1586],256],65200:[[1586],256],65201:[[1587],256],65202:[[1587],256],65203:[[1587],256],65204:[[1587],256],65205:[[1588],256],65206:[[1588],256],65207:[[1588],256],65208:[[1588],256],65209:[[1589],256],65210:[[1589],256],65211:[[1589],256],65212:[[1589],256],65213:[[1590],256],65214:[[1590],256],65215:[[1590],256],65216:[[1590],256],65217:[[1591],256],65218:[[1591],256],65219:[[1591],256],65220:[[1591],256],65221:[[1592],256],65222:[[1592],256],65223:[[1592],256],65224:[[1592],256],65225:[[1593],256],65226:[[1593],256],65227:[[1593],256],65228:[[1593],256],65229:[[1594],256],65230:[[1594],256],65231:[[1594],256],65232:[[1594],256],65233:[[1601],256],65234:[[1601],256],65235:[[1601],256],65236:[[1601],256],65237:[[1602],256],65238:[[1602],256],65239:[[1602],256],65240:[[1602],256],65241:[[1603],256],65242:[[1603],256],65243:[[1603],256],65244:[[1603],256],65245:[[1604],256],65246:[[1604],256],65247:[[1604],256],65248:[[1604],256],65249:[[1605],256],65250:[[1605],256],65251:[[1605],256],65252:[[1605],256],65253:[[1606],256],65254:[[1606],256],65255:[[1606],256],65256:[[1606],256],65257:[[1607],256],65258:[[1607],256],65259:[[1607],256],65260:[[1607],256],65261:[[1608],256],65262:[[1608],256],65263:[[1609],256],65264:[[1609],256],65265:[[1610],256],65266:[[1610],256],65267:[[1610],256],65268:[[1610],256],65269:[[1604,1570],256],65270:[[1604,1570],256],65271:[[1604,1571],256],65272:[[1604,1571],256],65273:[[1604,1573],256],65274:[[1604,1573],256],65275:[[1604,1575],256],65276:[[1604,1575],256]},
+65280:{65281:[[33],256],65282:[[34],256],65283:[[35],256],65284:[[36],256],65285:[[37],256],65286:[[38],256],65287:[[39],256],65288:[[40],256],65289:[[41],256],65290:[[42],256],65291:[[43],256],65292:[[44],256],65293:[[45],256],65294:[[46],256],65295:[[47],256],65296:[[48],256],65297:[[49],256],65298:[[50],256],65299:[[51],256],65300:[[52],256],65301:[[53],256],65302:[[54],256],65303:[[55],256],65304:[[56],256],65305:[[57],256],65306:[[58],256],65307:[[59],256],65308:[[60],256],65309:[[61],256],65310:[[62],256],65311:[[63],256],65312:[[64],256],65313:[[65],256],65314:[[66],256],65315:[[67],256],65316:[[68],256],65317:[[69],256],65318:[[70],256],65319:[[71],256],65320:[[72],256],65321:[[73],256],65322:[[74],256],65323:[[75],256],65324:[[76],256],65325:[[77],256],65326:[[78],256],65327:[[79],256],65328:[[80],256],65329:[[81],256],65330:[[82],256],65331:[[83],256],65332:[[84],256],65333:[[85],256],65334:[[86],256],65335:[[87],256],65336:[[88],256],65337:[[89],256],65338:[[90],256],65339:[[91],256],65340:[[92],256],65341:[[93],256],65342:[[94],256],65343:[[95],256],65344:[[96],256],65345:[[97],256],65346:[[98],256],65347:[[99],256],65348:[[100],256],65349:[[101],256],65350:[[102],256],65351:[[103],256],65352:[[104],256],65353:[[105],256],65354:[[106],256],65355:[[107],256],65356:[[108],256],65357:[[109],256],65358:[[110],256],65359:[[111],256],65360:[[112],256],65361:[[113],256],65362:[[114],256],65363:[[115],256],65364:[[116],256],65365:[[117],256],65366:[[118],256],65367:[[119],256],65368:[[120],256],65369:[[121],256],65370:[[122],256],65371:[[123],256],65372:[[124],256],65373:[[125],256],65374:[[126],256],65375:[[10629],256],65376:[[10630],256],65377:[[12290],256],65378:[[12300],256],65379:[[12301],256],65380:[[12289],256],65381:[[12539],256],65382:[[12530],256],65383:[[12449],256],65384:[[12451],256],65385:[[12453],256],65386:[[12455],256],65387:[[12457],256],65388:[[12515],256],65389:[[12517],256],65390:[[12519],256],65391:[[12483],256],65392:[[12540],256],65393:[[12450],256],65394:[[12452],256],65395:[[12454],256],65396:[[12456],256],65397:[[12458],256],65398:[[12459],256],65399:[[12461],256],65400:[[12463],256],65401:[[12465],256],65402:[[12467],256],65403:[[12469],256],65404:[[12471],256],65405:[[12473],256],65406:[[12475],256],65407:[[12477],256],65408:[[12479],256],65409:[[12481],256],65410:[[12484],256],65411:[[12486],256],65412:[[12488],256],65413:[[12490],256],65414:[[12491],256],65415:[[12492],256],65416:[[12493],256],65417:[[12494],256],65418:[[12495],256],65419:[[12498],256],65420:[[12501],256],65421:[[12504],256],65422:[[12507],256],65423:[[12510],256],65424:[[12511],256],65425:[[12512],256],65426:[[12513],256],65427:[[12514],256],65428:[[12516],256],65429:[[12518],256],65430:[[12520],256],65431:[[12521],256],65432:[[12522],256],65433:[[12523],256],65434:[[12524],256],65435:[[12525],256],65436:[[12527],256],65437:[[12531],256],65438:[[12441],256],65439:[[12442],256],65440:[[12644],256],65441:[[12593],256],65442:[[12594],256],65443:[[12595],256],65444:[[12596],256],65445:[[12597],256],65446:[[12598],256],65447:[[12599],256],65448:[[12600],256],65449:[[12601],256],65450:[[12602],256],65451:[[12603],256],65452:[[12604],256],65453:[[12605],256],65454:[[12606],256],65455:[[12607],256],65456:[[12608],256],65457:[[12609],256],65458:[[12610],256],65459:[[12611],256],65460:[[12612],256],65461:[[12613],256],65462:[[12614],256],65463:[[12615],256],65464:[[12616],256],65465:[[12617],256],65466:[[12618],256],65467:[[12619],256],65468:[[12620],256],65469:[[12621],256],65470:[[12622],256],65474:[[12623],256],65475:[[12624],256],65476:[[12625],256],65477:[[12626],256],65478:[[12627],256],65479:[[12628],256],65482:[[12629],256],65483:[[12630],256],65484:[[12631],256],65485:[[12632],256],65486:[[12633],256],65487:[[12634],256],65490:[[12635],256],65491:[[12636],256],65492:[[12637],256],65493:[[12638],256],65494:[[12639],256],65495:[[12640],256],65498:[[12641],256],65499:[[12642],256],65500:[[12643],256],65504:[[162],256],65505:[[163],256],65506:[[172],256],65507:[[175],256],65508:[[166],256],65509:[[165],256],65510:[[8361],256],65512:[[9474],256],65513:[[8592],256],65514:[[8593],256],65515:[[8594],256],65516:[[8595],256],65517:[[9632],256],65518:[[9675],256]}
+
+};
+
+   /***** Module to export */
+   var unorm = {
+      nfc: nfc,
+      nfd: nfd,
+      nfkc: nfkc,
+      nfkd: nfkd
+   };
+
+   /*globals module:true,define:true*/
+
+   // CommonJS
+   if (typeof module === "object") {
+      module.exports = unorm;
+
+   // AMD
+   } else if (typeof define === "function" && define.amd) {
+      define("unorm", function () {
+         return unorm;
+      });
+
+   // Global
+   } else {
+      root.unorm = unorm;
+   }
+
+   /***** Export as shim for String::normalize method *****/
+   /*
+      http://wiki.ecmascript.org/doku.php?id=harmony:specification_drafts#november_8_2013_draft_rev_21
+
+      21.1.3.12 String.prototype.normalize(form="NFC")
+      When the normalize method is called with one argument form, the following steps are taken:
+
+      1. Let O be CheckObjectCoercible(this value).
+      2. Let S be ToString(O).
+      3. ReturnIfAbrupt(S).
+      4. If form is not provided or undefined let form be "NFC".
+      5. Let f be ToString(form).
+      6. ReturnIfAbrupt(f).
+      7. If f is not one of "NFC", "NFD", "NFKC", or "NFKD", then throw a RangeError Exception.
+      8. Let ns be the String value is the result of normalizing S into the normalization form named by f as specified in Unicode Standard Annex #15, UnicodeNormalizatoin Forms.
+      9. Return ns.
+
+      The length property of the normalize method is 0.
+
+      *NOTE* The normalize function is intentionally generic; it does not require that its this value be a String object. Therefore it can be transferred to other kinds of objects for use as a method.
+   */
+    unorm.shimApplied = false;
+
+   if (!String.prototype.normalize) {
+      String.prototype.normalize = function(form) {
+         var str = "" + this;
+         form =  form === undefined ? "NFC" : form;
+
+         if (form === "NFC") {
+            return unorm.nfc(str);
+         } else if (form === "NFD") {
+            return unorm.nfd(str);
+         } else if (form === "NFKC") {
+            return unorm.nfkc(str);
+         } else if (form === "NFKD") {
+            return unorm.nfkd(str);
+         } else {
+            throw new RangeError("Invalid normalization form: " + form);
+         }
+      };
+
+      unorm.shimApplied = true;
+   }
+}(this));
+
 /*!
  * Vue.js v2.4.0
  * (c) 2014-2017 Evan You
